@@ -1,0 +1,149 @@
+#' Generate synthetic cohort data for testing and examples
+#'
+#' Produces a tibble that mimics a clustered cohort study with optional
+#' stepped-wedge period structure. The returned data is deliberately imperfect:
+#' some participants have missing values, withdrew consent, or failed screening,
+#' so that inclusion/exclusion criteria have something to remove.
+#'
+#' @param n_participants Integer. Total number of participant rows.
+#' @param n_clusters Integer. Number of clusters (e.g., GP practices, schools).
+#' @param n_sites Integer. Number of sites (clusters are nested in sites;
+#'   must be <= `n_clusters`).
+#' @param n_periods Integer. Number of time periods (e.g., waves in a
+#'   stepped-wedge design). Set to `1` for a simple cross-sectional cohort.
+#' @param seed Integer. Random seed for reproducibility.
+#'
+#' @return A [tibble::tibble()] with columns:
+#' \describe{
+#'   \item{`participant_id`}{Character. Unique participant identifier.}
+#'   \item{`cluster_id`}{Character. Cluster identifier.}
+#'   \item{`site_id`}{Character. Site identifier (clusters nested in sites).}
+#'   \item{`period`}{Integer. Study period (1 = first period).}
+#'   \item{`sequence`}{Integer. Stepped-wedge sequence the cluster is assigned
+#'     to (NA if `n_periods == 1`).}
+#'   \item{`age`}{Numeric. Age in years (some NAs to simulate missing data).}
+#'   \item{`age_group`}{Character. Age group (`"<18"`, `"18-39"`, `"40-64"`, `"65+"`).}
+#'   \item{`sex`}{Character. `"M"` / `"F"` / `"O"` (other).}
+#'   \item{`ethnicity`}{Character. One of five broad ethnic groups.}
+#'   \item{`consent_date`}{Date. Date of consent (NA = did not consent).}
+#'   \item{`baseline_complete`}{Logical. Whether the baseline assessment is
+#'     complete.}
+#'   \item{`withdrew`}{Logical. Whether the participant withdrew after consent.}
+#'   \item{`eligible_screen`}{Logical. Whether the participant passed initial
+#'     eligibility screening (e.g., diagnosis confirmed).}
+#' }
+#' @export
+#'
+#' @examples
+#' mock_cohortflow()
+#'
+#' # Larger study with three periods
+#' mock_cohortflow(n_participants = 2000, n_clusters = 20, n_periods = 3, seed = 42)
+mock_cohortflow <- function(
+    n_participants = 500L,
+    n_clusters     = 10L,
+    n_sites        = 3L,
+    n_periods      = 4L,
+    seed           = 123L
+) {
+  n_participants <- as.integer(n_participants)
+  n_clusters     <- as.integer(n_clusters)
+  n_sites        <- as.integer(n_sites)
+  n_periods      <- as.integer(n_periods)
+
+  if (n_sites > n_clusters) {
+    rlang::abort("`n_sites` must be <= `n_clusters`.")
+  }
+
+  set.seed(seed)
+
+  # -- Cluster / site / sequence structure ----------------------------------
+  cluster_ids <- paste0("C", sprintf("%02d", seq_len(n_clusters)))
+  site_ids    <- paste0("S", seq_len(n_sites))
+
+  # Assign each cluster to a site and a stepped-wedge sequence
+  cluster_tbl <- tibble::tibble(
+    cluster_id = cluster_ids,
+    site_id    = sample(site_ids, n_clusters, replace = TRUE),
+    sequence   = if (n_periods > 1L) {
+      # Sequences are 1..n_periods, spread across clusters
+      ((seq_len(n_clusters) - 1L) %% n_periods) + 1L
+    } else {
+      NA_integer_
+    }
+  )
+
+  # -- Participant rows -------------------------------------------------------
+  pid          <- paste0("P", sprintf("%04d", seq_len(n_participants)))
+  cluster_draw <- sample(cluster_ids, n_participants, replace = TRUE)
+  period_draw  <- sample(seq_len(n_periods), n_participants, replace = TRUE)
+
+  # Age: mix of adults and a few minors; 5 % NA
+  age_raw <- round(rnorm(n_participants, mean = 45, sd = 15))
+  age_raw[age_raw < 5]  <- 5L    # floor at 5
+  age_raw[age_raw > 90] <- 90L   # cap at 90
+  age_raw[sample(n_participants, max(1L, round(0.05 * n_participants)))] <- NA_real_
+
+  age_group <- dplyr::case_when(
+    is.na(age_raw)  ~ NA_character_,
+    age_raw < 18    ~ "<18",
+    age_raw < 40    ~ "18-39",
+    age_raw < 65    ~ "40-64",
+    TRUE            ~ "65+"
+  )
+
+  sex <- sample(c("M", "F", "O"), n_participants, replace = TRUE,
+                prob = c(0.48, 0.48, 0.04))
+
+  ethnicities <- c("European", "Maori", "Pacific", "Asian", "Other")
+  ethnicity   <- sample(ethnicities, n_participants, replace = TRUE,
+                        prob = c(0.60, 0.15, 0.09, 0.12, 0.04))
+
+  # Eligibility screening: ~10 % fail
+  eligible_screen <- stats::runif(n_participants) > 0.10
+
+  # Consent: 85 % of those who are eligible consent; 0 % of ineligible
+  consent_prob    <- ifelse(eligible_screen, 0.85, 0)
+  consented       <- stats::runif(n_participants) < consent_prob
+  # Random consent dates over a 1-year window
+  origin          <- as.Date("2023-01-01")
+  consent_date    <- as.Date(
+    ifelse(consented,
+           as.numeric(origin) + sample(0:364, n_participants, replace = TRUE),
+           NA_real_),
+    origin = "1970-01-01"
+  )
+
+  # Baseline complete: 90 % of those who consented
+  baseline_complete <- consented & (stats::runif(n_participants) < 0.90)
+
+  # Withdrew: 5 % of those who completed baseline
+  withdrew <- baseline_complete & (stats::runif(n_participants) < 0.05)
+
+  participants <- tibble::tibble(
+    participant_id    = pid,
+    cluster_id        = cluster_draw,
+    period            = period_draw,
+    age               = age_raw,
+    age_group         = age_group,
+    sex               = sex,
+    ethnicity         = ethnicity,
+    eligible_screen   = eligible_screen,
+    consent_date      = consent_date,
+    baseline_complete = baseline_complete,
+    withdrew          = withdrew
+  )
+
+  # Join cluster attributes (site, sequence)
+  out <- dplyr::left_join(participants, cluster_tbl, by = "cluster_id")
+
+  # Reorder columns logically
+  out <- dplyr::select(
+    out,
+    participant_id, cluster_id, site_id, period, sequence,
+    age, age_group, sex, ethnicity,
+    eligible_screen, consent_date, baseline_complete, withdrew
+  )
+
+  out
+}

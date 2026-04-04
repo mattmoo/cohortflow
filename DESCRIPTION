@@ -1,0 +1,23 @@
+Package: cohortflow
+Title: Define and Apply Cohort Inclusion/Exclusion Criteria
+Version: 0.0.0.9000
+Authors@R:
+    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
+Description: Define inclusion and exclusion criteria for cohort studies using
+    formulas or functions, apply them to data, and render the resulting
+    attrition flow as CONSORT flow diagrams, tables, or narrative text.
+    Supports hierarchical designs (participants nested in clusters/sites) and
+    flexible grouping for reporting. Criteria pipelines can be serialised to
+    YAML for reproducibility and sharing.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Imports:
+    dplyr,
+    rlang,
+    tibble,
+    yaml
