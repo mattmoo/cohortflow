@@ -4,60 +4,61 @@
 \alias{cf_criterion}
 \title{Create a single cohort criterion}
 \usage{
-cf_criterion(predicate, label, type = c("include", "exclude"))
+cf_criterion(
+  predicate,
+  label,
+  type = c("include", "exclude", "group_include", "group_exclude", "select_within"),
+  by = NULL
+)
 }
 \arguments{
-\item{predicate}{A one-sided formula or a function.}
+\item{predicate}{A one-sided formula or a function.
+\itemize{
+\item For \code{include} / \code{exclude}: evaluated row-wise; must return a logical
+vector of length \code{nrow(data)}.
+\item For \code{group_include} / \code{group_exclude}: evaluated in a
+\code{dplyr::summarise()} context per group (defined by \code{by}); must return a
+scalar logical. The result is broadcast back to all rows in each group.
+\item For \code{select_within}: evaluated per group; must return a logical vector
+identifying which rows within the group to keep.
+}}
 
-\item{label}{A short human-readable description of this criterion. Used in
-output tables and CONSORT diagrams.}
+\item{label}{A short human-readable description of this criterion.}
 
-\item{type}{\code{"include"} or \code{"exclude"}. Determines how the logical vector
-produced by \code{predicate} is interpreted: \code{include} keeps rows where the
-predicate is \code{TRUE}; \code{exclude} drops rows where it is \code{TRUE}.}
+\item{type}{One of \code{"include"}, \code{"exclude"}, \code{"group_include"},
+\code{"group_exclude"}, or \code{"select_within"}.}
+
+\item{by}{For grouped step types (\code{group_include}, \code{group_exclude},
+\code{select_within}): a single character string naming the grouping column.
+Ignored for row-wise types.}
 }
 \value{
 A \code{cf_criterion} object (an S3 list).
 }
 \description{
 A \code{cf_criterion} represents one inclusion or exclusion step in a cohort
-eligibility pipeline. The predicate can be supplied as:
-}
-\details{
-\itemize{
-\item A \strong{formula} whose RHS is evaluated against each row of the data and
-must return a logical vector (\code{~ age >= 18}).
-\item A \strong{function} that accepts a data frame and returns a logical vector of
-the same length as the number of rows (\code{function(d) d$age >= 18}).
-Functions may also return a data frame (for aggregate/cluster-level
-predicates) — see Details.
-}
-
-\strong{Row-wise vs. aggregate predicates}
-
-For simple row-wise filters (e.g., \code{~ age >= 18}), the predicate is
-evaluated with the data frame as the enclosing environment and must return a
-logical vector of length \code{nrow(data)}.
-
-For aggregate predicates — e.g., "cluster must have ≥ 5 consenting
-participants" — supply a function that returns a named logical vector (names
-= row indices or a column of row identifiers) or a single-column data frame.
-The function receives the \emph{current} data (after previous criteria have been
-applied).
-
-\strong{Formula shorthand}
-
-One-sided formulas (\code{~ expr}) are evaluated as if the RHS is wrapped in
-\code{with(data, expr)}, so column names are available without \code{$}.
+eligibility pipeline.
+Five step types are supported (see \code{type}). The predicate is always a
+one-sided \strong{formula} or a \strong{function}; the interpretation depends on
+the step type.
 }
 \examples{
-# Formula predicate
+# Row-wise inclusion
 cf_criterion(~ age >= 18, label = "Adults only", type = "include")
 
-# Function predicate
+# Group-level inclusion (clusters with >= 5 participants)
 cf_criterion(
-  function(d) !is.na(d$consent_date),
-  label = "Consent recorded",
-  type = "include"
+  ~ n() >= 5,
+  label = "Sufficient cluster size",
+  type  = "group_include",
+  by    = "cluster_id"
+)
+
+# Select first operation per patient
+cf_criterion(
+  ~ consent_date == min(consent_date, na.rm = TRUE),
+  label = "Index operation",
+  type  = "select_within",
+  by    = "participant_id"
 )
 }

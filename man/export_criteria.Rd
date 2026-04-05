@@ -13,13 +13,11 @@ export_criteria(criteria, path = NULL, fn_refs = list())
 returned as a character string.}
 
 \item{fn_refs}{An optional named list mapping function objects to
-\code{"pkg::name"} reference strings, e.g.
-\code{list(has_consent = "mypkg::has_consent")}. Only needed for function-based
-criteria that you want to store as portable references.}
+\code{"pkg::name"} reference strings.}
 }
 \value{
-Invisibly, the \code{criteria} object. Side effect: writes the YAML file
-if \code{path} is not \code{NULL}, or returns the YAML string if \code{path} is \code{NULL}.
+Invisibly. If \code{path = NULL}, returns the YAML text as a character
+string; otherwise, returns the \code{criteria} object.
 }
 \description{
 Serialises a \code{cf_criteria} object to a human-readable YAML file (or string).
@@ -30,42 +28,18 @@ The schema is self-describing and can be re-imported with \code{\link[=import_cr
 
 \if{html}{\out{<div class="sourceCode yaml">}}\preformatted{cohortflow_criteria:
   version: 1
-  hierarchy:           # optional
-    participant: participant_id
-    cluster:     cluster_id
-    site:        site_id
   steps:
-    - label:   "Adults only"
-      type:    include
-      kind:    formula        # "formula" | "function"
-      expr:    "age >= 18"    # for formula: deparsed RHS; for function: body
-      fn_ref:  null           # for function: "pkg::name" if named/exported
+    - label:  "Adults only"
+      type:   include
+      kind:   formula
+      by:     null
+      expr:   "age >= 18"
+      fn_ref: null
 }\if{html}{\out{</div>}}
 
-\strong{Portability notes}
-\itemize{
-\item Formula-based criteria round-trip cleanly: the RHS is deparsed to a string
-and re-parsed on import.
-\item Anonymous function criteria are stored as a deparsed function body.
-These can be re-imported as formulas when the body is a simple expression,
-or as functions otherwise. Complex closures (functions that capture
-variables from their enclosing environment) may not round-trip faithfully —
-a warning is issued.
-\item Named, exported functions can be stored as \code{"pkg::name"} references for
-fully portable YAML. Pass \code{fn_refs} to supply these mappings.
-}
+Formula-based criteria round-trip cleanly. Anonymous function bodies are
+deparsed as a fallback; complex closures may not round-trip and a warning
+is issued. Named exported functions can be stored as \code{"pkg::name"} references
+via \code{fn_refs}.
 }
 
-\examples{
-crit <- cf_criteria() |>
-  include(~ age >= 18, label = "Adults only") |>
-  exclude(~ is.na(consent_date), label = "No consent")
-
-# Return as a string
-cat(export_criteria(crit))
-
-# Write to a file
-\dontrun{
-export_criteria(crit, path = "criteria.yaml")
-}
-}

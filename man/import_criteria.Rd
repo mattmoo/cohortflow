@@ -10,12 +10,9 @@ import_criteria(path = NULL, text = NULL, envir = parent.frame())
 \item{path}{A file path to read from. Exactly one of \code{path} or \code{text} must
 be supplied.}
 
-\item{text}{A YAML string (as produced by \code{export_criteria(crit)} with no
-\code{path}). Exactly one of \code{path} or \code{text} must be supplied.}
+\item{text}{A YAML string. Exactly one of \code{path} or \code{text} must be supplied.}
 
-\item{envir}{The environment in which to evaluate re-parsed formula
-expressions and resolve \code{pkg::name} function references. Defaults to the
-caller's environment.}
+\item{envir}{The environment in which to evaluate re-parsed expressions.}
 }
 \value{
 A \code{cf_criteria} object.
@@ -23,13 +20,4 @@ A \code{cf_criteria} object.
 \description{
 Reads a YAML file (or string) written by \code{\link[=export_criteria]{export_criteria()}} and
 reconstructs a \code{cf_criteria} object.
-}
-\examples{
-crit <- cf_criteria() |>
-  include(~ age >= 18,          label = "Adults only") |>
-  exclude(~ is.na(consent_date), label = "No consent")
-
-yml  <- export_criteria(crit)
-crit2 <- import_criteria(text = yml)
-crit2
 }

@@ -9,7 +9,7 @@ exclude(criteria, predicate, label)
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
 
-\item{predicate}{A one-sided formula or a function (see \code{\link[=cf_criterion]{cf_criterion()}}).}
+\item{predicate}{A one-sided formula or a function evaluated row-wise.}
 
 \item{label}{A short human-readable description of this criterion.}
 }
@@ -21,6 +21,5 @@ Add an exclusion criterion to a criteria pipeline
 }
 \examples{
 cf_criteria() |>
-  exclude(~ is.na(age), label = "Missing age") |>
-  exclude(~ withdrew == TRUE, label = "Withdrew consent")
+  exclude(~ withdrew, label = "Withdrew consent")
 }

@@ -1,11 +1,10 @@
 #' Create an eligibility criteria pipeline
 #'
 #' `cf_criteria()` initialises an empty criteria pipeline. Use the pipe
-#' operators `include()` and `exclude()` to add steps, and `set_hierarchy()`
-#' to attach a nesting structure.
+#' operators `include()`, `exclude()`, `group_include()`, `group_exclude()`,
+#' and `select_within()` to add steps.
 #'
 #' @param ... Optional `cf_criterion` objects to include at construction time.
-#' @param hierarchy An optional `cf_hierarchy` object.
 #'
 #' @return A `cf_criteria` object.
 #' @export
@@ -16,25 +15,21 @@
 #' crit <- cf_criteria() |>
 #'   include(~ age >= 18, label = "Adults only") |>
 #'   include(has_consent, label = "Consent recorded") |>
-#'   exclude(~ baseline_complete == 0, label = "Missing baseline")
+#'   exclude(~ withdrew, label = "Withdrew consent") |
+#'   group_include(by = "cluster_id", ~ n() >= 5, label = "Cluster size >= 5") |
+#'   select_within(by = "participant_id", ~ consent_date == min(consent_date, na.rm = TRUE),
+#'                 label = "Index operation")
 #'
 #' crit
-cf_criteria <- function(..., hierarchy = NULL) {
+cf_criteria <- function(...) {
   steps <- list(...)
 
   if (!all(vapply(steps, inherits, logical(1L), "cf_criterion"))) {
     rlang::abort("All `...` arguments to `cf_criteria()` must be `cf_criterion` objects.")
   }
 
-  if (!is.null(hierarchy) && !inherits(hierarchy, "cf_hierarchy")) {
-    rlang::abort("`hierarchy` must be a `cf_hierarchy` object or NULL.")
-  }
-
   structure(
-    list(
-      steps     = steps,
-      hierarchy = hierarchy
-    ),
+    list(steps = steps),
     class = "cf_criteria"
   )
 }
@@ -45,7 +40,7 @@ cf_criteria <- function(..., hierarchy = NULL) {
 #' Add an inclusion criterion to a criteria pipeline
 #'
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
-#' @param predicate A one-sided formula or a function (see [cf_criterion()]).
+#' @param predicate A one-sided formula or a function evaluated row-wise.
 #' @param label A short human-readable description of this criterion.
 #'
 #' @return The updated `cf_criteria` object.
@@ -53,8 +48,7 @@ cf_criteria <- function(..., hierarchy = NULL) {
 #'
 #' @examples
 #' cf_criteria() |>
-#'   include(~ age >= 18, label = "Adults") |>
-#'   include(function(d) d$enrolled == TRUE, label = "Enrolled")
+#'   include(~ age >= 18, label = "Adults")
 include <- function(criteria, predicate, label) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label, type = "include")
@@ -65,7 +59,7 @@ include <- function(criteria, predicate, label) {
 #' Add an exclusion criterion to a criteria pipeline
 #'
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
-#' @param predicate A one-sided formula or a function (see [cf_criterion()]).
+#' @param predicate A one-sided formula or a function evaluated row-wise.
 #' @param label A short human-readable description of this criterion.
 #'
 #' @return The updated `cf_criteria` object.
@@ -73,8 +67,7 @@ include <- function(criteria, predicate, label) {
 #'
 #' @examples
 #' cf_criteria() |>
-#'   exclude(~ is.na(age), label = "Missing age") |>
-#'   exclude(~ withdrew == TRUE, label = "Withdrew consent")
+#'   exclude(~ withdrew, label = "Withdrew consent")
 exclude <- function(criteria, predicate, label) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label, type = "exclude")
@@ -82,24 +75,88 @@ exclude <- function(criteria, predicate, label) {
   criteria
 }
 
-#' Attach a hierarchy to a criteria pipeline
+#' Add a group-level inclusion criterion
+#'
+#' The predicate is evaluated in a `dplyr::summarise()` context per group
+#' (when a formula) or receives a grouped data frame (when a function). Groups
+#' where the predicate returns `TRUE` are kept; all rows in failing groups are
+#' removed.
 #'
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
-#' @param hierarchy A `cf_hierarchy` object.
+#' @param by A single column name (string) to group by.
+#' @param predicate A one-sided formula using summary functions (`n()`,
+#'   `mean()`, `n_distinct()`, etc.) or a function that receives a grouped
+#'   data frame and returns a tibble with columns `<by>` and `.pass`.
+#' @param label A short human-readable description of this criterion.
 #'
 #' @return The updated `cf_criteria` object.
 #' @export
 #'
 #' @examples
 #' cf_criteria() |>
-#'   set_hierarchy(cf_hierarchy(participant = "pid", cluster = "cid")) |>
-#'   include(~ age >= 18, label = "Adults")
-set_hierarchy <- function(criteria, hierarchy) {
+#'   group_include(by = "cluster_id", ~ n() >= 5, label = "Cluster size >= 5")
+group_include <- function(criteria, by, predicate, label) {
   criteria <- .ensure_criteria(criteria)
-  if (!inherits(hierarchy, "cf_hierarchy")) {
-    rlang::abort("`hierarchy` must be a `cf_hierarchy` object.")
-  }
-  criteria$hierarchy <- hierarchy
+  crit <- cf_criterion(predicate = predicate, label = label,
+                       type = "group_include", by = by)
+  criteria$steps <- c(criteria$steps, list(crit))
+  criteria
+}
+
+#' Add a group-level exclusion criterion
+#'
+#' The predicate is evaluated per group; groups where the predicate returns
+#' `TRUE` are removed (all their rows dropped).
+#'
+#' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
+#' @param by A single column name (string) to group by.
+#' @param predicate A one-sided formula using summary functions, or a function.
+#' @param label A short human-readable description of this criterion.
+#'
+#' @return The updated `cf_criteria` object.
+#' @export
+#'
+#' @examples
+#' cf_criteria() |>
+#'   group_exclude(by = "cluster_id", ~ mean(is.na(age)) > 0.5,
+#'                 label = "Excessive missing age in cluster")
+group_exclude <- function(criteria, by, predicate, label) {
+  criteria <- .ensure_criteria(criteria)
+  crit <- cf_criterion(predicate = predicate, label = label,
+                       type = "group_exclude", by = by)
+  criteria$steps <- c(criteria$steps, list(crit))
+  criteria
+}
+
+#' Select rows within groups
+#'
+#' The predicate is evaluated separately within each group defined by `by` and
+#' must return a logical vector the same length as the group. Rows where the
+#' predicate is `FALSE` are dropped and recorded in the excluded rows store.
+#' This is the natural way to select one (or more) records per unit, e.g. the
+#' index operation per patient.
+#'
+#' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
+#' @param by A single column name (string) defining the grouping (e.g.
+#'   `"participant_id"`).
+#' @param predicate A one-sided formula evaluated within each group, or a
+#'   function that receives a group's rows as a data frame and returns a
+#'   logical vector.
+#' @param label A short human-readable description of this step.
+#'
+#' @return The updated `cf_criteria` object.
+#' @export
+#'
+#' @examples
+#' cf_criteria() |>
+#'   select_within(by = "participant_id",
+#'                 ~ consent_date == min(consent_date, na.rm = TRUE),
+#'                 label = "Index operation per patient")
+select_within <- function(criteria, by, predicate, label) {
+  criteria <- .ensure_criteria(criteria)
+  crit <- cf_criterion(predicate = predicate, label = label,
+                       type = "select_within", by = by)
+  criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
 
@@ -122,20 +179,30 @@ print.cf_criteria <- function(x, ...) {
   n <- length(x$steps)
   cat(sprintf("Cohort criteria pipeline  (%d step%s)\n", n, if (n == 1) "" else "s"))
 
-  if (!is.null(x$hierarchy)) {
-    cat("Hierarchy: ", format(x$hierarchy), "\n", sep = "")
-  }
-
   if (n == 0L) {
-    cat("  <empty — use include() / exclude() to add steps>\n")
+    cat("  <empty — use include() / exclude() / group_include() etc. to add steps>\n")
   } else {
     for (i in seq_along(x$steps)) {
       s <- x$steps[[i]]
-      type_sym  <- if (s$type == "include") "+" else "-"
+      type_sym <- switch(s$type,
+        include        = "+",
+        exclude        = "-",
+        group_include  = "+",
+        group_exclude  = "-",
+        select_within  = ">"
+      )
       pred_type <- if (is_formula(s$predicate)) "~" else "f"
       pred_str  <- predicate_label(s$predicate)
-      cat(sprintf("  %2d. [%s][%s] %s\n          %s\n",
-                  i, type_sym, pred_type, s$label, pred_str))
+      by_str    <- if (!is.null(s$by)) sprintf(" [by: %s]", s$by) else ""
+      type_label <- switch(s$type,
+        include        = "include",
+        exclude        = "exclude",
+        group_include  = "group_include",
+        group_exclude  = "group_exclude",
+        select_within  = "select_within"
+      )
+      cat(sprintf("  %2d. [%s][%s] (%s)%s %s\n          %s\n",
+                  i, type_sym, pred_type, type_label, by_str, s$label, pred_str))
     }
   }
   invisible(x)
@@ -162,11 +229,6 @@ c.cf_criteria <- function(...) {
   if (!all(vapply(args, inherits, logical(1L), "cf_criteria"))) {
     rlang::abort("All arguments to `c()` must be `cf_criteria` objects.")
   }
-  # Use hierarchy from the first non-NULL hierarchy found
-  hier <- NULL
-  for (a in args) {
-    if (!is.null(a$hierarchy)) { hier <- a$hierarchy; break }
-  }
   all_steps <- do.call(c, lapply(args, `[[`, "steps"))
-  structure(list(steps = all_steps, hierarchy = hier), class = "cf_criteria")
+  structure(list(steps = all_steps), class = "cf_criteria")
 }

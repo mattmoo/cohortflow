@@ -4,20 +4,18 @@
 \alias{cf_criteria}
 \title{Create an eligibility criteria pipeline}
 \usage{
-cf_criteria(..., hierarchy = NULL)
+cf_criteria(...)
 }
 \arguments{
 \item{...}{Optional \code{cf_criterion} objects to include at construction time.}
-
-\item{hierarchy}{An optional \code{cf_hierarchy} object.}
 }
 \value{
 A \code{cf_criteria} object.
 }
 \description{
 \code{cf_criteria()} initialises an empty criteria pipeline. Use the pipe
-operators \code{include()} and \code{exclude()} to add steps, and \code{set_hierarchy()}
-to attach a nesting structure.
+operators \code{include()}, \code{exclude()}, \code{group_include()}, \code{group_exclude()},
+and \code{select_within()} to add steps.
 }
 \examples{
 has_consent <- function(d) !is.na(d$consent_date)
@@ -25,7 +23,10 @@ has_consent <- function(d) !is.na(d$consent_date)
 crit <- cf_criteria() |>
   include(~ age >= 18, label = "Adults only") |>
   include(has_consent, label = "Consent recorded") |>
-  exclude(~ baseline_complete == 0, label = "Missing baseline")
+  exclude(~ withdrew, label = "Withdrew consent") |>
+  group_include(by = "cluster_id", ~ n() >= 5, label = "Cluster size >= 5") |>
+  select_within(by = "participant_id", ~ consent_date == min(consent_date, na.rm = TRUE),
+                label = "Index operation")
 
 crit
 }

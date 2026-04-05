@@ -10,15 +10,12 @@ test_that("export_criteria() returns a YAML string when path = NULL", {
   expect_true(grepl("No consent",  yml))
 })
 
-test_that("export_criteria() includes hierarchy when set", {
-  h <- cf_hierarchy(participant = "pid", cluster = "cid")
+test_that("export_criteria() includes by field for group steps", {
   crit <- cf_criteria() |>
-    set_hierarchy(h) |>
-    include(~ age >= 18, label = "Adults")
-
+    group_include(by = "cluster_id", ~ n() >= 5, label = "Min size")
   yml <- export_criteria(crit)
-  expect_true(grepl("hierarchy", yml))
-  expect_true(grepl("participant", yml))
+  expect_true(grepl("cluster_id", yml))
+  expect_true(grepl("group_include", yml))
 })
 
 test_that("import_criteria() round-trips a formula-based pipeline", {
@@ -37,18 +34,13 @@ test_that("import_criteria() round-trips a formula-based pipeline", {
   expect_equal(crit2$steps[[2]]$type,  "exclude")
 })
 
-test_that("import_criteria() round-trips the hierarchy", {
-  h <- cf_hierarchy(participant = "pid", cluster = "cid")
+test_that("import_criteria() round-trips group step by field", {
   crit <- cf_criteria() |>
-    set_hierarchy(h) |>
-    include(~ age >= 18, label = "Adults")
-
+    group_include(by = "cluster_id", ~ n() >= 5, label = "Min size")
   yml   <- export_criteria(crit)
   crit2 <- import_criteria(text = yml)
-
-  expect_s3_class(crit2$hierarchy, "cf_hierarchy")
-  expect_equal(unname(crit2$hierarchy["participant"]), "pid")
-  expect_equal(unname(crit2$hierarchy["cluster"]),    "cid")
+  expect_equal(crit2$steps[[1]]$by,   "cluster_id")
+  expect_equal(crit2$steps[[1]]$type, "group_include")
 })
 
 test_that("re-imported formula predicates evaluate correctly", {

@@ -9,7 +9,7 @@ include(criteria, predicate, label)
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
 
-\item{predicate}{A one-sided formula or a function (see \code{\link[=cf_criterion]{cf_criterion()}}).}
+\item{predicate}{A one-sided formula or a function evaluated row-wise.}
 
 \item{label}{A short human-readable description of this criterion.}
 }
@@ -21,6 +21,5 @@ Add an inclusion criterion to a criteria pipeline
 }
 \examples{
 cf_criteria() |>
-  include(~ age >= 18, label = "Adults") |>
-  include(function(d) d$enrolled == TRUE, label = "Enrolled")
+  include(~ age >= 18, label = "Adults")
 }

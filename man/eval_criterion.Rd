@@ -2,21 +2,11 @@
 % Please edit documentation in R/criterion.R
 \name{eval_criterion}
 \alias{eval_criterion}
-\title{Evaluate a criterion against a data frame}
+\title{Evaluate a row-wise criterion against a data frame}
 \usage{
 eval_criterion(criterion, data)
 }
-\arguments{
-\item{criterion}{A \code{cf_criterion}.}
-
-\item{data}{A data frame.}
-}
-\value{
-A logical vector of length \code{nrow(data)}.
-}
 \description{
-Internal helper used by \code{apply_criteria()}. Returns a logical vector of
-length \code{nrow(data)} indicating which rows satisfy the criterion's predicate
-(before accounting for include/exclude direction).
+Evaluate a row-wise criterion against a data frame
 }
 \keyword{internal}
