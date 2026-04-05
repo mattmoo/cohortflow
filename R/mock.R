@@ -16,6 +16,8 @@
 #' @return A [tibble::tibble()] with columns:
 #' \describe{
 #'   \item{`participant_id`}{Character. Unique participant identifier.}
+#'   \item{`event_id`}{Character. Unique event (row) identifier — useful when
+#'     the dataset has multiple rows per participant (e.g., one per operation).}
 #'   \item{`cluster_id`}{Character. Cluster identifier.}
 #'   \item{`site_id`}{Character. Site identifier (clusters nested in sites).}
 #'   \item{`period`}{Integer. Study period (1 = first period).}
@@ -74,8 +76,15 @@ mock_cohortflow <- function(
   )
 
   # -- Participant rows -------------------------------------------------------
-  pid          <- paste0("P", sprintf("%04d", seq_len(n_participants)))
-  cluster_draw <- sample(cluster_ids, n_participants, replace = TRUE)
+  pid <- paste0("P", sprintf("%04d", seq_len(n_participants)))
+
+  # Imbalanced cluster sizes: Dirichlet-like draw (Gamma shape=0.5 gives high
+  # variance — some clusters will be 3-5x larger than others)
+  cluster_weights <- stats::rgamma(n_clusters, shape = 0.5)
+  cluster_probs   <- cluster_weights / sum(cluster_weights)
+  cluster_draw    <- sample(cluster_ids, n_participants, replace = TRUE,
+                            prob = cluster_probs)
+
   period_draw  <- sample(seq_len(n_periods), n_participants, replace = TRUE)
 
   # Age: mix of adults and a few minors; 5 % NA
@@ -122,6 +131,7 @@ mock_cohortflow <- function(
 
   participants <- tibble::tibble(
     participant_id    = pid,
+    event_id          = paste0("E", sprintf("%04d", seq_len(n_participants))),
     cluster_id        = cluster_draw,
     period            = period_draw,
     age               = age_raw,
@@ -140,7 +150,7 @@ mock_cohortflow <- function(
   # Reorder columns logically
   out <- dplyr::select(
     out,
-    participant_id, cluster_id, site_id, period, sequence,
+    participant_id, event_id, cluster_id, site_id, period, sequence,
     age, age_group, sex, ethnicity,
     eligible_screen, consent_date, baseline_complete, withdrew
   )

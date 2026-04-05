@@ -3,7 +3,7 @@ test_that("mock_cohortflow() returns a tibble with expected columns", {
   expect_s3_class(d, "tbl_df")
 
   expected_cols <- c(
-    "participant_id", "cluster_id", "site_id", "period", "sequence",
+    "participant_id", "event_id", "cluster_id", "site_id", "period", "sequence",
     "age", "age_group", "sex", "ethnicity",
     "eligible_screen", "consent_date", "baseline_complete", "withdrew"
   )

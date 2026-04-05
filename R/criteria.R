@@ -42,16 +42,19 @@ cf_criteria <- function(...) {
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
 #' @param predicate A one-sided formula or a function evaluated row-wise.
 #' @param label A short human-readable description of this criterion.
+#' @param category An optional string grouping this step with others for
+#'   display (e.g. `"Age"`). `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
 #' @export
 #'
 #' @examples
 #' cf_criteria() |>
-#'   include(~ age >= 18, label = "Adults")
-include <- function(criteria, predicate, label) {
+#'   include(~ age >= 18, label = "Adults", category = "Age")
+include <- function(criteria, predicate, label, category = NULL) {
   criteria <- .ensure_criteria(criteria)
-  crit <- cf_criterion(predicate = predicate, label = label, type = "include")
+  crit <- cf_criterion(predicate = predicate, label = label,
+                       type = "include", category = category)
   criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
@@ -61,6 +64,8 @@ include <- function(criteria, predicate, label) {
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
 #' @param predicate A one-sided formula or a function evaluated row-wise.
 #' @param label A short human-readable description of this criterion.
+#' @param category An optional string grouping this step with others for
+#'   display. `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
 #' @export
@@ -68,9 +73,10 @@ include <- function(criteria, predicate, label) {
 #' @examples
 #' cf_criteria() |>
 #'   exclude(~ withdrew, label = "Withdrew consent")
-exclude <- function(criteria, predicate, label) {
+exclude <- function(criteria, predicate, label, category = NULL) {
   criteria <- .ensure_criteria(criteria)
-  crit <- cf_criterion(predicate = predicate, label = label, type = "exclude")
+  crit <- cf_criterion(predicate = predicate, label = label,
+                       type = "exclude", category = category)
   criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
@@ -88,6 +94,8 @@ exclude <- function(criteria, predicate, label) {
 #'   `mean()`, `n_distinct()`, etc.) or a function that receives a grouped
 #'   data frame and returns a tibble with columns `<by>` and `.pass`.
 #' @param label A short human-readable description of this criterion.
+#' @param category An optional string grouping this step with others for
+#'   display. `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
 #' @export
@@ -95,10 +103,10 @@ exclude <- function(criteria, predicate, label) {
 #' @examples
 #' cf_criteria() |>
 #'   group_include(by = "cluster_id", ~ n() >= 5, label = "Cluster size >= 5")
-group_include <- function(criteria, by, predicate, label) {
+group_include <- function(criteria, by, predicate, label, category = NULL) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label,
-                       type = "group_include", by = by)
+                       type = "group_include", by = by, category = category)
   criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
@@ -112,6 +120,8 @@ group_include <- function(criteria, by, predicate, label) {
 #' @param by A single column name (string) to group by.
 #' @param predicate A one-sided formula using summary functions, or a function.
 #' @param label A short human-readable description of this criterion.
+#' @param category An optional string grouping this step with others for
+#'   display. `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
 #' @export
@@ -120,10 +130,10 @@ group_include <- function(criteria, by, predicate, label) {
 #' cf_criteria() |>
 #'   group_exclude(by = "cluster_id", ~ mean(is.na(age)) > 0.5,
 #'                 label = "Excessive missing age in cluster")
-group_exclude <- function(criteria, by, predicate, label) {
+group_exclude <- function(criteria, by, predicate, label, category = NULL) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label,
-                       type = "group_exclude", by = by)
+                       type = "group_exclude", by = by, category = category)
   criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
@@ -143,6 +153,8 @@ group_exclude <- function(criteria, by, predicate, label) {
 #'   function that receives a group's rows as a data frame and returns a
 #'   logical vector.
 #' @param label A short human-readable description of this step.
+#' @param category An optional string grouping this step with others for
+#'   display. `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
 #' @export
@@ -152,10 +164,10 @@ group_exclude <- function(criteria, by, predicate, label) {
 #'   select_within(by = "participant_id",
 #'                 ~ consent_date == min(consent_date, na.rm = TRUE),
 #'                 label = "Index operation per patient")
-select_within <- function(criteria, by, predicate, label) {
+select_within <- function(criteria, by, predicate, label, category = NULL) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label,
-                       type = "select_within", by = by)
+                       type = "select_within", by = by, category = category)
   criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
@@ -191,18 +203,14 @@ print.cf_criteria <- function(x, ...) {
         group_exclude  = "-",
         select_within  = ">"
       )
-      pred_type <- if (is_formula(s$predicate)) "~" else "f"
-      pred_str  <- predicate_label(s$predicate)
-      by_str    <- if (!is.null(s$by)) sprintf(" [by: %s]", s$by) else ""
-      type_label <- switch(s$type,
-        include        = "include",
-        exclude        = "exclude",
-        group_include  = "group_include",
-        group_exclude  = "group_exclude",
-        select_within  = "select_within"
-      )
-      cat(sprintf("  %2d. [%s][%s] (%s)%s %s\n          %s\n",
-                  i, type_sym, pred_type, type_label, by_str, s$label, pred_str))
+      pred_type  <- if (is_formula(s$predicate)) "~" else "f"
+      pred_str   <- predicate_label(s$predicate)
+      by_str     <- if (!is.null(s$by))       sprintf(" [by: %s]",  s$by)      else ""
+      cat_str    <- if (!is.null(s$category)) sprintf(" {%s}",      s$category) else ""
+      type_label <- s$type
+      cat(sprintf("  %2d. [%s][%s] (%s)%s%s %s\n          %s\n",
+                  i, type_sym, pred_type, type_label, by_str, cat_str,
+                  s$label, pred_str))
     }
   }
   invisible(x)

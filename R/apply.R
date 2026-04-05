@@ -94,6 +94,7 @@ apply_criteria <- function(data, criteria, id = NULL) {
       label        = s$label,
       type         = s$type,
       by           = s$by,
+      category     = s$category,
       n_in         = n_in,
       n_pass       = nrow(current),
       n_fail       = nrow(excluded_rows),

@@ -95,10 +95,11 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     return(list(
       label  = crit$label,
       type   = crit$type,
-      kind   = "formula",
-      by     = crit$by,
-      expr   = expr_str,
-      fn_ref = NULL
+      kind     = "formula",
+      by       = crit$by,
+      category = crit$category,
+      expr     = expr_str,
+      fn_ref   = NULL
     ))
   }
 
@@ -131,6 +132,7 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     type     = crit$type,
     kind     = "function",
     by       = crit$by,
+    category = crit$category,
     expr     = body_str,
     fn_args  = formals_str,
     fn_ref   = fn_ref_str
@@ -138,8 +140,9 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
 }
 
 .list_to_criterion <- function(s, envir = parent.frame()) {
-  kind   <- s$kind %||% "formula"
-  by_val <- s$by   %||% NULL
+  kind    <- s$kind     %||% "formula"
+  by_val  <- s$by       %||% NULL
+  cat_val <- s$category %||% NULL
 
   if (kind == "formula") {
     expr <- parse(text = s$expr, keep.source = FALSE)[[1L]]
@@ -159,7 +162,8 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     }
   }
 
-  cf_criterion(predicate = pred, label = s$label, type = s$type, by = by_val)
+  cf_criterion(predicate = pred, label = s$label, type = s$type,
+               by = by_val, category = cat_val)
 }
 
 `%||%` <- function(x, y) if (is.null(x)) y else x

@@ -87,18 +87,20 @@ excluded <- function(flow) {
   chunks <- lapply(flow$steps, function(s) {
     if (length(s$excluded_ids) == 0L) return(NULL)
     rows <- flow$data[flow$data$.cf_row_id %in% s$excluded_ids, , drop = FALSE]
-    rows$cf_step  <- s$step
-    rows$cf_label <- s$label
-    rows$cf_type  <- s$type
+    rows$cf_step     <- s$step
+    rows$cf_label    <- s$label
+    rows$cf_type     <- s$type
+    rows$cf_category <- s$category %||% NA_character_
     rows
   })
   chunks <- Filter(Negate(is.null), chunks)
 
   if (length(chunks) == 0L) {
     empty <- flow$data[0L, , drop = FALSE]
-    empty$cf_step  <- integer(0L)
-    empty$cf_label <- character(0L)
-    empty$cf_type  <- character(0L)
+    empty$cf_step     <- integer(0L)
+    empty$cf_label    <- character(0L)
+    empty$cf_type     <- character(0L)
+    empty$cf_category <- character(0L)
     return(tibble::as_tibble(empty))
   }
 

@@ -20,6 +20,10 @@
 #' @param by For grouped step types (`group_include`, `group_exclude`,
 #'   `select_within`): a single character string naming the grouping column.
 #'   Ignored for row-wise types.
+#' @param category An optional character string grouping this criterion with
+#'   others for display purposes (e.g. `"Age"` to group age-related steps into
+#'   one box in a CONSORT diagram). `NULL` (default) leaves the step
+#'   uncategorised (`NA` in output).
 #'
 #' @return A `cf_criterion` object (an S3 list).
 #' @export
@@ -27,6 +31,10 @@
 #' @examples
 #' # Row-wise inclusion
 #' cf_criterion(~ age >= 18, label = "Adults only", type = "include")
+#'
+#' # Grouped under a category
+#' cf_criterion(~ !is.na(age), label = "Age recorded",
+#'              type = "include", category = "Age")
 #'
 #' # Group-level inclusion (clusters with >= 5 participants)
 #' cf_criterion(
@@ -48,7 +56,8 @@ cf_criterion <- function(predicate,
                          type = c("include", "exclude",
                                   "group_include", "group_exclude",
                                   "select_within"),
-                         by = NULL) {
+                         by       = NULL,
+                         category = NULL) {
   type <- match.arg(type)
 
   if (!is_formula(predicate) && !is.function(predicate)) {
@@ -85,12 +94,20 @@ cf_criterion <- function(predicate,
     }
   }
 
+  if (!is.null(category)) {
+    if (!is.character(category) || length(category) != 1L ||
+        is.na(category) || !nzchar(category)) {
+      cli_abort("{.arg category} must be a single non-empty string or NULL.")
+    }
+  }
+
   structure(
     list(
       predicate = predicate,
       label     = label,
       type      = type,
-      by        = by
+      by        = by,
+      category  = category
     ),
     class = "cf_criterion"
   )
