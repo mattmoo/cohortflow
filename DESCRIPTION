@@ -1,6 +1,6 @@
 Package: cohortflow
 Title: Define and Apply Cohort Inclusion/Exclusion Criteria
-Version: 0.0.0.9006
+Version: 0.0.0.9007
 Authors@R:
     person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
 Description: Define inclusion and exclusion criteria for cohort studies using

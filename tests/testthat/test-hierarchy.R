@@ -43,3 +43,15 @@ test_that("validate_hierarchy() errors on missing columns", {
   d <- data.frame(pid = 1)
   expect_error(cohortflow:::validate_hierarchy(h, d), class = "rlang_error")
 })
+
+test_that("format.cf_hierarchy() returns a character string", {
+  h <- cf_hierarchy(participant = "pid", cluster = "cid")
+  s <- format(h)
+  expect_type(s, "character")
+  expect_true(grepl("pid", s))
+  expect_true(grepl("cid", s))
+})
+
+test_that("cf_hierarchy() rejects non-character values", {
+  expect_error(cf_hierarchy(participant = 1L), class = "rlang_error")
+})

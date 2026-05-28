@@ -93,3 +93,68 @@ test_that("export_criteria() stores function-based criteria as 'function' kind",
   # formula kind is stored as "formula" in YAML
   expect_true(grepl("kind: formula", yml))
 })
+
+test_that("export/import round-trips a function predicate via body deparse", {
+  fn   <- function(d) !is.na(d$consent_date)
+  crit <- cf_criteria() |> include(fn, label = "Has consent")
+
+  yml   <- suppressWarnings(export_criteria(crit))
+  expect_true(grepl("kind: function", yml))
+
+  crit2 <- import_criteria(text = yml)
+  expect_s3_class(crit2, "cf_criteria")
+  expect_equal(crit2$steps[[1]]$label, "Has consent")
+
+  # Verify it evaluates correctly after round-trip
+  d   <- data.frame(consent_date = c(as.Date("2023-01-01"), NA))
+  res <- cohortflow:::eval_criterion(crit2$steps[[1]], d)
+  expect_equal(res, c(TRUE, FALSE))
+})
+
+test_that("export_criteria() warns when function captures non-empty closure", {
+  threshold <- 18
+  fn_closure <- function(d) d$age >= threshold  # captures 'threshold'
+  crit <- cf_criteria() |> include(fn_closure, label = "Age threshold")
+  expect_warning(export_criteria(crit), regexp = "enclosing environment")
+})
+
+test_that("export_criteria() uses fn_refs when function matches", {
+  fn   <- function(d) !is.na(d$consent_date)
+  refs <- list("mypkg::has_consent" = fn)
+  crit <- cf_criteria() |> include(fn, label = "Consent")
+
+  yml <- export_criteria(crit, fn_refs = refs)
+  expect_true(grepl("mypkg::has_consent", yml))
+})
+
+test_that("import_criteria() resolves fn_ref with :: notation", {
+  # Use a real exported function as the fn_ref target
+  fn   <- base::is.na
+  refs <- list("base::is.na" = fn)
+  crit <- cf_criteria() |> include(fn, label = "Is NA")
+  yml  <- export_criteria(crit, fn_refs = refs)
+
+  crit2 <- import_criteria(text = yml)
+  expect_equal(crit2$steps[[1]]$label, "Is NA")
+  expect_true(is.function(crit2$steps[[1]]$predicate))
+})
+
+test_that("export_criteria() errors on non-cf_criteria input", {
+  expect_error(export_criteria(list()), class = "rlang_error")
+})
+
+test_that("import_criteria() round-trips select_within with by and category", {
+  crit <- cf_criteria() |>
+    select_within(
+      by       = "participant_id",
+      label    = "Index event",
+      category = "Selection",
+      ~ consent_date == min(consent_date, na.rm = TRUE)
+    )
+  yml   <- export_criteria(crit)
+  crit2 <- import_criteria(text = yml)
+
+  expect_equal(crit2$steps[[1]]$by,       "participant_id")
+  expect_equal(crit2$steps[[1]]$category, "Selection")
+  expect_equal(crit2$steps[[1]]$type,     "select_within")
+})

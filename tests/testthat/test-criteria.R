@@ -80,3 +80,41 @@ test_that("print.cf_criteria() runs without error", {
 test_that("print.cf_criteria() handles an empty pipeline", {
   expect_output(print(cf_criteria()), "empty")
 })
+
+test_that("format.cf_criteria() returns a character string", {
+  crit <- cf_criteria() |>
+    include(~ age >= 18, label = "Adults") |>
+    exclude(~ withdrew,  label = "Withdrew")
+  s <- format(crit)
+  expect_type(s, "character")
+  expect_true(nzchar(s))
+})
+
+test_that("group_exclude() adds a group_exclude step", {
+  crit <- cf_criteria() |>
+    group_exclude(by = "cluster_id", ~ n() < 5, label = "Small clusters")
+  expect_equal(crit$steps[[1]]$type, "group_exclude")
+  expect_equal(crit$steps[[1]]$by,   "cluster_id")
+})
+
+test_that("select_within() adds a select_within step", {
+  crit <- cf_criteria() |>
+    select_within(
+      by    = "participant_id",
+      label = "First per patient",
+      ~ consent_date == min(consent_date, na.rm = TRUE)
+    )
+  expect_equal(crit$steps[[1]]$type, "select_within")
+  expect_equal(crit$steps[[1]]$by,   "participant_id")
+})
+
+test_that("cf_criteria() constructed with cf_criterion objects directly", {
+  cr <- cf_criterion(~ age >= 18, label = "Adults")
+  crit <- cf_criteria(cr)
+  expect_equal(length(crit), 1L)
+  expect_equal(crit$steps[[1]]$label, "Adults")
+})
+
+test_that("cf_criteria() errors if non-cf_criterion passed directly", {
+  expect_error(cf_criteria(list(a = 1)), class = "rlang_error")
+})

@@ -274,3 +274,29 @@ test_that("as_attrition_table() errors informatively when backend package missin
     "huxtable"
   )
 })
+
+test_that("as_attrition_table() with gt returns a gt_tbl", {
+  skip_if_not_installed("gt")
+
+  flow <- make_flow_categorised()
+  gt_tbl <- as_attrition_table(flow, backend = "gt")
+  expect_s3_class(gt_tbl, "gt_tbl")
+})
+
+test_that("as_attrition_tibble() respects digits argument", {
+  flow <- make_flow_flat()
+  out0 <- as_attrition_tibble(flow, digits = 0L)
+  out2 <- as_attrition_tibble(flow, digits = 2L)
+
+  step_rows0 <- out0[out0$row_type == "step" & !is.na(out0$pct_removed), ]
+  step_rows2 <- out2[out2$row_type == "step" & !is.na(out2$pct_removed), ]
+
+  # digits = 0 values are integers (no decimal places)
+  expect_true(all(step_rows0$pct_removed == round(step_rows0$pct_removed, 0)))
+  # digits = 2 values match round(..., 2)
+  expect_true(all(step_rows2$pct_removed == round(step_rows2$pct_removed, 2)))
+})
+
+test_that("as_attrition_table() rejects non-cf_flow input", {
+  expect_error(as_attrition_table(list()), "`flow` must be a `cf_flow` object")
+})

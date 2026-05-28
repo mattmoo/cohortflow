@@ -68,3 +68,138 @@ test_that("eval_criterion() errors if predicate returns non-logical", {
   d    <- data.frame(x = 1:3)
   expect_error(cohortflow:::eval_criterion(crit, d), class = "rlang_error")
 })
+
+# ---------------------------------------------------------------------------
+# cf_criterion category parameter
+
+test_that("cf_criterion() accepts a category", {
+  crit <- cf_criterion(~ age >= 18, label = "Adults", category = "Age")
+  expect_equal(crit$category, "Age")
+})
+
+test_that("cf_criterion() rejects empty category string", {
+  expect_error(
+    cf_criterion(~ age >= 18, label = "Adults", category = ""),
+    class = "rlang_error"
+  )
+})
+
+test_that("cf_criterion() rejects NA category", {
+  expect_error(
+    cf_criterion(~ age >= 18, label = "Adults", category = NA_character_),
+    class = "rlang_error"
+  )
+})
+
+# ---------------------------------------------------------------------------
+# format methods
+
+test_that("format.cf_criterion() returns a string", {
+  crit <- cf_criterion(~ age >= 18, label = "Adults", type = "include")
+  s    <- format(crit)
+  expect_type(s, "character")
+  expect_true(nzchar(s))
+  expect_true(grepl("Adults", s))
+})
+
+test_that("format.cf_criterion() works for function predicate", {
+  fn   <- function(d) !is.na(d$age)
+  crit <- cf_criterion(fn, label = "Age present", type = "exclude")
+  s    <- format(crit)
+  expect_type(s, "character")
+  expect_true(grepl("Age present", s))
+})
+
+test_that("format.cf_criterion() works for select_within", {
+  crit <- cf_criterion(
+    ~ consent_date == min(consent_date, na.rm = TRUE),
+    label = "First consent",
+    type  = "select_within",
+    by    = "participant_id"
+  )
+  s <- format(crit)
+  expect_true(grepl(">", s))
+})
+
+# ---------------------------------------------------------------------------
+# eval_group_criterion
+
+test_that("eval_group_criterion() works with formula predicate", {
+  crit <- cf_criterion(
+    ~ n() >= 2,
+    label = "Min group size",
+    type  = "group_include",
+    by    = "grp"
+  )
+  d <- data.frame(
+    grp = c("a", "a", "b"),
+    x   = 1:3
+  )
+  res <- cohortflow:::eval_group_criterion(crit, d)
+  expect_equal(unname(res), c(TRUE, TRUE, FALSE))
+})
+
+test_that("eval_group_criterion() works with function predicate", {
+  # Function must return a data frame with the by column and .pass
+  fn <- function(g) {
+    dplyr::summarise(g, .pass = dplyr::n() >= 2, .groups = "drop")
+  }
+  crit <- cf_criterion(
+    fn,
+    label = "Min group size (fn)",
+    type  = "group_include",
+    by    = "grp"
+  )
+  d <- data.frame(grp = c("a", "a", "b"), x = 1:3)
+  res <- cohortflow:::eval_group_criterion(crit, d)
+  expect_equal(unname(res), c(TRUE, TRUE, FALSE))
+})
+
+test_that("eval_group_criterion() errors when by_col missing from data", {
+  crit <- cf_criterion(~ n() >= 2, label = "Size", type = "group_include", by = "grp")
+  d    <- data.frame(x = 1:3)
+  expect_error(cohortflow:::eval_group_criterion(crit, d), class = "rlang_error")
+})
+
+test_that("eval_group_criterion() errors when fn does not return .pass column", {
+  fn <- function(g) dplyr::summarise(g, result = dplyr::n() >= 2, .groups = "drop")
+  crit <- cf_criterion(fn, label = "Bad fn", type = "group_include", by = "grp")
+  d    <- data.frame(grp = c("a", "a"), x = 1:2)
+  expect_error(cohortflow:::eval_group_criterion(crit, d), class = "rlang_error")
+})
+
+# ---------------------------------------------------------------------------
+# eval_select_criterion
+
+test_that("eval_select_criterion() works with formula predicate", {
+  crit <- cf_criterion(
+    ~ x == min(x),
+    label = "Min per group",
+    type  = "select_within",
+    by    = "grp"
+  )
+  d   <- data.frame(grp = c("a", "a", "b", "b"), x = c(3, 1, 4, 2))
+  res <- cohortflow:::eval_select_criterion(crit, d)
+  expect_equal(res, c(FALSE, TRUE, FALSE, TRUE))
+})
+
+test_that("eval_select_criterion() works with function predicate", {
+  fn <- function(g) g$x == min(g$x)
+  crit <- cf_criterion(fn, label = "Min fn", type = "select_within", by = "grp")
+  d    <- data.frame(grp = c("a", "a", "b", "b"), x = c(3, 1, 4, 2))
+  res  <- cohortflow:::eval_select_criterion(crit, d)
+  expect_equal(res, c(FALSE, TRUE, FALSE, TRUE))
+})
+
+test_that("eval_select_criterion() errors when by_col missing from data", {
+  crit <- cf_criterion(~ x == min(x), label = "Min", type = "select_within", by = "grp")
+  d    <- data.frame(x = 1:3)
+  expect_error(cohortflow:::eval_select_criterion(crit, d), class = "rlang_error")
+})
+
+test_that("eval_select_criterion() errors when predicate returns wrong type", {
+  fn <- function(g) as.integer(g$x == min(g$x))  # integer, not logical
+  crit <- cf_criterion(fn, label = "Bad", type = "select_within", by = "grp")
+  d    <- data.frame(grp = c("a", "a"), x = 1:2)
+  expect_error(cohortflow:::eval_select_criterion(crit, d), class = "rlang_error")
+})
