@@ -1,5 +1,9 @@
 # cohortflow
 
+[![R-CMD-check](https://github.com/mattmoo/cohortflow/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/mattmoo/cohortflow/actions/workflows/R-CMD-check.yaml)
+[![lint](https://github.com/mattmoo/cohortflow/actions/workflows/lint.yaml/badge.svg)](https://github.com/mattmoo/cohortflow/actions/workflows/lint.yaml)
+[![codecov](https://codecov.io/gh/mattmoo/cohortflow/branch/main/graph/badge.svg)](https://codecov.io/gh/mattmoo/cohortflow)
+
 Define and apply inclusion/exclusion criteria for cohort studies, then generate transparent attrition outputs for reporting.
 
 `cohortflow` helps you:
