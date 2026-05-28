@@ -72,11 +72,11 @@
 #' flow <- apply_criteria(dat, crit)
 #' as_attrition_tibble(flow)
 as_attrition_tibble <- function(
-    flow,
-    show_categories = TRUE,
-    assessed_label  = "Assessed for eligibility",
-    final_label     = "Final cohort",
-    digits          = 1L
+  flow,
+  show_categories = TRUE,
+  assessed_label  = "Assessed for eligibility",
+  final_label     = "Final cohort",
+  digits          = 1L
 ) {
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
@@ -136,9 +136,9 @@ as_attrition_tibble <- function(
       # Collect all consecutive steps sharing this category
       j <- i
       while (j <= length(steps) &&
-             !is.null(steps[[j]]$category) &&
-             !is.na(steps[[j]]$category) &&
-             steps[[j]]$category == cat) {
+               !is.null(steps[[j]]$category) &&
+               !is.na(steps[[j]]$category) &&
+               steps[[j]]$category == cat) {
         j <- j + 1L
       }
       cat_steps <- steps[seq(i, j - 1L)]
@@ -253,16 +253,16 @@ as_attrition_tibble <- function(
 #' gt::as_latex(gt_tbl)
 #' }
 as_attrition_table <- function(
-    flow,
-    backend             = c("flextable", "gt", "huxtable"),
-    show_categories     = TRUE,
-    assessed_label      = "Assessed for eligibility",
-    final_label         = "Final cohort",
-    digits              = 1L,
-    criterion_col_label = "Criterion",
-    n_col_label         = "N",
-    removed_col_label   = "Removed",
-    pct_col_label       = "% removed"
+  flow,
+  backend             = c("flextable", "gt", "huxtable"),
+  show_categories     = TRUE,
+  assessed_label      = "Assessed for eligibility",
+  final_label         = "Final cohort",
+  digits              = 1L,
+  criterion_col_label = "Criterion",
+  n_col_label         = "N",
+  removed_col_label   = "Removed",
+  pct_col_label       = "% removed"
 ) {
   backend <- match.arg(backend)
 

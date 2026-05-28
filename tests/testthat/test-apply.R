@@ -1,5 +1,3 @@
-# tests/testthat/test-apply.R
-
 test_that("apply_criteria() returns a cf_flow object", {
   dat  <- mock_cohortflow(100, seed = 1)
   crit <- cf_criteria() |>
@@ -175,4 +173,3 @@ test_that("multiple step types work together in one pipeline", {
   expect_equal(flow$steps[[5]]$type, "select_within")
   expect_lte(nrow(cohort(flow)), nrow(dat))
 })
-

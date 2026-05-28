@@ -52,7 +52,7 @@ test_that("as_attrition_tibble() returns a tibble with required columns", {
 
   expect_s3_class(out, "tbl_df")
   expect_named(out, c("row_type", "label", "indent_level", "n",
-                       "n_removed", "pct_removed"))
+                      "n_removed", "pct_removed"))
 })
 
 test_that("first row is the header, last row is the final cohort", {

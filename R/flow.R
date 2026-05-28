@@ -109,4 +109,3 @@ excluded <- function(flow) {
 
   tibble::as_tibble(do.call(rbind, chunks))
 }
-

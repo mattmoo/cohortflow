@@ -114,7 +114,7 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
   if (is.null(fn_ref_str)) {
     fn_env <- environment(crit$predicate)
     if (!identical(fn_env, globalenv()) && !identical(fn_env, baseenv()) &&
-        !identical(fn_env, emptyenv()) && length(ls(fn_env)) > 0L) {
+          !identical(fn_env, emptyenv()) && length(ls(fn_env)) > 0L) {
       rlang::warn(paste0(
         "Criterion '", crit$label, "': the function predicate captures ",
         "variables from its enclosing environment and may not round-trip ",
@@ -160,8 +160,5 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     }
   }
 
-  cf_criterion(predicate = pred, label = s$label, type = s$type, by = by_val, category = s$category %||% NULL)
+  cf_criterion(predicate = pred, label = s$label, type = s$type, by = by_val, category = s$category)
 }
-
-`%||%` <- function(x, y) if (is.null(x)) y else x
-

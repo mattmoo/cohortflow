@@ -134,4 +134,3 @@ apply_criteria <- function(data, criteria, id = NULL) {
   data$.cf_row_id <- seq_len(nrow(data))
   data
 }
-

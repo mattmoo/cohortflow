@@ -42,11 +42,11 @@
 #' # Larger study with three periods
 #' mock_cohortflow(n_participants = 2000, n_clusters = 20, n_periods = 3, seed = 42)
 mock_cohortflow <- function(
-    n_participants = 500L,
-    n_clusters     = 10L,
-    n_sites        = 3L,
-    n_periods      = 4L,
-    seed           = 123L
+  n_participants = 500L,
+  n_clusters     = 10L,
+  n_sites        = 3L,
+  n_periods      = 4L,
+  seed           = 123L
 ) {
   n_participants <- as.integer(n_participants)
   n_clusters     <- as.integer(n_clusters)

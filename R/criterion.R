@@ -96,7 +96,7 @@ cf_criterion <- function(predicate,
 
   if (!is.null(category)) {
     if (!is.character(category) || length(category) != 1L ||
-        is.na(category) || !nzchar(category)) {
+          is.na(category) || !nzchar(category)) {
       cli_abort("{.arg category} must be a single non-empty string or NULL.")
     }
   }
@@ -143,7 +143,7 @@ predicate_label <- function(predicate) {
 #' @export
 print.cf_criterion <- function(x, ...) {
   type_sym  <- if (x$type %in% c("include", "group_include")) "+" else
-               if (x$type == "select_within") ">" else "-"
+    if (x$type == "select_within") ">" else "-"
   pred_str  <- predicate_label(x$predicate)
   pred_type <- if (is_formula(x$predicate)) "~" else "f"
   by_str    <- if (!is.null(x$by)) sprintf(" [by: %s]", x$by) else ""
@@ -158,7 +158,7 @@ print.cf_criterion <- function(x, ...) {
 #' @export
 format.cf_criterion <- function(x, ...) {
   type_sym  <- if (x$type %in% c("include", "group_include")) "+" else
-               if (x$type == "select_within") ">" else "-"
+    if (x$type == "select_within") ">" else "-"
   pred_str  <- predicate_label(x$predicate)
   pred_type <- if (is_formula(x$predicate)) "~" else "f"
   by_str    <- if (!is.null(x$by)) sprintf(" [by: %s]", x$by) else ""
