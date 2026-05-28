@@ -70,8 +70,8 @@ cohortflow/
 - [x] **2.2** Implement `include()`, `exclude()`, `group_include()`, `group_exclude()`, `select_within()`, `apply_criteria()`
 - [x] **2.3** Implement `as_attrition_tibble()`, `as_attrition_table()`, `cohort()`, `excluded()`
 - [x] **2.4** Unit tests for criteria application and edge cases
-- [ ] **2.5** Fix: add `ggplot2` to `Imports` in `DESCRIPTION`
-- [ ] **2.6** Fix: update placeholder author info in `DESCRIPTION`
+- [x] **2.5** Fix: add `ggplot2` to `Imports` in `DESCRIPTION`
+- [x] **2.6** Fix: update placeholder author info in `DESCRIPTION`
 
 ### Milestone 3: Visualization & CONSORT Diagrams
 - [x] **3.1** Attrition bar chart (`ggplot2`) implemented in `flow.R`

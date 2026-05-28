@@ -1,14 +1,17 @@
 Package: cohortflow
 Title: Define and Apply Cohort Inclusion/Exclusion Criteria
-Version: 0.0.0.9007
+Version: 0.0.0.9008
 Authors@R:
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
+    person("Matthew", "Moore", , "matthew.moore@auckland.ac.nz", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0003-0730-8027"))
 Description: Define inclusion and exclusion criteria for cohort studies using
     formulas or functions, apply them to data, and render the resulting
     attrition flow as CONSORT flow diagrams, tables, or narrative text.
     Supports hierarchical designs (participants nested in clusters/sites) and
     flexible grouping for reporting. Criteria pipelines can be serialised to
     YAML for reproducibility and sharing.
+    Parts of this package were developed with the assistance of GitHub Copilot
+    (powered by Claude), an AI coding assistant.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends:
@@ -24,6 +27,7 @@ Suggests:
 Config/testthat/edition: 3
 Imports:
     dplyr,
+    ggplot2,
     rlang,
     tibble,
     yaml
