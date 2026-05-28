@@ -10,10 +10,12 @@ excluded(flow)
 \item{flow}{A \code{cf_flow} object produced by \code{\link[=apply_criteria]{apply_criteria()}}.}
 }
 \value{
-A tibble with original columns plus \code{cf_step}, \code{cf_label}, \code{cf_type}.
+A tibble with original columns plus \code{cf_step}, \code{cf_label},
+\code{cf_type}, \code{cf_category}.
 }
 \description{
 Returns a flat tibble of all rows removed at any step, with additional
-columns \code{cf_step} (integer), \code{cf_label} (character), and \code{cf_type}
-(character). Rows are in step order.
+columns \code{cf_step} (integer), \code{cf_label} (character), \code{cf_type} (character),
+and \code{cf_category} (character, \code{NA} if the criterion had no category).
+Rows are in step order.
 }

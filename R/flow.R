@@ -43,10 +43,11 @@ print.cf_flow <- function(x, ...) {
       group_exclude = "[-]",
       select_within = "[>]"
     )
-    by_str <- if (!is.null(s$by)) sprintf(" by %s", s$by) else ""
+    by_str  <- if (!is.null(s$by)) sprintf(" by %s", s$by) else ""
+    cat_str <- if (!is.null(s$category)) sprintf(" {%s}", s$category) else ""
     cat(sprintf(
-      "  %2d. %s %s%s\n       n_in: %d  kept: %d  removed: %d\n",
-      s$step, type_sym, s$label, by_str,
+      "  %2d. %s %s%s%s\n       n_in: %d  kept: %d  removed: %d\n",
+      s$step, type_sym, s$label, by_str, cat_str,
       s$n_in, s$n_pass, s$n_fail
     ))
   }
@@ -75,11 +76,13 @@ cohort <- function(flow) {
 #' Extract excluded rows from a flow object
 #'
 #' Returns a flat tibble of all rows removed at any step, with additional
-#' columns `cf_step` (integer), `cf_label` (character), and `cf_type`
-#' (character). Rows are in step order.
+#' columns `cf_step` (integer), `cf_label` (character), `cf_type` (character),
+#' and `cf_category` (character, `NA` if the criterion had no category).
+#' Rows are in step order.
 #'
 #' @param flow A `cf_flow` object produced by [apply_criteria()].
-#' @return A tibble with original columns plus `cf_step`, `cf_label`, `cf_type`.
+#' @return A tibble with original columns plus `cf_step`, `cf_label`,
+#'   `cf_type`, `cf_category`.
 #' @export
 excluded <- function(flow) {
   if (!inherits(flow, "cf_flow")) rlang::abort("`flow` must be a `cf_flow` object.")
@@ -90,7 +93,7 @@ excluded <- function(flow) {
     rows$cf_step     <- s$step
     rows$cf_label    <- s$label
     rows$cf_type     <- s$type
-    rows$cf_category <- s$category %||% NA_character_
+    rows$cf_category <- if (is.null(s$category)) NA_character_ else s$category
     rows
   })
   chunks <- Filter(Negate(is.null), chunks)

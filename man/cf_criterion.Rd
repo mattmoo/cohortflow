@@ -8,7 +8,8 @@ cf_criterion(
   predicate,
   label,
   type = c("include", "exclude", "group_include", "group_exclude", "select_within"),
-  by = NULL
+  by = NULL,
+  category = NULL
 )
 }
 \arguments{
@@ -31,6 +32,11 @@ identifying which rows within the group to keep.
 \item{by}{For grouped step types (\code{group_include}, \code{group_exclude},
 \code{select_within}): a single character string naming the grouping column.
 Ignored for row-wise types.}
+
+\item{category}{An optional character string grouping this criterion with
+others for display purposes (e.g. \code{"Age"} to group age-related steps into
+one box in a CONSORT diagram). \code{NULL} (default) leaves the step
+uncategorised (\code{NA} in output).}
 }
 \value{
 A \code{cf_criterion} object (an S3 list).
@@ -45,6 +51,10 @@ the step type.
 \examples{
 # Row-wise inclusion
 cf_criterion(~ age >= 18, label = "Adults only", type = "include")
+
+# Grouped under a category
+cf_criterion(~ !is.na(age), label = "Age recorded",
+             type = "include", category = "Age")
 
 # Group-level inclusion (clusters with >= 5 participants)
 cf_criterion(

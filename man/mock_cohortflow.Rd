@@ -29,6 +29,8 @@ stepped-wedge design). Set to \code{1} for a simple cross-sectional cohort.}
 A \code{\link[tibble:tibble]{tibble::tibble()}} with columns:
 \describe{
 \item{\code{participant_id}}{Character. Unique participant identifier.}
+\item{\code{event_id}}{Character. Unique event (row) identifier — useful when
+the dataset has multiple rows per participant (e.g., one per operation).}
 \item{\code{cluster_id}}{Character. Cluster identifier.}
 \item{\code{site_id}}{Character. Site identifier (clusters nested in sites).}
 \item{\code{period}}{Integer. Study period (1 = first period).}

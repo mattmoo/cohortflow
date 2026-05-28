@@ -4,7 +4,7 @@
 \alias{group_exclude}
 \title{Add a group-level exclusion criterion}
 \usage{
-group_exclude(criteria, by, predicate, label)
+group_exclude(criteria, by, predicate, label, category = NULL)
 }
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
@@ -14,6 +14,9 @@ group_exclude(criteria, by, predicate, label)
 \item{predicate}{A one-sided formula using summary functions, or a function.}
 
 \item{label}{A short human-readable description of this criterion.}
+
+\item{category}{An optional string grouping this step with others for
+display. \code{NULL} leaves it uncategorised.}
 }
 \value{
 The updated \code{cf_criteria} object.

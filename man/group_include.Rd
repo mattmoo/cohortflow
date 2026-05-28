@@ -4,7 +4,7 @@
 \alias{group_include}
 \title{Add a group-level inclusion criterion}
 \usage{
-group_include(criteria, by, predicate, label)
+group_include(criteria, by, predicate, label, category = NULL)
 }
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
@@ -16,6 +16,9 @@ group_include(criteria, by, predicate, label)
 data frame and returns a tibble with columns \verb{<by>} and \code{.pass}.}
 
 \item{label}{A short human-readable description of this criterion.}
+
+\item{category}{An optional string grouping this step with others for
+display. \code{NULL} leaves it uncategorised.}
 }
 \value{
 The updated \code{cf_criteria} object.

@@ -4,7 +4,7 @@
 \alias{exclude}
 \title{Add an exclusion criterion to a criteria pipeline}
 \usage{
-exclude(criteria, predicate, label)
+exclude(criteria, predicate, label, category = NULL)
 }
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
@@ -12,6 +12,9 @@ exclude(criteria, predicate, label)
 \item{predicate}{A one-sided formula or a function evaluated row-wise.}
 
 \item{label}{A short human-readable description of this criterion.}
+
+\item{category}{An optional string grouping this step with others for
+display. \code{NULL} leaves it uncategorised.}
 }
 \value{
 The updated \code{cf_criteria} object.

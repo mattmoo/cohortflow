@@ -1,4 +1,3 @@
-#' Export a criteria pipeline to YAML
 #'
 #' Serialises a `cf_criteria` object to a human-readable YAML file (or string).
 #' The schema is self-describing and can be re-imported with [import_criteria()].
@@ -95,11 +94,11 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     return(list(
       label  = crit$label,
       type   = crit$type,
-      kind     = "formula",
-      by       = crit$by,
-      category = crit$category,
-      expr     = expr_str,
-      fn_ref   = NULL
+      kind   = "formula",
+      by     = crit$by,
+      expr   = expr_str,
+      fn_ref = NULL,
+      category = crit$category
     ))
   }
 
@@ -132,17 +131,16 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     type     = crit$type,
     kind     = "function",
     by       = crit$by,
-    category = crit$category,
     expr     = body_str,
     fn_args  = formals_str,
-    fn_ref   = fn_ref_str
+    fn_ref   = fn_ref_str,
+    category = crit$category
   )
 }
 
 .list_to_criterion <- function(s, envir = parent.frame()) {
-  kind    <- s$kind     %||% "formula"
-  by_val  <- s$by       %||% NULL
-  cat_val <- s$category %||% NULL
+  kind   <- s$kind %||% "formula"
+  by_val <- s$by   %||% NULL
 
   if (kind == "formula") {
     expr <- parse(text = s$expr, keep.source = FALSE)[[1L]]
@@ -162,8 +160,7 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     }
   }
 
-  cf_criterion(predicate = pred, label = s$label, type = s$type,
-               by = by_val, category = cat_val)
+  cf_criterion(predicate = pred, label = s$label, type = s$type, by = by_val, category = s$category %||% NULL)
 }
 
 `%||%` <- function(x, y) if (is.null(x)) y else x

@@ -4,7 +4,7 @@
 \alias{include}
 \title{Add an inclusion criterion to a criteria pipeline}
 \usage{
-include(criteria, predicate, label)
+include(criteria, predicate, label, category = NULL)
 }
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
@@ -12,6 +12,9 @@ include(criteria, predicate, label)
 \item{predicate}{A one-sided formula or a function evaluated row-wise.}
 
 \item{label}{A short human-readable description of this criterion.}
+
+\item{category}{An optional string grouping this step with others for
+display (e.g. \code{"Age"}). \code{NULL} leaves it uncategorised.}
 }
 \value{
 The updated \code{cf_criteria} object.
@@ -21,5 +24,5 @@ Add an inclusion criterion to a criteria pipeline
 }
 \examples{
 cf_criteria() |>
-  include(~ age >= 18, label = "Adults")
+  include(~ age >= 18, label = "Adults", category = "Age")
 }

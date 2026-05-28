@@ -4,7 +4,7 @@
 \alias{select_within}
 \title{Select rows within groups}
 \usage{
-select_within(criteria, by, predicate, label)
+select_within(criteria, by, predicate, label, category = NULL)
 }
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
@@ -17,6 +17,9 @@ function that receives a group's rows as a data frame and returns a
 logical vector.}
 
 \item{label}{A short human-readable description of this step.}
+
+\item{category}{An optional string grouping this step with others for
+display. \code{NULL} leaves it uncategorised.}
 }
 \value{
 The updated \code{cf_criteria} object.

@@ -2,7 +2,8 @@
 % Please edit documentation in R/yaml.R
 \name{export_criteria}
 \alias{export_criteria}
-\title{Export a criteria pipeline to YAML}
+\title{Serialises a \code{cf_criteria} object to a human-readable YAML file (or string).
+The schema is self-describing and can be re-imported with \code{\link[=import_criteria]{import_criteria()}}.}
 \usage{
 export_criteria(criteria, path = NULL, fn_refs = list())
 }
@@ -16,8 +17,7 @@ returned as a character string.}
 \code{"pkg::name"} reference strings.}
 }
 \value{
-Invisibly. If \code{path = NULL}, returns the YAML text as a character
-string; otherwise, returns the \code{criteria} object.
+Invisibly, the \code{criteria} object (or the YAML string if \code{path = NULL}).
 }
 \description{
 Serialises a \code{cf_criteria} object to a human-readable YAML file (or string).
