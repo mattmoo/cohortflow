@@ -1,3 +1,9 @@
+utils::globalVariables(c(
+  "participant_id", "event_id", "cluster_id", "site_id", "period",
+  "sequence", "age", "age_group", "sex", "ethnicity",
+  "eligible_screen", "consent_date", "baseline_complete", "withdrew"
+))
+
 #' Generate synthetic cohort data for testing and examples
 #'
 #' Produces a tibble that mimics a clustered cohort study with optional
@@ -41,11 +47,6 @@
 #'
 #' # Larger study with three periods
 #' mock_cohortflow(n_participants = 2000, n_clusters = 20, n_periods = 3, seed = 42)
-utils::globalVariables(c(
-  "participant_id", "event_id", "cluster_id", "site_id", "period",
-  "sequence", "age", "age_group", "sex", "ethnicity",
-  "eligible_screen", "consent_date", "baseline_complete", "withdrew"
-))
 mock_cohortflow <- function(
   n_participants = 500L,
   n_clusters     = 10L,

@@ -20,7 +20,8 @@ as_attrition_table(
 \arguments{
 \item{flow}{A \code{cf_flow} object produced by \code{\link[=apply_criteria]{apply_criteria()}}.}
 
-\item{backend}{Character string: \code{"flextable"} (default), \code{"gt"}, or \code{"huxtable"}.}
+\item{backend}{Character string: \code{"flextable"} (default), \code{"gt"}, or
+\code{"huxtable"}.}
 
 \item{show_categories}{Logical. When \code{TRUE} (default) steps with the same
 \code{category} are collapsed under a single parent row. When \code{FALSE} one row
@@ -47,15 +48,32 @@ Default \code{"Removed"}.}
 Default \code{"\% removed"}.}
 }
 \value{
-A \code{flextable} or \code{huxtable} object, ready to print or include in a
-document.
+A \code{flextable}, \code{gt_tbl}, or \code{huxtable} object, ready to print or
+include in a document.
 }
 \description{
-Produces a formatted attrition table from a \code{cf_flow} object. Two output
-backends are supported: \code{"flextable"} and \code{"huxtable"}. The underlying data
-is built by \code{\link[=as_attrition_tibble]{as_attrition_tibble()}}, which you can call directly for custom
-formatting.
+Produces a formatted attrition table from a \code{cf_flow} object. Three output
+backends are supported: \code{"flextable"} (best for Word), \code{"gt"} (best for
+HTML and LaTeX), and \code{"huxtable"}. The underlying data is built by
+\code{\link[=as_attrition_tibble]{as_attrition_tibble()}}, which you can call directly for custom formatting.
 }
+\section{Output formats}{
+
+\itemize{
+\item \strong{\code{"flextable"}} — uses the \pkg{flextable} and \pkg{officer} packages.
+Renders natively to Word (\code{.docx}) via \code{officer::read_docx()}, to PDF
+via \code{flextable::save_as_image()}, and to HTML. Best choice when Word is
+the primary target.
+\item \strong{\code{"gt"}} — uses the \pkg{gt} package. Renders to HTML
+(\code{gt::gtsave(..., "table.html")}), LaTeX
+(\code{gt::as_latex()}), and Word (via \code{gt::gtsave(..., "table.docx")}
+requires the \pkg{webshot2} package). Best choice when LaTeX or HTML
+is the primary target.
+\item \strong{\code{"huxtable"}} — uses the \pkg{huxtable} package. Supports Word, LaTeX,
+and HTML output.
+}
+}
+
 \examples{
 \dontrun{
 dat  <- mock_cohortflow(n_participants = 200, seed = 1)
@@ -66,8 +84,20 @@ crit <- cf_criteria() |>
   exclude(~ withdrew,        label = "Withdrew consent")
 flow <- apply_criteria(dat, crit)
 
-as_attrition_table(flow)                        # flextable
-as_attrition_table(flow, backend = "huxtable")  # huxtable
+as_attrition_table(flow)                       # flextable (Word-ready)
+as_attrition_table(flow, backend = "gt")       # gt (LaTeX/HTML-ready)
+as_attrition_table(flow, backend = "huxtable") # huxtable
+
+# Save to Word
+ft <- as_attrition_table(flow)
+flextable::save_as_docx(ft, path = "attrition.docx")
+
+# Save to Word via gt
+gt_tbl <- as_attrition_table(flow, backend = "gt")
+gt::gtsave(gt_tbl, "attrition.docx")
+
+# LaTeX snippet via gt
+gt::as_latex(gt_tbl)
 }
 }
 \seealso{

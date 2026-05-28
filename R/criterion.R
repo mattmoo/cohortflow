@@ -1,9 +1,8 @@
 #' Create a single cohort criterion
 #'
 #' A `cf_criterion` represents one inclusion or exclusion step in a cohort
-#' eligibility pipeline.
-#' @importFrom rlang .data
-#' Five step types are supported (see `type`). The predicate is always a
+#' eligibility pipeline. Five step types are supported (see `type`). The
+#' predicate is always a
 #' one-sided **formula** or a **function**; the interpretation depends on
 #' the step type.
 #'
@@ -116,6 +115,9 @@ cf_criterion <- function(predicate,
 
 # ---------------------------------------------------------------------------
 # Helpers
+
+#' @importFrom rlang .data
+NULL
 
 is_formula <- function(x) inherits(x, "formula")
 

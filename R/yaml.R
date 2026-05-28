@@ -139,8 +139,8 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
 }
 
 .list_to_criterion <- function(s, envir = parent.frame()) {
-  kind   <- s$kind %||% "formula"
-  by_val <- s$by   %||% NULL
+  kind   <- rlang::`%||%`(s$kind, "formula")
+  by_val <- rlang::`%||%`(s$by,   NULL)
 
   if (kind == "formula") {
     expr <- parse(text = s$expr, keep.source = FALSE)[[1L]]

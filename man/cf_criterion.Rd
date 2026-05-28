@@ -43,8 +43,8 @@ A \code{cf_criterion} object (an S3 list).
 }
 \description{
 A \code{cf_criterion} represents one inclusion or exclusion step in a cohort
-eligibility pipeline.
-Five step types are supported (see \code{type}). The predicate is always a
+eligibility pipeline. Five step types are supported (see \code{type}). The
+predicate is always a
 one-sided \strong{formula} or a \strong{function}; the interpretation depends on
 the step type.
 }
