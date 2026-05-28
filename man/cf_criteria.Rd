@@ -23,8 +23,8 @@ has_consent <- function(d) !is.na(d$consent_date)
 crit <- cf_criteria() |>
   include(~ age >= 18, label = "Adults only") |>
   include(has_consent, label = "Consent recorded") |>
-  exclude(~ withdrew, label = "Withdrew consent") |
-  group_include(by = "cluster_id", ~ n() >= 5, label = "Cluster size >= 5") |
+  exclude(~ withdrew, label = "Withdrew consent") |>
+  group_include(by = "cluster_id", ~ n() >= 5, label = "Cluster size >= 5") |>
   select_within(by = "participant_id", ~ consent_date == min(consent_date, na.rm = TRUE),
                 label = "Index operation")
 

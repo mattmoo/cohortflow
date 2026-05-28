@@ -6,7 +6,7 @@
 \usage{
 as_attrition_table(
   flow,
-  backend = c("flextable", "huxtable"),
+  backend = c("flextable", "gt", "huxtable"),
   show_categories = TRUE,
   assessed_label = "Assessed for eligibility",
   final_label = "Final cohort",
@@ -20,7 +20,7 @@ as_attrition_table(
 \arguments{
 \item{flow}{A \code{cf_flow} object produced by \code{\link[=apply_criteria]{apply_criteria()}}.}
 
-\item{backend}{Character string: \code{"flextable"} (default) or \code{"huxtable"}.}
+\item{backend}{Character string: \code{"flextable"} (default), \code{"gt"}, or \code{"huxtable"}.}
 
 \item{show_categories}{Logical. When \code{TRUE} (default) steps with the same
 \code{category} are collapsed under a single parent row. When \code{FALSE} one row
