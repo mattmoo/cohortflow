@@ -144,7 +144,7 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
 
   if (kind == "formula") {
     expr <- parse(text = s$expr, keep.source = FALSE)[[1L]]
-    pred <- as.formula(call("~", expr), env = envir)
+    pred <- stats::as.formula(call("~", expr), env = envir)
   } else {
     if (!is.null(s$fn_ref)) {
       parts <- strsplit(s$fn_ref, "::", fixed = TRUE)[[1L]]

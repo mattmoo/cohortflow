@@ -1,6 +1,6 @@
 Package: cohortflow
 Title: Define and Apply Cohort Inclusion/Exclusion Criteria
-Version: 0.0.0.9004
+Version: 0.0.0.9006
 Authors@R:
     person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
 Description: Define inclusion and exclusion criteria for cohort studies using
@@ -11,6 +11,8 @@ Description: Define inclusion and exclusion criteria for cohort studies using
     YAML for reproducibility and sharing.
 License: MIT + file LICENSE
 Encoding: UTF-8
+Depends:
+    R (>= 4.1.0)
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Suggests:

@@ -1,4 +1,4 @@
-#' Create an eligibility criteria pipeline
+﻿#' Create an eligibility criteria pipeline
 #'
 #' `cf_criteria()` initialises an empty criteria pipeline. Use the pipe
 #' operators `include()`, `exclude()`, `group_include()`, `group_exclude()`,
@@ -15,8 +15,8 @@
 #' crit <- cf_criteria() |>
 #'   include(~ age >= 18, label = "Adults only") |>
 #'   include(has_consent, label = "Consent recorded") |>
-#'   exclude(~ withdrew, label = "Withdrew consent") |
-#'   group_include(by = "cluster_id", ~ n() >= 5, label = "Cluster size >= 5") |
+#'   exclude(~ withdrew, label = "Withdrew consent") |>
+#'   group_include(by = "cluster_id", ~ n() >= 5, label = "Cluster size >= 5") |>
 #'   select_within(by = "participant_id", ~ consent_date == min(consent_date, na.rm = TRUE),
 #'                 label = "Index operation")
 #'
@@ -192,7 +192,7 @@ print.cf_criteria <- function(x, ...) {
   cat(sprintf("Cohort criteria pipeline  (%d step%s)\n", n, if (n == 1) "" else "s"))
 
   if (n == 0L) {
-    cat("  <empty — use include() / exclude() / group_include() etc. to add steps>\n")
+    cat("  <empty -- use include() / exclude() / group_include() etc. to add steps>\n")
   } else {
     for (i in seq_along(x$steps)) {
       s <- x$steps[[i]]

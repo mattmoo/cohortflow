@@ -2,6 +2,7 @@
 #'
 #' A `cf_criterion` represents one inclusion or exclusion step in a cohort
 #' eligibility pipeline.
+#' @importFrom rlang .data
 #' Five step types are supported (see `type`). The predicate is always a
 #' one-sided **formula** or a **function**; the interpretation depends on
 #' the step type.
@@ -211,7 +212,6 @@ eval_group_criterion <- function(criterion, data) {
   if (is_formula(criterion$predicate)) {
     # Evaluate in summarise() context using dplyr
     grp <- dplyr::group_by(data, .data[[by_col]])
-    # Build an env that exposes dplyr context functions (n, n_distinct, etc.)
     # while preserving the formula's own enclosing environment for user bindings.
     pred_env <- new.env(parent = environment(criterion$predicate))
     pred_env$n           <- dplyr::n

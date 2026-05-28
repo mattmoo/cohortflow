@@ -2,7 +2,7 @@
 
 [![R-CMD-check](https://github.com/mattmoo/cohortflow/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/mattmoo/cohortflow/actions/workflows/R-CMD-check.yaml)
 [![lint](https://github.com/mattmoo/cohortflow/actions/workflows/lint.yaml/badge.svg)](https://github.com/mattmoo/cohortflow/actions/workflows/lint.yaml)
-[![codecov](https://codecov.io/gh/mattmoo/cohortflow/branch/main/graph/badge.svg)](https://codecov.io/gh/mattmoo/cohortflow)
+[![codecov](https://codecov.io/gh/mattmoo/cohortflow/branch/master/graph/badge.svg)](https://codecov.io/gh/mattmoo/cohortflow)
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html)
 [![r-universe](https://mattmoo.r-universe.dev/badges/cohortflow)](https://mattmoo.r-universe.dev/cohortflow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

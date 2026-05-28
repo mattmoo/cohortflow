@@ -41,6 +41,11 @@
 #'
 #' # Larger study with three periods
 #' mock_cohortflow(n_participants = 2000, n_clusters = 20, n_periods = 3, seed = 42)
+utils::globalVariables(c(
+  "participant_id", "event_id", "cluster_id", "site_id", "period",
+  "sequence", "age", "age_group", "sex", "ethnicity",
+  "eligible_screen", "consent_date", "baseline_complete", "withdrew"
+))
 mock_cohortflow <- function(
   n_participants = 500L,
   n_clusters     = 10L,
@@ -88,7 +93,7 @@ mock_cohortflow <- function(
   period_draw  <- sample(seq_len(n_periods), n_participants, replace = TRUE)
 
   # Age: mix of adults and a few minors; 5 % NA
-  age_raw <- round(rnorm(n_participants, mean = 45, sd = 15))
+  age_raw <- round(stats::rnorm(n_participants, mean = 45, sd = 15))
   age_raw[age_raw < 5]  <- 5L    # floor at 5
   age_raw[age_raw > 90] <- 90L   # cap at 90
   age_raw[sample(n_participants, max(1L, round(0.05 * n_participants)))] <- NA_real_
