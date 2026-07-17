@@ -3,7 +3,7 @@
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
-# mock_parallel_rct()
+# mock_parallel_rct
 # ---------------------------------------------------------------------------
 
 test_that("mock_parallel_rct() returns a tibble with expected columns", {
@@ -39,7 +39,7 @@ test_that("mock_parallel_rct() errors with fewer than 2 arm_labels", {
 })
 
 # ---------------------------------------------------------------------------
-# mock_crossover()
+# mock_crossover
 # ---------------------------------------------------------------------------
 
 test_that("mock_crossover() returns a tibble with expected columns", {
@@ -94,7 +94,7 @@ test_that("mock_crossover() errors with fewer than 2 arm_labels", {
 })
 
 # ---------------------------------------------------------------------------
-# mock_cluster_rct()
+# mock_cluster_rct
 # ---------------------------------------------------------------------------
 
 test_that("mock_cluster_rct() returns a tibble with expected columns", {
@@ -132,7 +132,7 @@ test_that("mock_cluster_rct() is reproducible with same seed", {
 })
 
 # ---------------------------------------------------------------------------
-# mock_stepped_wedge()
+# mock_stepped_wedge
 # ---------------------------------------------------------------------------
 
 test_that("mock_stepped_wedge() returns a tibble with expected columns", {

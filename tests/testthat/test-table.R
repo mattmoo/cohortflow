@@ -70,7 +70,7 @@ test_that("final row pct_removed is retention percentage", {
 })
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble -- show_categories = TRUE (default)
+# as_attrition_tibble, show_categories TRUE (default)
 # ---------------------------------------------------------------------------
 
 test_that("show_categories=TRUE produces category rows with indent_level 1", {
@@ -147,7 +147,7 @@ test_that("grouped step sub-rows' pct_removed is relative to the category's ente
 
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble -- show_categories = FALSE
+# as_attrition_tibble, show_categories FALSE
 # ---------------------------------------------------------------------------
 
 test_that("show_categories=FALSE produces one step row per criterion", {

@@ -105,7 +105,7 @@ test_that("as_consort_diagram() accepts custom fill and border colours", {
 })
 
 # ---------------------------------------------------------------------------
-# print.consort_diagram()
+# print.consort_diagram
 # ---------------------------------------------------------------------------
 
 test_that("print.consort_diagram() returns the diagram invisibly", {
@@ -120,7 +120,7 @@ test_that("print.consort_diagram() returns the diagram invisibly", {
 })
 
 # ---------------------------------------------------------------------------
-# plot.cf_flow()
+# plot.cf_flow
 # ---------------------------------------------------------------------------
 
 test_that("plot.cf_flow() returns a consort_diagram invisibly and prints it", {
