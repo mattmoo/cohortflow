@@ -6,3 +6,4 @@
 .quarto
 dev
 .Rprofile
+*.pdf

@@ -1,5 +1,5 @@
 test_that("apply_criteria() returns a cf_flow object", {
-  dat  <- mock_cohortflow(100, seed = 1)
+  dat  <- suppressWarnings(mock_cohortflow(100, seed = 1))
   crit <- cf_criteria() |>
     include(~ eligible_screen, label = "Screening")
   flow <- apply_criteria(dat, crit)
@@ -7,8 +7,9 @@ test_that("apply_criteria() returns a cf_flow object", {
   expect_named(flow, c("data", "criteria", "steps"))
 })
 
+
 test_that("apply_criteria() adds .cf_row_id when absent", {
-  dat  <- mock_cohortflow(50, seed = 1)
+  dat  <- suppressWarnings(mock_cohortflow(50, seed = 1))
   crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
   expect_message(
     flow <- apply_criteria(dat, crit),
@@ -18,7 +19,7 @@ test_that("apply_criteria() adds .cf_row_id when absent", {
 })
 
 test_that("apply_criteria() uses existing .cf_row_id column", {
-  dat <- mock_cohortflow(50, seed = 1)
+  dat <- suppressWarnings(mock_cohortflow(50, seed = 1))
   dat$.cf_row_id <- seq_len(nrow(dat))
   crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
   flow <- suppressMessages(apply_criteria(dat, crit))
@@ -26,14 +27,14 @@ test_that("apply_criteria() uses existing .cf_row_id column", {
 })
 
 test_that("apply_criteria() uses supplied id column", {
-  dat  <- mock_cohortflow(50, seed = 1)
+  dat  <- suppressWarnings(mock_cohortflow(50, seed = 1))
   crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
   flow <- apply_criteria(dat, crit, id = "participant_id")
   expect_equal(flow$data$.cf_row_id, dat$participant_id)
 })
 
 test_that("include() step keeps TRUE rows cumulatively", {
-  dat  <- mock_cohortflow(200, seed = 42)
+  dat  <- suppressWarnings(mock_cohortflow(200, seed = 42))
   crit <- cf_criteria() |>
     include(~ eligible_screen, label = "Screening") |>
     include(~ !is.na(consent_date), label = "Consent")
@@ -47,7 +48,7 @@ test_that("include() step keeps TRUE rows cumulatively", {
 })
 
 test_that("exclude() step drops TRUE rows", {
-  dat  <- mock_cohortflow(200, seed = 42)
+  dat  <- suppressWarnings(mock_cohortflow(200, seed = 42))
   crit <- cf_criteria() |>
     include(~ eligible_screen, label = "Screening") |>
     exclude(~ withdrew, label = "Withdrew")
@@ -59,7 +60,7 @@ test_that("exclude() step drops TRUE rows", {
 })
 
 test_that("group_include() removes all rows from failing groups", {
-  dat  <- mock_cohortflow(300, n_clusters = 5, seed = 7)
+  dat  <- suppressWarnings(mock_cohortflow(300, n_clusters = 5, seed = 7))
   crit <- cf_criteria() |>
     group_include(by = "cluster_id", ~ n() >= 50, label = "Large clusters")
   flow <- suppressMessages(apply_criteria(dat, crit))
@@ -72,7 +73,7 @@ test_that("group_include() removes all rows from failing groups", {
 })
 
 test_that("group_exclude() removes all rows from matching groups", {
-  dat  <- mock_cohortflow(300, n_clusters = 5, seed = 7)
+  dat  <- suppressWarnings(mock_cohortflow(300, n_clusters = 5, seed = 7))
   crit <- cf_criteria() |>
     group_exclude(by = "cluster_id", ~ n() < 50, label = "Small clusters")
   flow <- suppressMessages(apply_criteria(dat, crit))
@@ -84,7 +85,7 @@ test_that("group_exclude() removes all rows from matching groups", {
 })
 
 test_that("select_within() keeps only predicate-TRUE rows per group", {
-  dat <- mock_cohortflow(100, seed = 1)
+  dat <- suppressWarnings(mock_cohortflow(100, seed = 1))
   # Keep only one row per cluster (the one with the earliest consent_date)
   crit <- cf_criteria() |>
     include(~ !is.na(consent_date), label = "Has consent") |>
@@ -102,7 +103,7 @@ test_that("select_within() keeps only predicate-TRUE rows per group", {
 })
 
 test_that("cohort() returns original columns without .cf_row_id", {
-  dat  <- mock_cohortflow(100, seed = 1)
+  dat  <- suppressWarnings(mock_cohortflow(100, seed = 1))
   crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
   flow <- suppressMessages(apply_criteria(dat, crit))
   out  <- cohort(flow)
@@ -112,7 +113,7 @@ test_that("cohort() returns original columns without .cf_row_id", {
 })
 
 test_that("excluded() returns flat tibble with cf_step / cf_label / cf_type", {
-  dat  <- mock_cohortflow(200, seed = 3)
+  dat  <- suppressWarnings(mock_cohortflow(200, seed = 3))
   crit <- cf_criteria() |>
     include(~ eligible_screen,    label = "Screening") |>
     include(~ !is.na(consent_date), label = "Consent")
@@ -125,7 +126,7 @@ test_that("excluded() returns flat tibble with cf_step / cf_label / cf_type", {
 })
 
 test_that("cohort() + excluded() together account for all rows", {
-  dat  <- mock_cohortflow(200, seed = 5)
+  dat  <- suppressWarnings(mock_cohortflow(200, seed = 5))
   crit <- cf_criteria() |>
     include(~ eligible_screen,      label = "Screening") |>
     include(~ !is.na(consent_date), label = "Consent") |>
@@ -148,7 +149,7 @@ test_that("excluded() returns empty tibble when nothing excluded", {
 })
 
 test_that("print.cf_flow() produces output", {
-  dat  <- mock_cohortflow(100, seed = 1)
+  dat  <- suppressWarnings(mock_cohortflow(100, seed = 1))
   crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
   flow <- suppressMessages(apply_criteria(dat, crit))
   expect_output(print(flow), "Cohort flow")
@@ -156,7 +157,7 @@ test_that("print.cf_flow() produces output", {
 })
 
 test_that("multiple step types work together in one pipeline", {
-  dat  <- mock_cohortflow(300, n_clusters = 6, seed = 99)
+  dat  <- suppressWarnings(mock_cohortflow(300, n_clusters = 6, seed = 99))
   crit <- cf_criteria() |>
     include(~ eligible_screen,         label = "Screening") |>
     include(~ !is.na(consent_date),    label = "Consent") |>

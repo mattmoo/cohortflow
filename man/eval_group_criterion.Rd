@@ -2,11 +2,11 @@
 % Please edit documentation in R/criterion.R
 \name{eval_group_criterion}
 \alias{eval_group_criterion}
-\title{Evaluate a group-level criterion — returns a logical vector (nrow(data))}
+\title{Evaluate a group-level criterion -- returns a logical vector (nrow(data))}
 \usage{
 eval_group_criterion(criterion, data)
 }
 \description{
-Evaluate a group-level criterion — returns a logical vector (nrow(data))
+Evaluate a group-level criterion -- returns a logical vector (nrow(data))
 }
 \keyword{internal}

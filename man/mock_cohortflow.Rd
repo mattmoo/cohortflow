@@ -2,7 +2,7 @@
 % Please edit documentation in R/mock.R
 \name{mock_cohortflow}
 \alias{mock_cohortflow}
-\title{Generate synthetic cohort data for testing and examples}
+\title{Generate synthetic cohort data for testing and examples (deprecated)}
 \usage{
 mock_cohortflow(
   n_participants = 500L,
@@ -29,7 +29,7 @@ stepped-wedge design). Set to \code{1} for a simple cross-sectional cohort.}
 A \code{\link[tibble:tibble]{tibble::tibble()}} with columns:
 \describe{
 \item{\code{participant_id}}{Character. Unique participant identifier.}
-\item{\code{event_id}}{Character. Unique event (row) identifier — useful when
+\item{\code{event_id}}{Character. Unique event (row) identifier -- useful when
 the dataset has multiple rows per participant (e.g., one per operation).}
 \item{\code{cluster_id}}{Character. Cluster identifier.}
 \item{\code{site_id}}{Character. Site identifier (clusters nested in sites).}
@@ -49,10 +49,19 @@ eligibility screening (e.g., diagnosis confirmed).}
 }
 }
 \description{
+\strong{Deprecated.} \code{mock_cohortflow()} is deprecated in favour of
+design-specific generators that produce realistic data for common study
+designs: \code{\link[=mock_parallel_rct]{mock_parallel_rct()}}, \code{\link[=mock_crossover]{mock_crossover()}}, \code{\link[=mock_cluster_rct]{mock_cluster_rct()}},
+and \code{\link[=mock_stepped_wedge]{mock_stepped_wedge()}}. Those functions include an explicit \code{arm}
+column and design-appropriate structure (e.g. cluster-level
+randomisation, within-participant crossover sequences, stepped-wedge
+roll-out), which \code{mock_cohortflow()} never modelled.
+
 Produces a tibble that mimics a clustered cohort study with optional
-stepped-wedge period structure. The returned data is deliberately imperfect:
-some participants have missing values, withdrew consent, or failed screening,
-so that inclusion/exclusion criteria have something to remove.
+stepped-wedge period structure. The returned data is deliberately
+imperfect: some participants have missing values, withdrew consent, or
+failed screening, so that inclusion/exclusion criteria have something to
+remove.
 }
 \examples{
 mock_cohortflow()

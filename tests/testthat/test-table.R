@@ -1,37 +1,9 @@
 # ===========================================================================
 # Tests for as_attrition_tibble() and as_attrition_table()
 # ===========================================================================
-
-# ---------------------------------------------------------------------------
-# Shared fixtures
-# ---------------------------------------------------------------------------
-
-make_flow_categorised <- function() {
-  dat <- mock_cohortflow(n_participants = 200, seed = 1)
-  crit <- cf_criteria() |>
-    include(~ !is.na(age),     label = "Age recorded",    category = "Age") |>
-    include(~ age >= 18,       label = "Adults only",     category = "Age") |>
-    include(~ eligible_screen, label = "Passed screening", category = "Screening") |>
-    exclude(~ withdrew,        label = "Withdrew consent")
-  apply_criteria(dat, crit)
-}
-
-make_flow_flat <- function() {
-  dat <- mock_cohortflow(n_participants = 200, seed = 1)
-  crit <- cf_criteria() |>
-    include(~ !is.na(age),     label = "Age recorded") |>
-    include(~ age >= 18,       label = "Adults only") |>
-    exclude(~ withdrew,        label = "Withdrew consent")
-  apply_criteria(dat, crit)
-}
-
-make_flow_no_exclusions <- function() {
-  dat <- mock_cohortflow(n_participants = 100, seed = 42)
-  # A criterion that keeps everyone
-  crit <- cf_criteria() |>
-    include(~ !is.na(participant_id), label = "Has ID")
-  apply_criteria(dat, crit)
-}
+#
+# Shared fixtures (make_flow_categorised(), make_flow_flat(),
+# make_flow_no_exclusions()) live in helper-fixtures.R.
 
 # ---------------------------------------------------------------------------
 # as_attrition_tibble -- input validation
@@ -41,6 +13,7 @@ test_that("as_attrition_tibble() rejects non-cf_flow input", {
   expect_error(as_attrition_tibble(list()), "`flow` must be a `cf_flow` object")
   expect_error(as_attrition_tibble(NULL),   "`flow` must be a `cf_flow` object")
 })
+
 
 # ---------------------------------------------------------------------------
 # as_attrition_tibble -- structure
@@ -149,6 +122,29 @@ test_that("category pct_removed is relative to entering N of first step", {
 
   expect_equal(age_cat$pct_removed, expected_pct)
 })
+
+test_that("grouped step sub-rows' pct_removed is relative to the category's entering N", {
+  flow <- make_flow_categorised()
+  out  <- as_attrition_tibble(flow, show_categories = TRUE)
+
+  age_cat <- out[out$row_type == "category" & out$label == "Age", ]
+  age_steps <- out[out$row_type == "step" & out$indent_level == 2L &
+                     out$label %in% c("Age recorded", "Adults only"), ]
+
+  expected_pct <- round(100 * age_steps$n_removed / age_cat$n, 1)
+  expect_equal(age_steps$pct_removed, expected_pct)
+
+  # Sanity check: the second step's own entering N is smaller than the
+  # category's entering N (since it enters after the first step has
+  # already removed some participants), so its pct_removed differs from
+  # what it would be if computed relative to its own entering N.
+  adults_step <- age_steps[age_steps$label == "Adults only", ]
+  own_n_pct <- round(100 * adults_step$n_removed / adults_step$n, 1)
+  if (adults_step$n != age_cat$n) {
+    expect_false(isTRUE(all.equal(adults_step$pct_removed, own_n_pct)))
+  }
+})
+
 
 # ---------------------------------------------------------------------------
 # as_attrition_tibble -- show_categories = FALSE

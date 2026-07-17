@@ -35,6 +35,12 @@
 #'   relative to the initial N (i.e. `n / n_start * 100`).
 #' * Percentages are relative to `n_in` -- the number entering that step or,
 #'   for a category row, the number entering the first step in that category.
+#' * When steps are grouped under a category (`show_categories = TRUE`),
+#'   each step sub-row's `pct_removed` is also expressed relative to the
+#'   category's total entering N (rather than its own, progressively
+#'   smaller, entering N), so that all rows within a category share the same
+#'   denominator and sum consistently with the category row's percentage.
+
 #'
 #' @param flow A `cf_flow` object produced by [apply_criteria()].
 #' @param show_categories Logical. When `TRUE` (default) steps with the same
@@ -157,9 +163,14 @@ as_attrition_tibble <- function(
         pct_removed  = pct_removed
       )))
 
-      # Sub-rows for each step in category
+      # Sub-rows for each step in category -- percentages are relative to
+      # the total entering the category (n_in_cat), not each step's own
+      # (progressively smaller) entering N, so that all rows within a
+      # category are expressed as a percentage of the same denominator.
       for (cs in cat_steps) {
-        rows <- c(rows, list(.make_step_row(cs, indent_level = 2L, digits = digits)))
+        rows <- c(rows, list(.make_step_row(
+          cs, indent_level = 2L, digits = digits, pct_denom = n_in_cat
+        )))
       }
 
       i <- j
@@ -173,9 +184,12 @@ as_attrition_tibble <- function(
   lapply(steps, .make_step_row, indent_level = 1L, digits = digits)
 }
 
-# Build one step row
-.make_step_row <- function(s, indent_level, digits) {
-  pct <- if (s$n_in > 0L) round(100 * s$n_fail / s$n_in, digits) else NA_real_
+# Build one step row. `pct_denom` is the denominator used for `pct_removed`
+# (defaults to the step's own entering N); pass a different value (e.g. the
+# category's entering N) to express the percentage relative to a shared
+# denominator across grouped steps.
+.make_step_row <- function(s, indent_level, digits, pct_denom = s$n_in) {
+  pct <- if (pct_denom > 0L) round(100 * s$n_fail / pct_denom, digits) else NA_real_
   tibble::tibble(
     row_type     = "step",
     label        = s$label,
@@ -185,6 +199,7 @@ as_attrition_tibble <- function(
     pct_removed  = pct
   )
 }
+
 
 
 # ---------------------------------------------------------------------------

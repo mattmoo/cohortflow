@@ -2,11 +2,11 @@
 % Please edit documentation in R/criterion.R
 \name{eval_select_criterion}
 \alias{eval_select_criterion}
-\title{Evaluate a select_within criterion — returns a logical vector (nrow(data))}
+\title{Evaluate a select_within criterion -- returns a logical vector (nrow(data))}
 \usage{
 eval_select_criterion(criterion, data)
 }
 \description{
-Evaluate a select_within criterion — returns a logical vector (nrow(data))
+Evaluate a select_within criterion -- returns a logical vector (nrow(data))
 }
 \keyword{internal}

@@ -14,6 +14,7 @@ Define and apply inclusion/exclusion criteria for cohort studies, then generate 
 - Apply criteria step-by-step to a dataset
 - Extract final cohort and excluded records
 - Produce attrition tables as a tibble or formatted table (`flextable`, `gt`, `huxtable`)
+- Render a CONSORT-style flow diagram summarising participant flow
 - Export/import criteria pipelines as YAML for reproducibility
 
 ## Installation
@@ -36,12 +37,14 @@ remotes::install_github("mattmoo/cohortflow")
 ```r
 library(cohortflow)
 
-# Example data
-dat <- mock_cohortflow(n_participants = 200, seed = 1)
+# Example data (a parallel-group RCT). See also mock_crossover(),
+# mock_cluster_rct(), and mock_stepped_wedge() for other study designs.
+dat <- mock_parallel_rct(n_participants = 200, seed = 1)
 
 # Define criteria pipeline
 crit <- cf_criteria() |>
   include(~ !is.na(age),     label = "Age recorded",    category = "Age") |>
+
   include(~ age >= 18,       label = "Adults only",     category = "Age") |>
   include(~ eligible_screen, label = "Passed screening", category = "Screening") |>
   exclude(~ withdrew,        label = "Withdrew consent")
@@ -60,13 +63,17 @@ attr_tbl <- as_attrition_tibble(flow)
 
 # Formatted attrition table
 ft <- as_attrition_table(flow, backend = "flextable")
+
+# CONSORT flow diagram
+diagram <- as_consort_diagram(flow)
+print(diagram)
 ```
 
 ## Visual output
 
-Example visual generated from `as_attrition_tibble(flow)`:
+Example CONSORT flow diagram generated from `as_consort_diagram(flow)`:
 
-![Attrition preview](man/figures/attrition-tibble-preview.png)
+![CONSORT diagram preview](man/figures/consort-diagram-preview.png)
 
 Regenerate this figure:
 
@@ -102,6 +109,7 @@ flowchart LR
   B --> D[Excluded records\nexcluded]
   B --> E[Attrition tibble\nas_attrition_tibble]
   E --> F[Formatted table\nas_attrition_table]
+  E --> H[CONSORT diagram\nas_consort_diagram]
   A --> G[YAML export/import\nexport_criteria / import_criteria]
 ```
 

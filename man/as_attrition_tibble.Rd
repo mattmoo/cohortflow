@@ -63,8 +63,13 @@ Uncategorised steps appear at indent level 1 without sub-rows. When
 \item \code{pct_removed}: percentage of entering N removed at this row's step (or
 category). For the final cohort row this is the percentage \emph{retained}
 relative to the initial N (i.e. \code{n / n_start * 100}).
-\item Percentages are relative to \code{n_in} — the number entering that step or,
+\item Percentages are relative to \code{n_in} -- the number entering that step or,
 for a category row, the number entering the first step in that category.
+\item When steps are grouped under a category (\code{show_categories = TRUE}),
+each step sub-row's \code{pct_removed} is also expressed relative to the
+category's total entering N (rather than its own, progressively
+smaller, entering N), so that all rows within a category share the same
+denominator and sum consistently with the category row's percentage.
 }
 }
 

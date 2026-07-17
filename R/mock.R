@@ -1,15 +1,111 @@
 utils::globalVariables(c(
   "participant_id", "event_id", "cluster_id", "site_id", "period",
   "sequence", "age", "age_group", "sex", "ethnicity",
-  "eligible_screen", "consent_date", "baseline_complete", "withdrew"
+  "eligible_screen", "consent_date", "baseline_complete", "withdrew",
+  "arm"
 ))
 
-#' Generate synthetic cohort data for testing and examples
+# ---------------------------------------------------------------------------
+# Internal helpers shared by all mock_* generators
+# ---------------------------------------------------------------------------
+
+# Generate demographic columns (age, age_group, sex, ethnicity) for `n` rows.
+# Deliberately introduces missingness in `age` to give criteria something to
+# exclude on.
+.mock_demographics <- function(n) {
+  age_raw <- round(stats::rnorm(n, mean = 45, sd = 15))
+  age_raw[age_raw < 5]  <- 5L    # floor at 5
+  age_raw[age_raw > 90] <- 90L   # cap at 90
+  if (n > 0L) {
+    age_raw[sample(n, max(1L, round(0.05 * n)))] <- NA_real_
+  }
+
+  age_group <- dplyr::case_when(
+    is.na(age_raw)  ~ NA_character_,
+    age_raw < 18    ~ "<18",
+    age_raw < 40    ~ "18-39",
+    age_raw < 65    ~ "40-64",
+    TRUE            ~ "65+"
+  )
+
+  sex <- sample(c("M", "F", "O"), n, replace = TRUE,
+                prob = c(0.48, 0.48, 0.04))
+
+  ethnicities <- c("European", "Maori", "Pacific", "Asian", "Other")
+  ethnicity   <- sample(ethnicities, n, replace = TRUE,
+                        prob = c(0.60, 0.15, 0.09, 0.12, 0.04))
+
+  tibble::tibble(
+    age       = age_raw,
+    age_group = age_group,
+    sex       = sex,
+    ethnicity = ethnicity
+  )
+}
+
+# Generate screening/consent/baseline/withdrawal columns for `n` rows,
+# mimicking a typical trial pipeline: ~10% fail screening, 85% of eligible
+# consent, 90% of consented complete baseline, 5% of baseline-completers
+# withdraw.
+.mock_consent_flow <- function(n) {
+  eligible_screen <- stats::runif(n) > 0.10
+
+  consent_prob <- ifelse(eligible_screen, 0.85, 0)
+  consented    <- stats::runif(n) < consent_prob
+
+  origin       <- as.Date("2023-01-01")
+  consent_date <- as.Date(
+    ifelse(consented,
+           as.numeric(origin) + sample(0:364, n, replace = TRUE),
+           NA_real_),
+    origin = "1970-01-01"
+  )
+
+  baseline_complete <- consented & (stats::runif(n) < 0.90)
+  withdrew          <- baseline_complete & (stats::runif(n) < 0.05)
+
+  tibble::tibble(
+    eligible_screen   = eligible_screen,
+    consent_date      = consent_date,
+    baseline_complete = baseline_complete,
+    withdrew          = withdrew
+  )
+}
+
+# Zero-pad an integer id vector with a prefix, e.g. .mock_ids("P", 1:5).
+.mock_ids <- function(prefix, i, width = NULL) {
+  if (is.null(width)) width <- max(2L, nchar(as.character(max(i, 1L))))
+  paste0(prefix, formatC(i, width = width, flag = "0"))
+}
+
+# Emit a one-time-per-session deprecation warning for mock_cohortflow().
+.deprecate_mock_cohortflow <- function() {
+  rlang::warn(
+    paste(
+      "`mock_cohortflow()` is deprecated. Use a design-specific generator",
+      "instead: mock_parallel_rct(), mock_crossover(), mock_cluster_rct(),",
+      "or mock_stepped_wedge()."
+    )
+  )
+}
+
+
+#' Generate synthetic cohort data for testing and examples (deprecated)
+#'
+#' @description
+#' **Deprecated.** `mock_cohortflow()` is deprecated in favour of
+#' design-specific generators that produce realistic data for common study
+#' designs: [mock_parallel_rct()], [mock_crossover()], [mock_cluster_rct()],
+#' and [mock_stepped_wedge()]. Those functions include an explicit `arm`
+#' column and design-appropriate structure (e.g. cluster-level
+#' randomisation, within-participant crossover sequences, stepped-wedge
+#' roll-out), which `mock_cohortflow()` never modelled.
 #'
 #' Produces a tibble that mimics a clustered cohort study with optional
-#' stepped-wedge period structure. The returned data is deliberately imperfect:
-#' some participants have missing values, withdrew consent, or failed screening,
-#' so that inclusion/exclusion criteria have something to remove.
+#' stepped-wedge period structure. The returned data is deliberately
+#' imperfect: some participants have missing values, withdrew consent, or
+#' failed screening, so that inclusion/exclusion criteria have something to
+#' remove.
 #'
 #' @param n_participants Integer. Total number of participant rows.
 #' @param n_clusters Integer. Number of clusters (e.g., GP practices, schools).
@@ -54,6 +150,8 @@ mock_cohortflow <- function(
   n_periods      = 4L,
   seed           = 123L
 ) {
+  .deprecate_mock_cohortflow()
+
   n_participants <- as.integer(n_participants)
   n_clusters     <- as.integer(n_clusters)
   n_sites        <- as.integer(n_sites)
@@ -93,61 +191,22 @@ mock_cohortflow <- function(
 
   period_draw  <- sample(seq_len(n_periods), n_participants, replace = TRUE)
 
-  # Age: mix of adults and a few minors; 5 % NA
-  age_raw <- round(stats::rnorm(n_participants, mean = 45, sd = 15))
-  age_raw[age_raw < 5]  <- 5L    # floor at 5
-  age_raw[age_raw > 90] <- 90L   # cap at 90
-  age_raw[sample(n_participants, max(1L, round(0.05 * n_participants)))] <- NA_real_
-
-  age_group <- dplyr::case_when(
-    is.na(age_raw)  ~ NA_character_,
-    age_raw < 18    ~ "<18",
-    age_raw < 40    ~ "18-39",
-    age_raw < 65    ~ "40-64",
-    TRUE            ~ "65+"
-  )
-
-  sex <- sample(c("M", "F", "O"), n_participants, replace = TRUE,
-                prob = c(0.48, 0.48, 0.04))
-
-  ethnicities <- c("European", "Maori", "Pacific", "Asian", "Other")
-  ethnicity   <- sample(ethnicities, n_participants, replace = TRUE,
-                        prob = c(0.60, 0.15, 0.09, 0.12, 0.04))
-
-  # Eligibility screening: ~10 % fail
-  eligible_screen <- stats::runif(n_participants) > 0.10
-
-  # Consent: 85 % of those who are eligible consent; 0 % of ineligible
-  consent_prob    <- ifelse(eligible_screen, 0.85, 0)
-  consented       <- stats::runif(n_participants) < consent_prob
-  # Random consent dates over a 1-year window
-  origin          <- as.Date("2023-01-01")
-  consent_date    <- as.Date(
-    ifelse(consented,
-           as.numeric(origin) + sample(0:364, n_participants, replace = TRUE),
-           NA_real_),
-    origin = "1970-01-01"
-  )
-
-  # Baseline complete: 90 % of those who consented
-  baseline_complete <- consented & (stats::runif(n_participants) < 0.90)
-
-  # Withdrew: 5 % of those who completed baseline
-  withdrew <- baseline_complete & (stats::runif(n_participants) < 0.05)
+  demog <- .mock_demographics(n_participants)
+  flow  <- .mock_consent_flow(n_participants)
 
   participants <- tibble::tibble(
     participant_id    = pid,
     event_id          = paste0("E", sprintf("%04d", seq_len(n_participants))),
     cluster_id        = cluster_draw,
     period            = period_draw,
-    age               = age_raw,
-    age_group         = age_group,
-    sex               = sex,
-    ethnicity         = ethnicity,
-    eligible_screen   = eligible_screen,
-    consent_date      = consent_date,
-    baseline_complete = baseline_complete,
-    withdrew          = withdrew
+    age               = demog$age,
+    age_group         = demog$age_group,
+    sex               = demog$sex,
+    ethnicity         = demog$ethnicity,
+    eligible_screen   = flow$eligible_screen,
+    consent_date      = flow$consent_date,
+    baseline_complete = flow$baseline_complete,
+    withdrew          = flow$withdrew
   )
 
   # Join cluster attributes (site, sequence)

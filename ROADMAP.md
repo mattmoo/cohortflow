@@ -39,10 +39,11 @@ cohortflow/
 │   ├── apply.R       # apply_criteria(), include(), exclude(), group_*(), select_within()
 │   ├── criteria.R    # cf_criteria() S3 class
 │   ├── criterion.R   # cf_criterion() S3 class
-│   ├── flow.R        # cf_flow S3 class, attrition bar chart
+│   ├── flow.R        # cf_flow S3 class
 │   ├── hierarchy.R   # cf_hierarchy() S3 class
 │   ├── mock.R        # mock_cohortflow() for examples/tests
 │   ├── table.R       # as_attrition_tibble(), as_attrition_table()
+│   ├── consort.R     # as_consort_diagram(), plot.cf_flow()
 │   └── yaml.R        # export_criteria(), import_criteria()
 ├── tests/
 │   └── testthat/     # Tests for apply, criteria, criterion, hierarchy, table, yaml, mock
@@ -74,8 +75,8 @@ cohortflow/
 - [x] **2.6** Fix: update placeholder author info in `DESCRIPTION`
 
 ### Milestone 3: Visualization & CONSORT Diagrams
-- [x] **3.1** Attrition bar chart (`ggplot2`) implemented in `flow.R`
-- [ ] **3.2** Implement true CONSORT flow diagram (consider `DiagrammeR`, `ggraph`, or `grid`-based)
+- [x] **3.1** ~~Attrition bar chart (`ggplot2`)~~ Removed -- superseded by CONSORT flow diagram below
+- [x] **3.2** Implement true CONSORT flow diagram (`grid`-based) in `consort.R`
 - [ ] **3.3** Add plot customisation: themes, label formatting, colour palettes
 - [ ] **3.4** Support export to PNG/SVG/PDF for manuscript submission
 

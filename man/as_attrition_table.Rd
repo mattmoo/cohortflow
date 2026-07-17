@@ -60,16 +60,16 @@ HTML and LaTeX), and \code{"huxtable"}. The underlying data is built by
 \section{Output formats}{
 
 \itemize{
-\item \strong{\code{"flextable"}} — uses the \pkg{flextable} and \pkg{officer} packages.
+\item \strong{\code{"flextable"}} -- uses the \pkg{flextable} and \pkg{officer} packages.
 Renders natively to Word (\code{.docx}) via \code{officer::read_docx()}, to PDF
 via \code{flextable::save_as_image()}, and to HTML. Best choice when Word is
 the primary target.
-\item \strong{\code{"gt"}} — uses the \pkg{gt} package. Renders to HTML
+\item \strong{\code{"gt"}} -- uses the \pkg{gt} package. Renders to HTML
 (\code{gt::gtsave(..., "table.html")}), LaTeX
 (\code{gt::as_latex()}), and Word (via \code{gt::gtsave(..., "table.docx")}
 requires the \pkg{webshot2} package). Best choice when LaTeX or HTML
 is the primary target.
-\item \strong{\code{"huxtable"}} — uses the \pkg{huxtable} package. Supports Word, LaTeX,
+\item \strong{\code{"huxtable"}} -- uses the \pkg{huxtable} package. Supports Word, LaTeX,
 and HTML output.
 }
 }
