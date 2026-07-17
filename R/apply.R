@@ -124,7 +124,7 @@ apply_criteria <- function(data, criteria, id = NULL) {
   }
 
   if (".cf_row_id" %in% names(data)) {
-    # Already has an ID column — use it
+    # Already has an ID column -- use it
     return(data)
   }
 

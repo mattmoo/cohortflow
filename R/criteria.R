@@ -1,4 +1,4 @@
-﻿#' Create an eligibility criteria pipeline
+#' Create an eligibility criteria pipeline
 #'
 #' `cf_criteria()` initialises an empty criteria pipeline. Use the pipe
 #' operators `include()`, `exclude()`, `group_include()`, `group_exclude()`,

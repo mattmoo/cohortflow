@@ -198,7 +198,7 @@ eval_criterion <- function(criterion, data) {
   result
 }
 
-#' Evaluate a group-level criterion — returns a logical vector (nrow(data))
+#' Evaluate a group-level criterion -- returns a logical vector (nrow(data))
 #' @keywords internal
 eval_group_criterion <- function(criterion, data) {
   stopifnot(criterion$type %in% c("group_include", "group_exclude"))
@@ -239,7 +239,7 @@ eval_group_criterion <- function(criterion, data) {
   pass_map[as.character(data[[by_col]])]
 }
 
-#' Evaluate a select_within criterion — returns a logical vector (nrow(data))
+#' Evaluate a select_within criterion -- returns a logical vector (nrow(data))
 #' @keywords internal
 eval_select_criterion <- function(criterion, data) {
   stopifnot(criterion$type == "select_within")

@@ -12,7 +12,7 @@
 }
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble() — plain data layer
+# as_attrition_tibble() -- plain data layer
 # ---------------------------------------------------------------------------
 
 #' Build an attrition tibble from a cohort flow object
@@ -33,7 +33,7 @@
 #' * `pct_removed`: percentage of entering N removed at this row's step (or
 #'   category). For the final cohort row this is the percentage *retained*
 #'   relative to the initial N (i.e. `n / n_start * 100`).
-#' * Percentages are relative to `n_in` — the number entering that step or,
+#' * Percentages are relative to `n_in` -- the number entering that step or,
 #'   for a category row, the number entering the first step in that category.
 #'
 #' @param flow A `cf_flow` object produced by [apply_criteria()].
@@ -129,7 +129,7 @@ as_attrition_tibble <- function(
     cat <- s$category
 
     if (is.null(cat) || is.na(cat)) {
-      # Uncategorised step — emit a single step row at level 1
+      # Uncategorised step -- emit a single step row at level 1
       rows <- c(rows, list(.make_step_row(s, indent_level = 1L, digits = digits)))
       i <- i + 1L
     } else {
@@ -188,7 +188,7 @@ as_attrition_tibble <- function(
 
 
 # ---------------------------------------------------------------------------
-# as_attrition_table() — formatted table
+# as_attrition_table() -- formatted table
 # ---------------------------------------------------------------------------
 
 #' Format an attrition table from a cohort flow object
@@ -199,16 +199,16 @@ as_attrition_tibble <- function(
 #' [as_attrition_tibble()], which you can call directly for custom formatting.
 #'
 #' @section Output formats:
-#' * **`"flextable"`** — uses the \pkg{flextable} and \pkg{officer} packages.
+#' * **`"flextable"`** -- uses the \pkg{flextable} and \pkg{officer} packages.
 #'   Renders natively to Word (`.docx`) via `officer::read_docx()`, to PDF
 #'   via `flextable::save_as_image()`, and to HTML. Best choice when Word is
 #'   the primary target.
-#' * **`"gt"`** — uses the \pkg{gt} package. Renders to HTML
+#' * **`"gt"`** -- uses the \pkg{gt} package. Renders to HTML
 #'   (`gt::gtsave(..., "table.html")`), LaTeX
 #'   (`gt::as_latex()`), and Word (via `gt::gtsave(..., "table.docx")`
 #'   requires the \pkg{webshot2} package). Best choice when LaTeX or HTML
 #'   is the primary target.
-#' * **`"huxtable"`** — uses the \pkg{huxtable} package. Supports Word, LaTeX,
+#' * **`"huxtable"`** -- uses the \pkg{huxtable} package. Supports Word, LaTeX,
 #'   and HTML output.
 #'
 #' @inheritParams as_attrition_tibble
@@ -289,7 +289,7 @@ as_attrition_table <- function(
 
 
 # ---------------------------------------------------------------------------
-# Shared display helper — formats the tibble for display
+# Shared display helper -- formats the tibble for display
 # ---------------------------------------------------------------------------
 
 # Converts the raw attrition tibble to a display data frame (4 cols) and
@@ -350,7 +350,7 @@ as_attrition_table <- function(
   df    <- display$df
   col_w <- display$col_widths
 
-  # Row indices — flextable body i= is 1-based into the body rows only,
+  # Row indices -- flextable body i= is 1-based into the body rows only,
   # no offset needed.
   header_rows <- which(tbl$row_type == "header")
   final_rows  <- which(tbl$row_type == "final")
@@ -434,7 +434,7 @@ as_attrition_table <- function(
   step1_rows  <- which(tbl$row_type == "step" & tbl$indent_level == 1L)
   step2_rows  <- which(tbl$row_type == "step" & tbl$indent_level == 2L)
 
-  # gt needs a numeric row selector — add a row index
+  # gt needs a numeric row selector -- add a row index
   df$.row <- seq_len(nrow(df))
 
   gt_tbl <- gt::gt(df) |>

@@ -22,7 +22,7 @@ utils::globalVariables(c(
 #' @return A [tibble::tibble()] with columns:
 #' \describe{
 #'   \item{`participant_id`}{Character. Unique participant identifier.}
-#'   \item{`event_id`}{Character. Unique event (row) identifier — useful when
+#'   \item{`event_id`}{Character. Unique event (row) identifier -- useful when
 #'     the dataset has multiple rows per participant (e.g., one per operation).}
 #'   \item{`cluster_id`}{Character. Cluster identifier.}
 #'   \item{`site_id`}{Character. Site identifier (clusters nested in sites).}
@@ -85,7 +85,7 @@ mock_cohortflow <- function(
   pid <- paste0("P", sprintf("%04d", seq_len(n_participants)))
 
   # Imbalanced cluster sizes: Dirichlet-like draw (Gamma shape=0.5 gives high
-  # variance — some clusters will be 3-5x larger than others)
+  # variance -- some clusters will be 3-5x larger than others)
   cluster_weights <- stats::rgamma(n_clusters, shape = 0.5)
   cluster_probs   <- cluster_weights / sum(cluster_weights)
   cluster_draw    <- sample(cluster_ids, n_participants, replace = TRUE,

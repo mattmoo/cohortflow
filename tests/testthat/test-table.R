@@ -34,7 +34,7 @@ make_flow_no_exclusions <- function() {
 }
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble — input validation
+# as_attrition_tibble -- input validation
 # ---------------------------------------------------------------------------
 
 test_that("as_attrition_tibble() rejects non-cf_flow input", {
@@ -43,7 +43,7 @@ test_that("as_attrition_tibble() rejects non-cf_flow input", {
 })
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble — structure
+# as_attrition_tibble -- structure
 # ---------------------------------------------------------------------------
 
 test_that("as_attrition_tibble() returns a tibble with required columns", {
@@ -97,7 +97,7 @@ test_that("final row pct_removed is retention percentage", {
 })
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble — show_categories = TRUE (default)
+# as_attrition_tibble -- show_categories = TRUE (default)
 # ---------------------------------------------------------------------------
 
 test_that("show_categories=TRUE produces category rows with indent_level 1", {
@@ -121,7 +121,7 @@ test_that("uncategorised steps appear at indent_level 1 with row_type 'step'", {
   flow <- make_flow_categorised()
   out  <- as_attrition_tibble(flow, show_categories = TRUE)
 
-  # 'Withdrew consent' has no category — should be step at level 1
+  # 'Withdrew consent' has no category -- should be step at level 1
   withdrew_row <- out[out$label == "Withdrew consent", ]
   expect_equal(nrow(withdrew_row), 1L)
   expect_equal(withdrew_row$row_type, "step")
@@ -151,7 +151,7 @@ test_that("category pct_removed is relative to entering N of first step", {
 })
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble — show_categories = FALSE
+# as_attrition_tibble -- show_categories = FALSE
 # ---------------------------------------------------------------------------
 
 test_that("show_categories=FALSE produces one step row per criterion", {
@@ -179,7 +179,7 @@ test_that("show_categories=FALSE: all step rows at indent_level 1", {
 })
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble — label customisation
+# as_attrition_tibble -- label customisation
 # ---------------------------------------------------------------------------
 
 test_that("custom assessed_label appears in header row", {
@@ -197,7 +197,7 @@ test_that("custom final_label appears in final row", {
 })
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble — numerical consistency
+# as_attrition_tibble -- numerical consistency
 # ---------------------------------------------------------------------------
 
 test_that("step pct_removed = n_removed / n * 100 (rounded to 1 dp)", {
@@ -221,7 +221,7 @@ test_that("total n_removed across steps equals n_start - n_end", {
 })
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble — edge cases
+# as_attrition_tibble -- edge cases
 # ---------------------------------------------------------------------------
 
 test_that("flow with no exclusions produces correct table", {
@@ -235,7 +235,7 @@ test_that("flow with no exclusions produces correct table", {
 })
 
 # ---------------------------------------------------------------------------
-# as_attrition_table — basic smoke tests (no rendering, just class checks)
+# as_attrition_table -- basic smoke tests (no rendering, just class checks)
 # ---------------------------------------------------------------------------
 
 test_that("as_attrition_table() with flextable returns a flextable", {
