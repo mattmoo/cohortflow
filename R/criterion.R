@@ -21,8 +21,8 @@
 #'   `select_within`): a single character string naming the grouping column.
 #'   Ignored for row-wise types.
 #' @param category An optional character string grouping this criterion with
-#'   others for display purposes (e.g. `"Age"` to group age-related steps into
-#'   one box in a CONSORT diagram). `NULL` (default) leaves the step
+#'   others for display purposes (e.g. `"Valid age"` to group age-related steps
+#'   into one box in a CONSORT diagram). `NULL` (default) leaves the step
 #'   uncategorised (`NA` in output).
 #'
 #' @return A `cf_criterion` object (an S3 list).
@@ -34,7 +34,7 @@
 #'
 #' # Grouped under a category
 #' cf_criterion(~ !is.na(age), label = "Age recorded",
-#'              type = "include", category = "Age")
+#'              type = "include", category = "Valid age")
 #'
 #' # Group-level inclusion (clusters with >= 5 participants)
 #' cf_criterion(

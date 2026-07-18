@@ -8,9 +8,9 @@ if (requireNamespace("pkgload", quietly = TRUE)) {
 dat <- mock_parallel_rct(n_participants = 220, seed = 7)
 
 crit <- cf_criteria() |>
-  include(~ !is.na(age), label = "Age recorded", category = "Age") |>
-  include(~ age >= 18, label = "Adults only", category = "Age") |>
-  include(~ eligible_screen, label = "Passed screening", category = "Screening") |>
+  include(~ !is.na(age), label = "Age recorded", category = "Valid age") |>
+  include(~ age >= 18, label = "Adults only", category = "Valid age") |>
+  include(~ eligible_screen, label = "Passed screening", category = "Eligible at screening") |>
   exclude(~ withdrew, label = "Withdrew consent")
 
 flow <- apply_criteria(dat, crit)

@@ -25,7 +25,7 @@ test_that("as_attrition_tibble() returns a tibble with required columns", {
 
   expect_s3_class(out, "tbl_df")
   expect_named(out, c("row_type", "label", "indent_level", "n",
-                      "n_removed", "pct_removed"))
+                      "n_removed", "pct_removed", "branch"))
 })
 
 test_that("first row is the header, last row is the final cohort", {
@@ -90,23 +90,23 @@ test_that("step sub-rows under categories have indent_level 2", {
   expect_gt(nrow(sub_rows), 0L)
 })
 
-test_that("uncategorised steps appear at indent_level 1 with row_type 'step'", {
+test_that("categorised exclude steps appear at indent_level 2 with row_type 'step'", {
   flow <- make_flow_categorised()
   out  <- as_attrition_tibble(flow, show_categories = TRUE)
 
-  # 'Withdrew consent' has no category -- should be step at level 1
+  # 'Withdrew consent' is now categorised under 'Consent' -- should be step at level 2
   withdrew_row <- out[out$label == "Withdrew consent", ]
   expect_equal(nrow(withdrew_row), 1L)
   expect_equal(withdrew_row$row_type, "step")
-  expect_equal(withdrew_row$indent_level, 1L)
+  expect_equal(withdrew_row$indent_level, 2L)
 })
 
 test_that("category row n_removed is sum of constituent step n_fail", {
   flow <- make_flow_categorised()
   out  <- as_attrition_tibble(flow, show_categories = TRUE)
 
-  # Age category: two steps
-  age_cat   <- out[out$row_type == "category" & out$label == "Age", ]
+  # Valid age category: two steps
+  age_cat   <- out[out$row_type == "category" & out$label == "Valid age", ]
   age_steps <- out[out$row_type == "step" & out$indent_level == 2L &
                      out$label %in% c("Age recorded", "Adults only"), ]
 
@@ -117,7 +117,7 @@ test_that("category pct_removed is relative to entering N of first step", {
   flow <- make_flow_categorised()
   out  <- as_attrition_tibble(flow, show_categories = TRUE)
 
-  age_cat <- out[out$row_type == "category" & out$label == "Age", ]
+  age_cat <- out[out$row_type == "category" & out$label == "Valid age", ]
   expected_pct <- round(100 * age_cat$n_removed / age_cat$n, 1)
 
   expect_equal(age_cat$pct_removed, expected_pct)
@@ -127,7 +127,7 @@ test_that("grouped step sub-rows' pct_removed is relative to the category's ente
   flow <- make_flow_categorised()
   out  <- as_attrition_tibble(flow, show_categories = TRUE)
 
-  age_cat <- out[out$row_type == "category" & out$label == "Age", ]
+  age_cat <- out[out$row_type == "category" & out$label == "Valid age", ]
   age_steps <- out[out$row_type == "step" & out$indent_level == 2L &
                      out$label %in% c("Age recorded", "Adults only"), ]
 
@@ -295,4 +295,165 @@ test_that("as_attrition_tibble() respects digits argument", {
 
 test_that("as_attrition_table() rejects non-cf_flow input", {
   expect_error(as_attrition_table(list()), "`flow` must be a `cf_flow` object")
+})
+
+# ---------------------------------------------------------------------------
+# as_attrition_tibble -- singleton category handling
+# ---------------------------------------------------------------------------
+
+test_that("singleton category has NA n_removed and pct_removed on category row", {
+  # Create a flow with a category that has only one step
+  dat <- suppressWarnings(mock_cohortflow(n_participants = 100, seed = 1))
+  crit <- cf_criteria() |>
+    include(~ !is.na(age), label = "Age recorded", category = "Valid age") |>
+    include(~ eligible_screen, label = "Passed screening", category = "Screening")
+  flow <- apply_criteria(dat, crit)
+  out  <- as_attrition_tibble(flow)
+
+  # Both categories have only one step each
+  cat_rows <- out[out$row_type == "category", ]
+  expect_true(all(is.na(cat_rows$n_removed)))
+  expect_true(all(is.na(cat_rows$pct_removed)))
+
+  # But the child step rows should have the actual values
+  step_rows <- out[out$row_type == "step" & out$indent_level == 2L, ]
+  expect_gt(nrow(step_rows), 0L)
+  expect_false(any(is.na(step_rows$n_removed)))
+})
+
+test_that("multi-step category has n_removed and pct_removed on category row", {
+  flow <- make_flow_categorised()
+  out  <- as_attrition_tibble(flow)
+
+  # "Valid age" category has two steps
+  age_cat <- out[out$row_type == "category" & out$label == "Valid age", ]
+  expect_equal(nrow(age_cat), 1L)
+  expect_false(is.na(age_cat$n_removed))
+  expect_false(is.na(age_cat$pct_removed))
+})
+
+# ---------------------------------------------------------------------------
+# as_attrition_tibble -- branching
+# ---------------------------------------------------------------------------
+
+test_that("as_attrition_tibble() accepts branch_by parameter", {
+  flow <- make_flow_parallel_rct()
+  out  <- as_attrition_tibble(flow, branch_by = "arm")
+
+  expect_s3_class(out, "tbl_df")
+  expect_true("branch" %in% names(out))
+})
+
+test_that("branch_by creates one branch row per unique value", {
+  flow <- make_flow_parallel_rct()
+  out  <- as_attrition_tibble(flow, branch_by = "arm")
+
+  branch_rows <- out[out$row_type == "branch", ]
+  cohort_data <- cohort(flow)
+  expected_branches <- length(unique(cohort_data$arm))
+
+  expect_equal(nrow(branch_rows), expected_branches)
+})
+
+test_that("branch counts sum to final cohort size", {
+  flow <- make_flow_parallel_rct()
+  out  <- as_attrition_tibble(flow, branch_by = "arm")
+
+  branch_rows <- out[out$row_type == "branch", ]
+  final_row   <- out[out$row_type == "final", ]
+
+  expect_equal(sum(branch_rows$n), final_row$n)
+})
+
+test_that("branch rows have NA n_removed and pct_removed", {
+  flow <- make_flow_parallel_rct()
+  out  <- as_attrition_tibble(flow, branch_by = "arm")
+
+  branch_rows <- out[out$row_type == "branch", ]
+  expect_true(all(is.na(branch_rows$n_removed)))
+  expect_true(all(is.na(branch_rows$pct_removed)))
+})
+
+test_that("branch rows have indent_level 1", {
+  flow <- make_flow_parallel_rct()
+  out  <- as_attrition_tibble(flow, branch_by = "arm")
+
+  branch_rows <- out[out$row_type == "branch", ]
+  expect_true(all(branch_rows$indent_level == 1L))
+})
+
+test_that("branch_by errors when column not found", {
+  flow <- make_flow_categorised()
+  expect_error(
+    as_attrition_tibble(flow, branch_by = "nonexistent"),
+    "not found"
+  )
+})
+
+test_that("count_by requires branch_by", {
+  flow <- make_flow_crossover()
+  expect_error(
+    as_attrition_tibble(flow, count_by = "participant_id"),
+    "requires.*branch_by"
+  )
+})
+
+test_that("count_by uses distinct counts", {
+  flow <- make_flow_crossover()
+  out  <- as_attrition_tibble(
+    flow,
+    branch_by = "sequence",
+    count_by = "participant_id"
+  )
+
+  branch_rows <- out[out$row_type == "branch", ]
+  cohort_data <- cohort(flow)
+
+  for (i in seq_len(nrow(branch_rows))) {
+    seq_val <- branch_rows$branch[i]
+    expected_n <- dplyr::n_distinct(
+      cohort_data$participant_id[cohort_data$sequence == seq_val]
+    )
+    expect_equal(branch_rows$n[i], expected_n)
+  }
+})
+
+test_that("count_by errors when column not found", {
+  flow <- make_flow_parallel_rct()
+  expect_error(
+    as_attrition_tibble(flow, branch_by = "arm", count_by = "nonexistent"),
+    "not found"
+  )
+})
+
+test_that("linear table has no branch rows when branch_by is NULL", {
+  flow <- make_flow_categorised()
+  out  <- as_attrition_tibble(flow)
+
+  expect_equal(sum(out$row_type == "branch"), 0L)
+})
+
+test_that("as_attrition_table() accepts branch_by parameter", {
+  skip_if_not_installed("flextable")
+  skip_if_not_installed("officer")
+
+  flow <- make_flow_parallel_rct()
+  ft   <- as_attrition_table(flow, backend = "flextable", branch_by = "arm")
+  expect_s3_class(ft, "flextable")
+})
+
+test_that("as_attrition_table() with gt accepts branch_by", {
+  skip_if_not_installed("gt")
+
+  flow <- make_flow_parallel_rct()
+  gt_tbl <- as_attrition_table(flow, backend = "gt", branch_by = "arm")
+  expect_s3_class(gt_tbl, "gt_tbl")
+})
+
+test_that("as_attrition_table() with huxtable accepts branch_by", {
+  skip_if_not_installed("huxtable")
+
+  flow <- make_flow_parallel_rct()
+  ht   <- as_attrition_table(flow, backend = "huxtable", branch_by = "arm")
+  expect_s3_class(ht, "huxtable")
 })

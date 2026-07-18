@@ -24,5 +24,6 @@ Add an exclusion criterion to a criteria pipeline
 }
 \examples{
 cf_criteria() |>
-  exclude(~ withdrew, label = "Withdrew consent")
+  include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
+  exclude(~ withdrew, label = "Withdrew consent", category = "Consent")
 }

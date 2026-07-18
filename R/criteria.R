@@ -14,8 +14,8 @@
 #'
 #' crit <- cf_criteria() |>
 #'   include(~ age >= 18, label = "Adults only") |>
-#'   include(has_consent, label = "Consent recorded") |>
-#'   exclude(~ withdrew, label = "Withdrew consent") |>
+#'   include(has_consent, label = "Consent recorded", category = "Consent") |>
+#'   exclude(~ withdrew, label = "Withdrew consent", category = "Consent") |>
 #'   group_include(by = "cluster_id", ~ n() >= 5, label = "Cluster size >= 5") |>
 #'   select_within(by = "participant_id", ~ consent_date == min(consent_date, na.rm = TRUE),
 #'                 label = "Index operation")
@@ -43,14 +43,14 @@ cf_criteria <- function(...) {
 #' @param predicate A one-sided formula or a function evaluated row-wise.
 #' @param label A short human-readable description of this criterion.
 #' @param category An optional string grouping this step with others for
-#'   display (e.g. `"Age"`). `NULL` leaves it uncategorised.
+#'   display (e.g. `"Valid age"`). `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
 #' @export
 #'
 #' @examples
 #' cf_criteria() |>
-#'   include(~ age >= 18, label = "Adults", category = "Age")
+#'   include(~ age >= 18, label = "Adults", category = "Valid age")
 include <- function(criteria, predicate, label, category = NULL) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label,
@@ -72,7 +72,8 @@ include <- function(criteria, predicate, label, category = NULL) {
 #'
 #' @examples
 #' cf_criteria() |>
-#'   exclude(~ withdrew, label = "Withdrew consent")
+#'   include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
+#'   exclude(~ withdrew, label = "Withdrew consent", category = "Consent")
 exclude <- function(criteria, predicate, label, category = NULL) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label,

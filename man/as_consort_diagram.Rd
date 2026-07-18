@@ -18,7 +18,13 @@ as_consort_diagram(
   text_colour = "#222222",
   font_family = "",
   title = NULL,
-  title_colour = text_colour
+  title_colour = text_colour,
+  wrap_width = NULL,
+  big_mark = ",",
+  branch_by = NULL,
+  stage_by = NULL,
+  stage_label_by = NULL,
+  count_by = NULL
 )
 }
 \arguments{
@@ -63,6 +69,35 @@ Default \code{0.5} (the \code{ggplot2} default line width).}
 (no title).}
 
 \item{title_colour}{Colour for the title text. Default \code{text_colour}.}
+
+\item{wrap_width}{Optional integer. Maximum character width for wrapping
+text in boxes. When \code{NULL} (default), text is not wrapped. When a
+positive integer, each line in a box label is wrapped to at most that
+many characters using word-boundary wrapping.}
+
+\item{big_mark}{Character string used as the thousands-separator when
+formatting counts in box labels (e.g. \code{"1,234"} with the default
+\code{","}). Pass \code{""} to disable grouping (e.g. \code{"1234"}).}
+
+\item{branch_by}{Optional column name (string) for allocation branching.
+When \code{NULL} (default), the diagram is linear. When supplied, the
+surviving cohort is split by this column and branches are drawn below
+the final common-flow box, connected via a right-angle "elbow"
+connector (a trunk dropping from the final box, a horizontal crossbar,
+then a vertical arrow into each branch box). Use
+\code{final_label = "Randomised"} when appropriate.}
+
+\item{stage_by}{Optional column name (string) for ordered stages within
+each branch (e.g. crossover \code{period}). When \code{NULL} (default), no
+stage-specific nodes are drawn.}
+
+\item{stage_label_by}{Optional column name (string) providing labels for
+each stage (e.g. crossover \code{arm}). Ignored when \code{stage_by} is \code{NULL}.}
+
+\item{count_by}{Optional column name (string) for distinct counts. When
+supplied, counts are computed as \code{n_distinct(count_by)} rather than
+\code{nrow()}. Essential for crossover data where one participant has
+several event rows.}
 }
 \value{
 A \code{consort_diagram} object (a \code{ggplot2} \code{ggplot}), drawable via
@@ -92,9 +127,10 @@ with \code{+} and further \code{ggplot2} layers/themes, or exported with
 \examples{
 dat  <- mock_cohortflow(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
-  include(~ !is.na(age),     label = "Age recorded",    category = "Age") |>
-  include(~ age >= 18,       label = "Adults only",     category = "Age") |>
-  exclude(~ withdrew,        label = "Withdrew consent")
+  include(~ !is.na(age),          label = "Age recorded",    category = "Valid age") |>
+  include(~ age >= 18,            label = "Adults only",     category = "Valid age") |>
+  include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
+  exclude(~ withdrew,             label = "Withdrew consent", category = "Consent")
 flow <- apply_criteria(dat, crit)
 as_consort_diagram(flow)
 }

@@ -14,7 +14,7 @@ include(criteria, predicate, label, category = NULL)
 \item{label}{A short human-readable description of this criterion.}
 
 \item{category}{An optional string grouping this step with others for
-display (e.g. \code{"Age"}). \code{NULL} leaves it uncategorised.}
+display (e.g. \code{"Valid age"}). \code{NULL} leaves it uncategorised.}
 }
 \value{
 The updated \code{cf_criteria} object.
@@ -24,5 +24,5 @@ Add an inclusion criterion to a criteria pipeline
 }
 \examples{
 cf_criteria() |>
-  include(~ age >= 18, label = "Adults", category = "Age")
+  include(~ age >= 18, label = "Adults", category = "Valid age")
 }

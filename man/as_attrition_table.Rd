@@ -14,7 +14,9 @@ as_attrition_table(
   criterion_col_label = "Criterion",
   n_col_label = "N",
   removed_col_label = "Removed",
-  pct_col_label = "\% removed"
+  pct_col_label = "\% removed",
+  branch_by = NULL,
+  count_by = NULL
 )
 }
 \arguments{
@@ -46,6 +48,16 @@ Default \code{"Removed"}.}
 
 \item{pct_col_label}{Column header for the percentage column.
 Default \code{"\% removed"}.}
+
+\item{branch_by}{Optional column name (string) for allocation branching.
+When \code{NULL} (default), the table is linear. When supplied, the surviving
+cohort is split by this column and branch rows are appended below the
+final common-flow row. Use \code{final_label = "Randomised"} when appropriate.}
+
+\item{count_by}{Optional column name (string) for distinct counts. When
+supplied, counts are computed as \code{n_distinct(count_by)} rather than
+\code{nrow()}. Essential for crossover data where one participant has several
+event rows.}
 }
 \value{
 A \code{flextable}, \code{gt_tbl}, or \code{huxtable} object, ready to print or
@@ -78,10 +90,11 @@ and HTML output.
 \dontrun{
 dat  <- mock_cohortflow(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
-  include(~ !is.na(age),     label = "Age recorded",    category = "Age") |>
-  include(~ age >= 18,       label = "Adults only",      category = "Age") |>
+  include(~ !is.na(age),     label = "Age recorded",    category = "Valid age") |>
+  include(~ age >= 18,       label = "Adults only",      category = "Valid age") |>
   include(~ eligible_screen, label = "Passed screening") |>
-  exclude(~ withdrew,        label = "Withdrew consent")
+  include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
+  exclude(~ withdrew,        label = "Withdrew consent", category = "Consent")
 flow <- apply_criteria(dat, crit)
 
 as_attrition_table(flow)                       # flextable (Word-ready)

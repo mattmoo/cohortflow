@@ -9,7 +9,9 @@ as_attrition_tibble(
   show_categories = TRUE,
   assessed_label = "Assessed for eligibility",
   final_label = "Final cohort",
-  digits = 1L
+  digits = 1L,
+  branch_by = NULL,
+  count_by = NULL
 )
 }
 \arguments{
@@ -27,19 +29,32 @@ Default \code{"Final cohort"}.}
 
 \item{digits}{Integer. Number of decimal places for \code{pct_removed}. Default
 \code{1}.}
+
+\item{branch_by}{Optional column name (string) for allocation branching.
+When \code{NULL} (default), the table is linear. When supplied, the surviving
+cohort is split by this column and branch rows are appended below the
+final common-flow row. Use \code{final_label = "Randomised"} when appropriate.}
+
+\item{count_by}{Optional column name (string) for distinct counts. When
+supplied, counts are computed as \code{n_distinct(count_by)} rather than
+\code{nrow()}. Essential for crossover data where one participant has several
+event rows.}
 }
 \value{
 A \code{\link[tibble:tibble]{tibble::tibble()}} with columns:
 \describe{
-\item{\code{row_type}}{\code{"header"}, \code{"category"}, \code{"step"}, or \code{"final"}}
+\item{\code{row_type}}{\code{"header"}, \code{"category"}, \code{"step"}, \code{"final"}, or
+\code{"branch"}}
 \item{\code{label}}{Display text for the row}
 \item{\code{indent_level}}{\code{0} = header/final, \code{1} = category or top-level step,
-\code{2} = sub-step under a category}
+\code{2} = sub-step under a category, \code{1} = branch row}
 \item{\code{n}}{Number of participants at this point (N entering for
-category/step rows; N surviving for the final row)}
-\item{\code{n_removed}}{Number removed at this step (\code{NA} for header/final)}
+category/step rows; N surviving for the final row; N in branch for
+branch rows)}
+\item{\code{n_removed}}{Number removed at this step (\code{NA} for header/final/branch)}
 \item{\code{pct_removed}}{Percentage removed relative to entering N (\code{NA} for
-header; for final row: percentage retained of original N)}
+header/branch; for final row: percentage retained of original N)}
+\item{\code{branch}}{Branch value for branch rows (\code{NA} for all other rows)}
 }
 }
 \description{
@@ -76,10 +91,11 @@ denominator and sum consistently with the category row's percentage.
 \examples{
 dat  <- mock_cohortflow(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
-  include(~ !is.na(age),        label = "Age recorded",       category = "Age") |>
-  include(~ age >= 18,          label = "Adults only",         category = "Age") |>
-  include(~ eligible_screen,    label = "Passed screening",    category = "Screening") |>
-  exclude(~ withdrew,           label = "Withdrew consent")
+  include(~ !is.na(age),        label = "Age recorded",       category = "Valid age") |>
+  include(~ age >= 18,          label = "Adults only",         category = "Valid age") |>
+  include(~ eligible_screen,    label = "Passed screening",    category = "Eligible at screening") |>
+  include(~ !is.na(consent_date), label = "Consent recorded",  category = "Consent") |>
+  exclude(~ withdrew,           label = "Withdrew consent",    category = "Consent")
 flow <- apply_criteria(dat, crit)
 as_attrition_tibble(flow)
 }

@@ -34,8 +34,8 @@ identifying which rows within the group to keep.
 Ignored for row-wise types.}
 
 \item{category}{An optional character string grouping this criterion with
-others for display purposes (e.g. \code{"Age"} to group age-related steps into
-one box in a CONSORT diagram). \code{NULL} (default) leaves the step
+others for display purposes (e.g. \code{"Valid age"} to group age-related steps
+into one box in a CONSORT diagram). \code{NULL} (default) leaves the step
 uncategorised (\code{NA} in output).}
 }
 \value{
@@ -54,7 +54,7 @@ cf_criterion(~ age >= 18, label = "Adults only", type = "include")
 
 # Grouped under a category
 cf_criterion(~ !is.na(age), label = "Age recorded",
-             type = "include", category = "Age")
+             type = "include", category = "Valid age")
 
 # Group-level inclusion (clusters with >= 5 participants)
 cf_criterion(

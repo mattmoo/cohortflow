@@ -1,10 +1,55 @@
-.Rproj.user
+# RStudio files
+.Rproj.user/
+
+# History and session data
 .Rhistory
+.Rapp.history
 .RData
+.RDataTmp
+.Ruserdata
+.Renviron
+
+# R CMD build/check artifacts
+/*.tar.gz
+/*.Rcheck/
+*-Ex.R
+*.Rout
+
+# Vignette output
+vignettes/*.html
+vignettes/*.pdf
+
+# knitr / R Markdown
+*_cache/
+/cache/
+*.utf8.md
+*.knit.md
+
+# pkgdown site
+docs/
+
+# renv / packrat
+renv/
+renv.lock
+packrat/
+
+# rsconnect
+rsconnect/
+
+# OAuth2 token cache
 .httr-oauth
+
+# OS-specific
 .DS_Store
+Thumbs.db
+
+# Quarto
 .quarto
+
+# Project-specific
 dev
 .Rprofile
 *.pdf
 .vscode
+
+

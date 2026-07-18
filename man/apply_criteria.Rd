@@ -47,8 +47,8 @@ and \code{id} is \code{NULL}, a sequential integer identifier is added automatic
 dat  <- mock_cohortflow(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
   include(~ eligible_screen, label = "Passed screening") |>
-  include(~ !is.na(consent_date), label = "Consent recorded") |>
-  exclude(~ withdrew, label = "Withdrew consent") |>
+  include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
+  exclude(~ withdrew, label = "Withdrew consent", category = "Consent") |>
   group_include(by = "cluster_id", ~ n() >= 5,
                 label = "Cluster size >= 5")
 

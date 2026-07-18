@@ -77,8 +77,20 @@ cohortflow/
 ### Milestone 3: Visualization & CONSORT Diagrams
 - [x] **3.1** ~~Attrition bar chart (`ggplot2`)~~ Removed -- superseded by CONSORT flow diagram below
 - [x] **3.2** Implement true CONSORT flow diagram (`grid`-based) in `consort.R`
-- [ ] **3.3** Add plot customisation: themes, label formatting, colour palettes
-- [ ] **3.4** Support export to PNG/SVG/PDF for manuscript submission
+- [x] **3.3** Add plot customisation: themes, label formatting, colour palettes
+  - [x] APA-style attrition tables (no colour, minimal borders, Times New Roman)
+  - [x] Singleton category handling (suppress duplicate exclusion counts)
+  - [x] `wrap_width` parameter for text wrapping in boxes
+  - [x] Conditional colon in exclusion headers
+  - [x] Reduced right-side whitespace in diagrams
+- [x] **3.4** Support allocation branching in CONSORT diagrams
+  - [x] `branch_by` parameter for parallel/crossover trial arms
+  - [x] `stage_by` and `stage_label_by` for crossover period/arm labels
+  - [x] `count_by` for distinct participant counts in crossover data
+- [ ] **3.5** Support export to PNG/SVG/PDF for manuscript submission
+- [ ] **3.6** CONSORT 2010 template (blue heading boxes, classic layout)
+- [ ] **3.7** Modern parallel trial template
+- [ ] **3.8** Modern crossover trial template
 
 ### Milestone 4: `targets` Integration
 - [ ] **4.1** Develop `tar_cohort()` target factory
