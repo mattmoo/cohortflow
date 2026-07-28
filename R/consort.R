@@ -540,7 +540,7 @@ as_consort_diagram <- function(
       )
     } else {
       data.frame(id = "branch_trunk", x0 = final_box$x, x1 = final_box$x,
-                y0 = trunk_y0, y1 = gutter_y, stringsAsFactors = FALSE)
+                 y0 = trunk_y0, y1 = gutter_y, stringsAsFactors = FALSE)
     }
 
     # -- Stage nodes (for crossover designs) --------------------------------
