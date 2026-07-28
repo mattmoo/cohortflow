@@ -220,6 +220,9 @@
 #'   `title_colour` is supplied). Default `"#222222"`.
 #' @param font_family Font family for all box text and the title. Default
 #'   `""` (the device's default font family).
+#' @param arrow_size Length (in inches) of arrowheads on connector lines,
+#'   passed to [grid::arrow()]. Default `0.06` (smaller than the historical
+#'   default of `0.1`, which looked oversized relative to typical box sizes).
 #' @param title Optional plot title drawn above the diagram. Default `NULL`
 #'   (no title).
 #' @param title_colour Colour for the title text. Default `text_colour`.
@@ -277,6 +280,7 @@ as_consort_diagram <- function(
   text_size        = 9,
   text_colour      = "#222222",
   font_family      = "",
+  arrow_size       = 0.06,
   title            = NULL,
   title_colour     = text_colour,
   wrap_width       = NULL,
@@ -375,11 +379,16 @@ as_consort_diagram <- function(
   }
 
   has_excl_idx <- !vapply(excl_info, is.null, logical(1L))
-  excl_x <- NA_real_
+  # Left edge shared by every exclusion box, rather than a shared centre --
+  # each box is then positioned so its *left* edge sits here and it only
+  # extends as far right as its own content requires. This avoids padding
+  # narrower boxes out to the width of the widest one (which previously
+  # left excess whitespace to the right of any box narrower than the
+  # widest exclusion box in the column).
+  excl_x_left <- NA_real_
   if (any(has_excl_idx)) {
-    excl_widths <- vapply(excl_info[has_excl_idx], `[[`, numeric(1L), "w")
     main_right_edge <- max(main_df$x + main_df$w / 2)
-    excl_x <- main_right_edge + gap_x + max(excl_widths) / 2
+    excl_x_left <- main_right_edge + gap_x
   }
 
   excl_rows       <- list()
@@ -387,6 +396,7 @@ as_consort_diagram <- function(
   for (i in seq_len(n_main)) {
     if (!is.null(excl_info[[i]])) {
       excl_dims <- excl_info[[i]]
+      excl_x    <- excl_x_left + excl_dims$w / 2
 
       # Branch the exclusion arrow off the main vertical connector at the
       # midpoint between the *previous* main box and this one, so it
@@ -401,7 +411,7 @@ as_consort_diagram <- function(
 
       excl_arrow_rows[[length(excl_arrow_rows) + 1L]] <- data.frame(
         id = paste0("excl_arrow_", i),
-        x0 = main_x, x1 = excl_x - excl_dims$w / 2, y = branch_y
+        x0 = main_x, x1 = excl_x_left, y = branch_y
       )
 
       excl_rows[[length(excl_rows) + 1L]] <- data.frame(
@@ -641,7 +651,7 @@ as_consort_diagram <- function(
       data = main_arrow_df,
       mapping = ggplot2::aes(x = .data$x, xend = .data$x, y = .data$y0, yend = .data$y1),
       colour = border_colour, linewidth = border_linewidth,
-      arrow = grid::arrow(length = grid::unit(0.1, "inches"), type = "closed")
+      arrow = grid::arrow(length = grid::unit(arrow_size, "inches"), type = "closed")
     )
   }
 
@@ -650,7 +660,7 @@ as_consort_diagram <- function(
       data = excl_arrow_df,
       mapping = ggplot2::aes(x = .data$x0, xend = .data$x1, y = .data$y, yend = .data$y),
       colour = border_colour, linewidth = border_linewidth,
-      arrow = grid::arrow(length = grid::unit(0.1, "inches"), type = "closed")
+      arrow = grid::arrow(length = grid::unit(arrow_size, "inches"), type = "closed")
     )
   }
 
@@ -703,7 +713,7 @@ as_consort_diagram <- function(
       data = branch_arrow_df,
       mapping = ggplot2::aes(x = .data$x, xend = .data$x, y = .data$y0, yend = .data$y1),
       colour = border_colour, linewidth = border_linewidth,
-      arrow = grid::arrow(length = grid::unit(0.1, "inches"), type = "closed")
+      arrow = grid::arrow(length = grid::unit(arrow_size, "inches"), type = "closed")
     )
   }
 
@@ -731,7 +741,7 @@ as_consort_diagram <- function(
       data = stage_arrow_df,
       mapping = ggplot2::aes(x = .data$x, xend = .data$x, y = .data$y0, yend = .data$y1),
       colour = border_colour, linewidth = border_linewidth,
-      arrow = grid::arrow(length = grid::unit(0.1, "inches"), type = "closed")
+      arrow = grid::arrow(length = grid::unit(arrow_size, "inches"), type = "closed")
     )
   }
 

@@ -16,7 +16,14 @@ as_attrition_table(
   removed_col_label = "Removed",
   pct_col_label = "\% removed",
   branch_by = NULL,
-  count_by = NULL
+  count_by = NULL,
+  group_x = NULL,
+  group_y = NULL,
+  group_x_label = NULL,
+  group_y_label = NULL,
+  shade = NULL,
+  shade_fn = NULL,
+  shade_palette = c("#FFFFFF", "#F8696B")
 )
 }
 \arguments{
@@ -50,18 +57,53 @@ Default \code{"Removed"}.}
 Default \code{"\% removed"}.}
 
 \item{branch_by}{Optional column name (string) for allocation branching.
-When \code{NULL} (default), the table is linear. When supplied, the surviving
-cohort is split by this column and branch rows are appended below the
-final common-flow row. Use \code{final_label = "Randomised"} when appropriate.}
+When \code{NULL} (default), the table has a single \code{n} column. When
+supplied, the surviving cohort is split by this column and the final
+row's total is broken out into one additional column per branch value
+(named after the branch value, e.g. \code{Control}, \code{Intervention}), each
+populated only on the final row. Use \code{final_label = "Randomised"} when
+appropriate. Cannot be combined with \code{group_x}/\code{group_y}.}
 
 \item{count_by}{Optional column name (string) for distinct counts. When
 supplied, counts are computed as \code{n_distinct(count_by)} rather than
 \code{nrow()}. Essential for crossover data where one participant has several
 event rows.}
+
+\item{group_x}{Optional column name (string), present in \code{flow$data}, used
+to repeat the attrition table across the "column" direction (e.g. trial
+site). See the Grouping section.}
+
+\item{group_y}{Optional column name (string), present in \code{flow$data}, used
+to repeat the attrition table across the "row" direction (e.g. time
+period). See the Grouping section.}
+
+\item{group_x_label}{Optional prefix label for \code{group_x} column headings
+(e.g. \code{"Site"} to show \code{"Site: A"}). Default \code{NULL} (show the group
+value alone).}
+
+\item{group_y_label}{Optional prefix label for \code{group_y} row headings
+(e.g. \code{"Period"} to show \code{"Period: 1"}). Default \code{NULL} (show the group
+value alone).}
+
+\item{shade}{Optional character string: \code{"pct_removed"} or \code{"n_removed"}.
+When supplied, shades the N/Removed/\% cells of step and category rows
+with an automatic colour gradient based on that column's value. Default
+\code{NULL} (no shading).}
+
+\item{shade_fn}{Optional function for custom cell shading; see the
+Shading section. Default \code{NULL}.}
+
+\item{shade_palette}{Character vector of >= 2 colours defining the
+gradient used by \code{shade}. Default \code{c("#FFFFFF", "#F8696B")} (white to
+red).}
 }
 \value{
 A \code{flextable}, \code{gt_tbl}, or \code{huxtable} object, ready to print or
-include in a document.
+include in a document. When \code{branch_by} is supplied, one additional
+column per branch value is added after the percentage column, headed
+with the branch value itself and populated only on the final row. When
+\code{group_x}/\code{group_y} are supplied, the table is a repeated grid as
+described in the Grouping section.
 }
 \description{
 Produces a formatted attrition table from a \code{cf_flow} object. Three output
@@ -86,6 +128,33 @@ and HTML output.
 }
 }
 
+\section{Grouping (\code{group_x} / \code{group_y})}{
+
+Supplying \code{group_x} and/or \code{group_y} repeats the whole attrition table
+across a grid: \code{group_x} values become repeated column blocks (N /
+Removed / \% removed, headed by a spanning column group), and \code{group_y}
+values become repeated row blocks (each preceded by a bold group-heading
+row), so the criterion rows appear once but attrition counts are shown
+per group combination. This is useful, for example, for showing a
+stepped-wedge trial's attrition by site (\code{group_x}) and period
+(\code{group_y}). \code{branch_by} cannot be combined with grouping.
+}
+
+\section{Shading}{
+
+Cells can be shaded to highlight high-attrition rows/cells:
+\itemize{
+\item \code{shade = "pct_removed"} or \code{"n_removed"} applies an automatic colour
+gradient (\code{shade_palette}, default white to red) scaled across the
+values present in step/category rows.
+\item \code{shade_fn} gives full control: supply a function that takes the
+attrition tibble (as returned by \code{\link[=as_attrition_tibble]{as_attrition_tibble()}}, including
+\code{group_x}/\code{group_y} columns when grouped) and returns a character
+vector of colours (or \code{NA}) the same length as the tibble, one colour
+per row. \code{shade_fn} takes precedence over \code{shade} if both are supplied.
+}
+}
+
 \examples{
 \dontrun{
 dat  <- mock_cohortflow(n_participants = 200, seed = 1)
@@ -101,16 +170,17 @@ as_attrition_table(flow)                       # flextable (Word-ready)
 as_attrition_table(flow, backend = "gt")       # gt (LaTeX/HTML-ready)
 as_attrition_table(flow, backend = "huxtable") # huxtable
 
+# Shade cells by percentage removed
+as_attrition_table(flow, shade = "pct_removed")
+
+# Grid: sites as columns, periods as rows (stepped-wedge design)
+sw   <- mock_stepped_wedge(n_participants = 400, n_periods = 4, seed = 1)
+flow_sw <- apply_criteria(sw, crit, id = "event_id")
+as_attrition_table(flow_sw, group_x = "site_id", group_y = "period")
+
 # Save to Word
 ft <- as_attrition_table(flow)
 flextable::save_as_docx(ft, path = "attrition.docx")
-
-# Save to Word via gt
-gt_tbl <- as_attrition_table(flow, backend = "gt")
-gt::gtsave(gt_tbl, "attrition.docx")
-
-# LaTeX snippet via gt
-gt::as_latex(gt_tbl)
 }
 }
 \seealso{

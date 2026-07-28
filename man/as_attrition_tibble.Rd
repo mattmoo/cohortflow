@@ -11,7 +11,9 @@ as_attrition_tibble(
   final_label = "Final cohort",
   digits = 1L,
   branch_by = NULL,
-  count_by = NULL
+  count_by = NULL,
+  group_x = NULL,
+  group_y = NULL
 )
 }
 \arguments{
@@ -31,31 +33,46 @@ Default \code{"Final cohort"}.}
 \code{1}.}
 
 \item{branch_by}{Optional column name (string) for allocation branching.
-When \code{NULL} (default), the table is linear. When supplied, the surviving
-cohort is split by this column and branch rows are appended below the
-final common-flow row. Use \code{final_label = "Randomised"} when appropriate.}
+When \code{NULL} (default), the table has a single \code{n} column. When
+supplied, the surviving cohort is split by this column and the final
+row's total is broken out into one additional column per branch value
+(named after the branch value, e.g. \code{Control}, \code{Intervention}), each
+populated only on the final row. Use \code{final_label = "Randomised"} when
+appropriate. Cannot be combined with \code{group_x}/\code{group_y}.}
 
 \item{count_by}{Optional column name (string) for distinct counts. When
 supplied, counts are computed as \code{n_distinct(count_by)} rather than
 \code{nrow()}. Essential for crossover data where one participant has several
 event rows.}
+
+\item{group_x}{Optional column name (string), present in \code{flow$data}, used
+to repeat the attrition table across the "column" direction (e.g. trial
+site). See the Grouping section.}
+
+\item{group_y}{Optional column name (string), present in \code{flow$data}, used
+to repeat the attrition table across the "row" direction (e.g. time
+period). See the Grouping section.}
 }
 \value{
 A \code{\link[tibble:tibble]{tibble::tibble()}} with columns:
 \describe{
-\item{\code{row_type}}{\code{"header"}, \code{"category"}, \code{"step"}, \code{"final"}, or
-\code{"branch"}}
+\item{\code{row_type}}{\code{"header"}, \code{"category"}, \code{"step"}, or \code{"final"}}
 \item{\code{label}}{Display text for the row}
-\item{\code{indent_level}}{\code{0} = header/final, \code{1} = category or top-level step,
-\code{2} = sub-step under a category, \code{1} = branch row}
+\item{\code{indent_level}}{\code{0} = header/final, \code{1} = category or top-level
+step, \code{2} = sub-step under a category}
 \item{\code{n}}{Number of participants at this point (N entering for
-category/step rows; N surviving for the final row; N in branch for
-branch rows)}
-\item{\code{n_removed}}{Number removed at this step (\code{NA} for header/final/branch)}
+category/step rows; N surviving for the final row)}
+\item{\code{n_removed}}{Number removed at this step (\code{NA} for header/final)}
 \item{\code{pct_removed}}{Percentage removed relative to entering N (\code{NA} for
-header/branch; for final row: percentage retained of original N)}
-\item{\code{branch}}{Branch value for branch rows (\code{NA} for all other rows)}
+header; for final row: percentage retained of original N)}
+\item{\code{branch}}{Always \code{NA}; retained for backward compatibility}
 }
+When \code{branch_by} is supplied, one additional column per unique branch
+value is appended (named after the branch value), populated only on the
+final row with that branch's surviving count. When \code{group_x}/\code{group_y}
+are supplied, \code{group_x} and \code{group_y} character columns are appended (see
+the Grouping section) and the tibble contains one stacked block per group
+combination rather than a single block.
 }
 \description{
 Produces a flat tibble describing the attrition at each step (or category)
@@ -88,6 +105,20 @@ denominator and sum consistently with the category row's percentage.
 }
 }
 
+\section{Grouping (\code{group_x} / \code{group_y})}{
+
+When \code{group_x} and/or \code{group_y} are supplied, the criteria pipeline
+stored in \code{flow} is re-applied independently to each subset of the
+\emph{original} data defined by the unique values of the grouping column(s)
+(e.g. trial site, time period). The returned tibble is a flat, "long"
+stack of one full attrition block per group combination, with additional
+\code{group_x} and \code{group_y} character columns identifying which subset each
+row belongs to (\code{NA} for the ungrouped dimension). This long format is
+the input to the grid layout produced by \code{as_attrition_table()}; use it
+directly if you want to build your own custom cross-tabulated output.
+\code{branch_by}/\code{count_by} cannot currently be combined with grouping.
+}
+
 \examples{
 dat  <- mock_cohortflow(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
@@ -95,7 +126,7 @@ crit <- cf_criteria() |>
   include(~ age >= 18,          label = "Adults only",         category = "Valid age") |>
   include(~ eligible_screen,    label = "Passed screening",    category = "Eligible at screening") |>
   include(~ !is.na(consent_date), label = "Consent recorded",  category = "Consent") |>
-  exclude(~ withdrew,           label = "Withdrew consent",    category = "Consent")
+  exclude(~ withdrew,           label = "Withdrew consent", category = "Consent")
 flow <- apply_criteria(dat, crit)
 as_attrition_tibble(flow)
 }

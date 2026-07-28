@@ -90,6 +90,49 @@ source("scripts/generate_readme_figure.R")
 
 Optional backends are in `Suggests`, so install the ones you plan to use.
 
+## Grouped attrition tables
+
+For designs with a natural cross-tabulation -- for example a stepped-wedge
+trial with sites and periods -- `as_attrition_tibble()` and
+`as_attrition_table()` accept `group_x` and `group_y` to repeat the full
+attrition block once per group, arranged as columns (`group_x`) and/or row
+blocks (`group_y`):
+
+```r
+dat  <- mock_stepped_wedge(n_clusters = 6, n_sites = 2, n_periods = 3)
+crit <- cf_criteria() |>
+  include(~ !is.na(age), label = "Age recorded") |>
+  exclude(~ withdrew,    label = "Withdrew consent")
+flow <- apply_criteria(dat, crit, id = "event_id")
+
+ft <- as_attrition_table(
+  flow,
+  backend       = "flextable",
+  group_x       = "site_id",
+  group_y       = "period",
+  group_x_label = "Site",
+  group_y_label = "Period"
+)
+```
+
+Cells can be shaded based on a column (e.g. `pct_removed` or `n_removed`)
+via `shade`, or with a custom function via `shade_fn` for full control over
+which rows are highlighted and with what colour:
+
+```r
+# Shade by percentage removed using a colour ramp
+as_attrition_table(flow, shade = "pct_removed")
+
+# Custom rule: highlight steps that removed >5% of the cohort
+as_attrition_table(
+  flow,
+  shade_fn = function(tbl) {
+    ifelse(tbl$row_type == "step" & !is.na(tbl$pct_removed) & tbl$pct_removed > 5,
+           "#FFCCCC", NA_character_)
+  }
+)
+```
+
 ## Reproducibility with YAML
 
 ```r

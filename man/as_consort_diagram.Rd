@@ -17,6 +17,7 @@ as_consort_diagram(
   text_size = 9,
   text_colour = "#222222",
   font_family = "",
+  arrow_size = 0.06,
   title = NULL,
   title_colour = text_colour,
   wrap_width = NULL,
@@ -64,6 +65,10 @@ Default \code{0.5} (the \code{ggplot2} default line width).}
 
 \item{font_family}{Font family for all box text and the title. Default
 \code{""} (the device's default font family).}
+
+\item{arrow_size}{Length (in inches) of arrowheads on connector lines,
+passed to \code{\link[grid:arrow]{grid::arrow()}}. Default \code{0.06} (smaller than the historical
+default of \code{0.1}, which looked oversized relative to typical box sizes).}
 
 \item{title}{Optional plot title drawn above the diagram. Default \code{NULL}
 (no title).}

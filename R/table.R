@@ -40,7 +40,18 @@
 #'   category's total entering N (rather than its own, progressively
 #'   smaller, entering N), so that all rows within a category share the same
 #'   denominator and sum consistently with the category row's percentage.
-
+#'
+#' @section Grouping (`group_x` / `group_y`):
+#' When `group_x` and/or `group_y` are supplied, the criteria pipeline
+#' stored in `flow` is re-applied independently to each subset of the
+#' *original* data defined by the unique values of the grouping column(s)
+#' (e.g. trial site, time period). The returned tibble is a flat, "long"
+#' stack of one full attrition block per group combination, with additional
+#' `group_x` and `group_y` character columns identifying which subset each
+#' row belongs to (`NA` for the ungrouped dimension). This long format is
+#' the input to the grid layout produced by `as_attrition_table()`; use it
+#' directly if you want to build your own custom cross-tabulated output.
+#' `branch_by`/`count_by` cannot currently be combined with grouping.
 #'
 #' @param flow A `cf_flow` object produced by [apply_criteria()].
 #' @param show_categories Logical. When `TRUE` (default) steps with the same
@@ -53,29 +64,42 @@
 #' @param digits Integer. Number of decimal places for `pct_removed`. Default
 #'   `1`.
 #' @param branch_by Optional column name (string) for allocation branching.
-#'   When `NULL` (default), the table is linear. When supplied, the surviving
-#'   cohort is split by this column and branch rows are appended below the
-#'   final common-flow row. Use `final_label = "Randomised"` when appropriate.
+#'   When `NULL` (default), the table has a single `n` column. When
+#'   supplied, the surviving cohort is split by this column and the final
+#'   row's total is broken out into one additional column per branch value
+#'   (named after the branch value, e.g. `Control`, `Intervention`), each
+#'   populated only on the final row. Use `final_label = "Randomised"` when
+#'   appropriate. Cannot be combined with `group_x`/`group_y`.
 #' @param count_by Optional column name (string) for distinct counts. When
 #'   supplied, counts are computed as `n_distinct(count_by)` rather than
 #'   `nrow()`. Essential for crossover data where one participant has several
 #'   event rows.
+#' @param group_x Optional column name (string), present in `flow$data`, used
+#'   to repeat the attrition table across the "column" direction (e.g. trial
+#'   site). See the Grouping section.
+#' @param group_y Optional column name (string), present in `flow$data`, used
+#'   to repeat the attrition table across the "row" direction (e.g. time
+#'   period). See the Grouping section.
 #'
 #' @return A [tibble::tibble()] with columns:
 #' \describe{
-#'   \item{`row_type`}{`"header"`, `"category"`, `"step"`, `"final"`, or
-#'     `"branch"`}
+#'   \item{`row_type`}{`"header"`, `"category"`, `"step"`, or `"final"`}
 #'   \item{`label`}{Display text for the row}
-#'   \item{`indent_level`}{`0` = header/final, `1` = category or top-level step,
-#'     `2` = sub-step under a category, `1` = branch row}
+#'   \item{`indent_level`}{`0` = header/final, `1` = category or top-level
+#'     step, `2` = sub-step under a category}
 #'   \item{`n`}{Number of participants at this point (N entering for
-#'     category/step rows; N surviving for the final row; N in branch for
-#'     branch rows)}
-#'   \item{`n_removed`}{Number removed at this step (`NA` for header/final/branch)}
+#'     category/step rows; N surviving for the final row)}
+#'   \item{`n_removed`}{Number removed at this step (`NA` for header/final)}
 #'   \item{`pct_removed`}{Percentage removed relative to entering N (`NA` for
-#'     header/branch; for final row: percentage retained of original N)}
-#'   \item{`branch`}{Branch value for branch rows (`NA` for all other rows)}
+#'     header; for final row: percentage retained of original N)}
+#'   \item{`branch`}{Always `NA`; retained for backward compatibility}
 #' }
+#' When `branch_by` is supplied, one additional column per unique branch
+#' value is appended (named after the branch value), populated only on the
+#' final row with that branch's surviving count. When `group_x`/`group_y`
+#' are supplied, `group_x` and `group_y` character columns are appended (see
+#' the Grouping section) and the tibble contains one stacked block per group
+#' combination rather than a single block.
 #' @seealso [as_attrition_table()] for formatted table output.
 #' @export
 #'
@@ -86,7 +110,7 @@
 #'   include(~ age >= 18,          label = "Adults only",         category = "Valid age") |>
 #'   include(~ eligible_screen,    label = "Passed screening",    category = "Eligible at screening") |>
 #'   include(~ !is.na(consent_date), label = "Consent recorded",  category = "Consent") |>
-#'   exclude(~ withdrew,           label = "Withdrew consent",    category = "Consent")
+#'   exclude(~ withdrew,           label = "Withdrew consent", category = "Consent")
 #' flow <- apply_criteria(dat, crit)
 #' as_attrition_tibble(flow)
 as_attrition_tibble <- function(
@@ -96,10 +120,22 @@ as_attrition_tibble <- function(
   final_label     = "Final cohort",
   digits          = 1L,
   branch_by       = NULL,
-  count_by        = NULL
+  count_by        = NULL,
+  group_x         = NULL,
+  group_y         = NULL
 ) {
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
+  }
+
+  # -- Grouped path ----------------------------------------------------------
+  if (!is.null(group_x) || !is.null(group_y)) {
+    if (!is.null(branch_by) || !is.null(count_by)) {
+      rlang::abort("`branch_by`/`count_by` cannot be combined with `group_x`/`group_y`.")
+    }
+    return(.attrition_tibble_grouped(
+      flow, group_x, group_y, show_categories, assessed_label, final_label, digits
+    ))
   }
 
   # -- Validate branching parameters ----------------------------------------
@@ -149,12 +185,14 @@ as_attrition_tibble <- function(
     branch       = NA_character_
   )))
 
-  # -- Branch rows ----------------------------------------------------------
+  out <- do.call(rbind, rows)
+
+  # -- Branch columns ---------------------------------------------------------
   if (!is.null(branch_by)) {
-    rows <- c(rows, .attrition_rows_branches(flow, branch_by, count_by))
+    out <- .attrition_add_branch_columns(out, flow, branch_by, count_by)
   }
 
-  do.call(rbind, rows)
+  out
 }
 
 # Build rows with category grouping
@@ -222,9 +260,12 @@ as_attrition_tibble <- function(
   lapply(steps, .make_step_row, indent_level = 1L, digits = digits)
 }
 
-# Build branch rows from the surviving cohort, split by branch_by.
-# Returns a list of tibbles, one per branch value.
-.attrition_rows_branches <- function(flow, branch_by, count_by) {
+# Add one column per unique branch value to the attrition tibble, populated
+# only on the final row with that branch's surviving count. Column names are
+# the branch values themselves (e.g. "Control", "Intervention"), so the N
+# column is effectively split into per-branch columns on the final row
+# rather than adding extra rows below it.
+.attrition_add_branch_columns <- function(tbl, flow, branch_by, count_by) {
   cohort_data <- cohort(flow)
 
   # Count function: distinct count_by or nrow
@@ -239,21 +280,18 @@ as_attrition_tibble <- function(
 
   # Split cohort by branch_by
   branch_values <- sort(unique(cohort_data[[branch_by]]))
+  final_idx     <- which(tbl$row_type == "final")
 
-  lapply(branch_values, function(branch_val) {
+  for (branch_val in branch_values) {
     branch_data <- cohort_data[cohort_data[[branch_by]] == branch_val, ]
-    branch_n <- count_fn(branch_data)
+    branch_n    <- count_fn(branch_data)
 
-    tibble::tibble(
-      row_type     = "branch",
-      label        = as.character(branch_val),
-      indent_level = 1L,
-      n            = branch_n,
-      n_removed    = NA_integer_,
-      pct_removed  = NA_real_,
-      branch       = as.character(branch_val)
-    )
-  })
+    col_name <- as.character(branch_val)
+    tbl[[col_name]] <- NA_integer_
+    tbl[[col_name]][final_idx] <- branch_n
+  }
+
+  tbl
 }
 
 # Build one step row. `pct_denom` is the denominator used for `pct_removed`
@@ -273,7 +311,59 @@ as_attrition_tibble <- function(
   )
 }
 
+# ---------------------------------------------------------------------------
+# Grouped data layer -- group_x / group_y
+# ---------------------------------------------------------------------------
 
+# Re-applies `flow$criteria` independently to each subset of `flow$data`
+# defined by the unique values of `group_x`/`group_y`, and stacks the
+# resulting attrition blocks into one long tibble with `group_x`/`group_y`
+# identifier columns. The row structure (row_type/label/indent_level) is
+# identical across every block -- it depends only on the criteria pipeline,
+# never on the data -- so the blocks can later be pivoted into a grid.
+.attrition_tibble_grouped <- function(flow, group_x, group_y, show_categories,
+                                      assessed_label, final_label, digits) {
+  data <- flow$data
+
+  if (!is.null(group_x) && !group_x %in% names(data)) {
+    rlang::abort(sprintf("Column `%s` not found in data.", group_x))
+  }
+  if (!is.null(group_y) && !group_y %in% names(data)) {
+    rlang::abort(sprintf("Column `%s` not found in data.", group_y))
+  }
+
+  x_vals <- if (!is.null(group_x)) sort(unique(data[[group_x]])) else NA
+  y_vals <- if (!is.null(group_y)) sort(unique(data[[group_y]])) else NA
+
+  blocks <- list()
+  for (y in y_vals) {
+    for (x in x_vals) {
+      sub_data <- data
+      if (!is.null(group_x)) {
+        sub_data <- sub_data[sub_data[[group_x]] == x, , drop = FALSE]
+      }
+      if (!is.null(group_y)) {
+        sub_data <- sub_data[sub_data[[group_y]] == y, , drop = FALSE]
+      }
+
+      sub_flow <- apply_criteria(sub_data, flow$criteria, id = ".cf_row_id")
+
+      block <- as_attrition_tibble(
+        sub_flow,
+        show_categories = show_categories,
+        assessed_label  = assessed_label,
+        final_label     = final_label,
+        digits          = digits
+      )
+      block$group_x <- if (!is.null(group_x)) as.character(x) else NA_character_
+      block$group_y <- if (!is.null(group_y)) as.character(y) else NA_character_
+
+      blocks <- c(blocks, list(block))
+    }
+  }
+
+  do.call(rbind, blocks)
+}
 
 # ---------------------------------------------------------------------------
 # as_attrition_table() -- formatted table
@@ -299,6 +389,27 @@ as_attrition_tibble <- function(
 #' * **`"huxtable"`** -- uses the \pkg{huxtable} package. Supports Word, LaTeX,
 #'   and HTML output.
 #'
+#' @section Grouping (`group_x` / `group_y`):
+#' Supplying `group_x` and/or `group_y` repeats the whole attrition table
+#' across a grid: `group_x` values become repeated column blocks (N /
+#' Removed / % removed, headed by a spanning column group), and `group_y`
+#' values become repeated row blocks (each preceded by a bold group-heading
+#' row), so the criterion rows appear once but attrition counts are shown
+#' per group combination. This is useful, for example, for showing a
+#' stepped-wedge trial's attrition by site (`group_x`) and period
+#' (`group_y`). `branch_by` cannot be combined with grouping.
+#'
+#' @section Shading:
+#' Cells can be shaded to highlight high-attrition rows/cells:
+#' * `shade = "pct_removed"` or `"n_removed"` applies an automatic colour
+#'   gradient (`shade_palette`, default white to red) scaled across the
+#'   values present in step/category rows.
+#' * `shade_fn` gives full control: supply a function that takes the
+#'   attrition tibble (as returned by [as_attrition_tibble()], including
+#'   `group_x`/`group_y` columns when grouped) and returns a character
+#'   vector of colours (or `NA`) the same length as the tibble, one colour
+#'   per row. `shade_fn` takes precedence over `shade` if both are supplied.
+#'
 #' @inheritParams as_attrition_tibble
 #' @param backend Character string: `"flextable"` (default), `"gt"`, or
 #'   `"huxtable"`.
@@ -309,9 +420,28 @@ as_attrition_tibble <- function(
 #'   Default `"Removed"`.
 #' @param pct_col_label Column header for the percentage column.
 #'   Default `"% removed"`.
+#' @param group_x_label Optional prefix label for `group_x` column headings
+#'   (e.g. `"Site"` to show `"Site: A"`). Default `NULL` (show the group
+#'   value alone).
+#' @param group_y_label Optional prefix label for `group_y` row headings
+#'   (e.g. `"Period"` to show `"Period: 1"`). Default `NULL` (show the group
+#'   value alone).
+#' @param shade Optional character string: `"pct_removed"` or `"n_removed"`.
+#'   When supplied, shades the N/Removed/% cells of step and category rows
+#'   with an automatic colour gradient based on that column's value. Default
+#'   `NULL` (no shading).
+#' @param shade_fn Optional function for custom cell shading; see the
+#'   Shading section. Default `NULL`.
+#' @param shade_palette Character vector of >= 2 colours defining the
+#'   gradient used by `shade`. Default `c("#FFFFFF", "#F8696B")` (white to
+#'   red).
 #'
 #' @return A `flextable`, `gt_tbl`, or `huxtable` object, ready to print or
-#'   include in a document.
+#'   include in a document. When `branch_by` is supplied, one additional
+#'   column per branch value is added after the percentage column, headed
+#'   with the branch value itself and populated only on the final row. When
+#'   `group_x`/`group_y` are supplied, the table is a repeated grid as
+#'   described in the Grouping section.
 #' @seealso [as_attrition_tibble()] for the underlying plain-tibble data layer.
 #' @export
 #'
@@ -330,16 +460,17 @@ as_attrition_tibble <- function(
 #' as_attrition_table(flow, backend = "gt")       # gt (LaTeX/HTML-ready)
 #' as_attrition_table(flow, backend = "huxtable") # huxtable
 #'
+#' # Shade cells by percentage removed
+#' as_attrition_table(flow, shade = "pct_removed")
+#'
+#' # Grid: sites as columns, periods as rows (stepped-wedge design)
+#' sw   <- mock_stepped_wedge(n_participants = 400, n_periods = 4, seed = 1)
+#' flow_sw <- apply_criteria(sw, crit, id = "event_id")
+#' as_attrition_table(flow_sw, group_x = "site_id", group_y = "period")
+#'
 #' # Save to Word
 #' ft <- as_attrition_table(flow)
 #' flextable::save_as_docx(ft, path = "attrition.docx")
-#'
-#' # Save to Word via gt
-#' gt_tbl <- as_attrition_table(flow, backend = "gt")
-#' gt::gtsave(gt_tbl, "attrition.docx")
-#'
-#' # LaTeX snippet via gt
-#' gt::as_latex(gt_tbl)
 #' }
 as_attrition_table <- function(
   flow,
@@ -353,10 +484,53 @@ as_attrition_table <- function(
   removed_col_label   = "Removed",
   pct_col_label       = "% removed",
   branch_by           = NULL,
-  count_by            = NULL
+  count_by            = NULL,
+  group_x             = NULL,
+  group_y             = NULL,
+  group_x_label       = NULL,
+  group_y_label       = NULL,
+  shade               = NULL,
+  shade_fn            = NULL,
+  shade_palette       = c("#FFFFFF", "#F8696B")
 ) {
   backend <- match.arg(backend)
 
+  # -- Grouped grid path -------------------------------------------------
+  if (!is.null(group_x) || !is.null(group_y)) {
+    if (!is.null(branch_by) || !is.null(count_by)) {
+      rlang::abort("`branch_by`/`count_by` cannot be combined with `group_x`/`group_y`.")
+    }
+
+    tbl <- as_attrition_tibble(
+      flow,
+      show_categories = show_categories,
+      assessed_label  = assessed_label,
+      final_label     = final_label,
+      digits          = digits,
+      group_x         = group_x,
+      group_y         = group_y
+    )
+
+    shade_colours <- .attrition_shade_colours(tbl, shade, shade_fn, shade_palette)
+    grid <- .attrition_build_grid(tbl, group_x, group_y, shade_colours)
+
+    return(switch(backend,
+      flextable = .attrition_flextable_grouped(grid, criterion_col_label,
+                                               n_col_label, removed_col_label,
+                                               pct_col_label, group_x_label,
+                                               group_y_label),
+      gt        = .attrition_gt_grouped(grid, criterion_col_label,
+                                        n_col_label, removed_col_label,
+                                        pct_col_label, group_x_label,
+                                        group_y_label),
+      huxtable  = .attrition_huxtable_grouped(grid, criterion_col_label,
+                                              n_col_label, removed_col_label,
+                                              pct_col_label, group_x_label,
+                                              group_y_label)
+    ))
+  }
+
+  # -- Plain (ungrouped) path -------------------------------------------------
   tbl <- as_attrition_tibble(
     flow,
     show_categories = show_categories,
@@ -367,17 +541,68 @@ as_attrition_table <- function(
     count_by        = count_by
   )
 
+  shade_colours <- .attrition_shade_colours(tbl, shade, shade_fn, shade_palette)
+
   switch(backend,
     flextable = .attrition_flextable(tbl, criterion_col_label,
                                      n_col_label, removed_col_label,
-                                     pct_col_label),
+                                     pct_col_label, shade_colours),
     gt        = .attrition_gt(tbl, criterion_col_label,
                               n_col_label, removed_col_label,
-                              pct_col_label),
+                              pct_col_label, shade_colours),
     huxtable  = .attrition_huxtable(tbl, criterion_col_label,
                                     n_col_label, removed_col_label,
-                                    pct_col_label)
+                                    pct_col_label, shade_colours)
   )
+}
+
+
+# ---------------------------------------------------------------------------
+# Shading helper
+# ---------------------------------------------------------------------------
+
+# Computes a per-row colour vector (aligned with `tbl`, one entry per row,
+# NA meaning "no shading") from either a custom `shade_fn(tbl)` or a
+# built-in gradient over `shade` ("pct_removed"/"n_removed"). Only
+# step/category rows are shaded by the built-in gradient; header/final rows
+# (and NA values) are left unshaded.
+.attrition_shade_colours <- function(tbl, shade, shade_fn, shade_palette) {
+  if (!is.null(shade_fn)) {
+    cols <- shade_fn(tbl)
+    if (length(cols) != nrow(tbl)) {
+      rlang::abort(
+        "`shade_fn` must return a colour vector the same length as the attrition data (nrow(tbl))."
+      )
+    }
+    return(as.character(cols))
+  }
+
+  if (is.null(shade)) {
+    return(rep(NA_character_, nrow(tbl)))
+  }
+  if (!shade %in% c("pct_removed", "n_removed")) {
+    rlang::abort('`shade` must be "pct_removed", "n_removed", or NULL.')
+  }
+
+  values    <- tbl[[shade]]
+  shadeable <- tbl$row_type %in% c("step", "category") & !is.na(values)
+  cols      <- rep(NA_character_, nrow(tbl))
+
+  if (!any(shadeable)) return(cols)
+
+  rng    <- range(values[shadeable])
+  scaled <- if (diff(rng) == 0) {
+    rep(0, sum(shadeable))
+  } else {
+    (values[shadeable] - rng[1]) / diff(rng)
+  }
+
+  ramp    <- grDevices::colorRamp(shade_palette)
+  rgb_mat <- ramp(scaled)
+  cols[shadeable] <- grDevices::rgb(
+    rgb_mat[, 1], rgb_mat[, 2], rgb_mat[, 3], maxColorValue = 255
+  )
+  cols
 }
 
 
@@ -385,8 +610,11 @@ as_attrition_table <- function(
 # Shared display helper -- formats the tibble for display
 # ---------------------------------------------------------------------------
 
-# Converts the raw attrition tibble to a display data frame (4 cols) and
-# returns recommended column widths for flextable (inches).
+# Converts the raw attrition tibble to a display data frame and returns
+# recommended column widths for flextable (inches). Any column beyond the
+# standard set (row_type, label, indent_level, n, n_removed, pct_removed,
+# branch) is treated as a per-branch N column -- these are added to the
+# display data frame as-is (character, blank/NA except on the final row).
 .attrition_display <- function(tbl, criterion_col_label,
                                n_col_label, removed_col_label,
                                pct_col_label) {
@@ -394,13 +622,12 @@ as_attrition_table <- function(
   pct_str <- dplyr::case_when(
     tbl$row_type == "header"               ~ NA_character_,
     tbl$row_type == "final"                ~ paste0(tbl$pct_removed, "%"),
-    tbl$row_type == "branch"               ~ NA_character_,
     is.na(tbl$pct_removed) | tbl$pct_removed == 0 ~ "\u2014",
     TRUE                                   ~ paste0(tbl$pct_removed, "%")
   )
 
   n_removed_str <- dplyr::case_when(
-    tbl$row_type %in% c("header", "final", "branch") ~ NA_character_,
+    tbl$row_type %in% c("header", "final") ~ NA_character_,
     is.na(tbl$n_removed)                   ~ NA_character_,
     tbl$n_removed == 0L                    ~ "\u2014",
     TRUE                                   ~ as.character(tbl$n_removed)
@@ -413,9 +640,20 @@ as_attrition_table <- function(
     pct_removed = pct_str
   )
 
+  # Branch columns -- any column beyond the standard set is a per-branch N
+  # column, populated only on the final row (NA elsewhere).
+  standard_cols <- c("row_type", "label", "indent_level", "n",
+                     "n_removed", "pct_removed", "branch")
+  branch_cols <- setdiff(names(tbl), standard_cols)
+
+  for (col in branch_cols) {
+    df[[col]] <- ifelse(is.na(tbl[[col]]), NA_character_, as.character(tbl[[col]]))
+  }
+
   list(
-    df         = df,
-    col_widths = c(label = 3.5, n = 0.6, n_removed = 0.9, pct_removed = 1.0)
+    df          = df,
+    col_widths  = c(label = 3.5, n = 0.6, n_removed = 0.9, pct_removed = 1.0),
+    branch_cols = branch_cols
   )
 }
 
@@ -426,7 +664,7 @@ as_attrition_table <- function(
 
 .attrition_flextable <- function(tbl, criterion_col_label,
                                  n_col_label, removed_col_label,
-                                 pct_col_label) {
+                                 pct_col_label, shade_colours = NULL) {
 
   if (!.has_namespace("flextable")) {
     rlang::abort(
@@ -442,14 +680,16 @@ as_attrition_table <- function(
   display <- .attrition_display(tbl, criterion_col_label,
                                 n_col_label, removed_col_label,
                                 pct_col_label)
-  df    <- display$df
-  col_w <- display$col_widths
+  df          <- display$df
+  col_w       <- display$col_widths
+  branch_cols <- display$branch_cols
+
+  if (is.null(shade_colours)) shade_colours <- rep(NA_character_, nrow(tbl))
 
   # Row indices -- flextable body i= is 1-based into the body rows only,
   # no offset needed.
   header_rows  <- which(tbl$row_type == "header")
   final_rows   <- which(tbl$row_type == "final")
-  branch_rows  <- which(tbl$row_type == "branch")
   cat_rows     <- which(tbl$row_type == "category")
   step1_rows   <- which(tbl$row_type == "step" & tbl$indent_level == 1L)
   step2_rows   <- which(tbl$row_type == "step" & tbl$indent_level == 2L)
@@ -457,21 +697,24 @@ as_attrition_table <- function(
   border_dark  <- officer::fp_border(color = "black", width = 1.0)
   border_none  <- officer::fp_border(color = "white", width = 0)
 
+  # Header labels: base columns plus one per branch column (headed with the
+  # branch value itself).
+  header_values <- stats::setNames(
+    as.list(c(criterion_col_label, n_col_label, removed_col_label, pct_col_label,
+              branch_cols)),
+    c("label", "n", "n_removed", "pct_removed", branch_cols)
+  )
+
   ft <- flextable::flextable(df) |>
     # Column headers
-    flextable::set_header_labels(
-      label       = criterion_col_label,
-      n           = n_col_label,
-      n_removed   = removed_col_label,
-      pct_removed = pct_col_label
-    ) |>
+    flextable::set_header_labels(values = header_values) |>
     # Column widths (inches)
     flextable::width(j = "label",       width = col_w[["label"]]) |>
     flextable::width(j = "n",           width = col_w[["n"]]) |>
     flextable::width(j = "n_removed",   width = col_w[["n_removed"]]) |>
     flextable::width(j = "pct_removed", width = col_w[["pct_removed"]]) |>
     # Alignment
-    flextable::align(j = c("n", "n_removed", "pct_removed"),
+    flextable::align(j = c("n", "n_removed", "pct_removed", branch_cols),
                      align = "right", part = "all") |>
     flextable::align(j = "label", align = "left", part = "all") |>
     # Column header row: bold, no background
@@ -480,14 +723,10 @@ as_attrition_table <- function(
     flextable::bold(i = c(header_rows, final_rows)) |>
     # Category rows: bold label, no background
     flextable::bold(i = cat_rows, j = "label") |>
-    # Branch rows: bold label, no background
-    flextable::bold(i = branch_rows, j = "label") |>
     # Indentation via left cell padding (pts)
     flextable::padding(i = step1_rows, j = "label", padding.left = 12L,
                        part = "body") |>
     flextable::padding(i = step2_rows, j = "label", padding.left = 24L,
-                       part = "body") |>
-    flextable::padding(i = branch_rows, j = "label", padding.left = 12L,
                        part = "body") |>
     # APA-style borders: no outer box, no vertical borders
     # Top rule above header
@@ -497,13 +736,25 @@ as_attrition_table <- function(
     # Rule above final row
     flextable::hline(i = min(final_rows) - 1L, part = "body",
                      border = border_dark) |>
-    # Bottom rule below last row (branch rows if present, else final row)
+    # Bottom rule below last row
     flextable::hline_bottom(part = "body", border = border_dark) |>
     # Remove all vertical borders
     flextable::vline(part = "all", border = border_none) |>
     # Typography: Times New Roman for APA
     flextable::fontsize(size = 12, part = "all") |>
     flextable::font(fontname = "Times New Roman", part = "all")
+
+  if (length(branch_cols) > 0L) {
+    ft <- flextable::width(ft, j = branch_cols, width = 0.9)
+  }
+
+  # -- Shading ----------------------------------------------------------------
+  for (i in seq_along(shade_colours)) {
+    if (!is.na(shade_colours[[i]])) {
+      ft <- flextable::bg(ft, i = i, j = c("n", "n_removed", "pct_removed"),
+                          bg = shade_colours[[i]])
+    }
+  }
 
   ft
 }
@@ -515,7 +766,7 @@ as_attrition_table <- function(
 
 .attrition_gt <- function(tbl, criterion_col_label,
                           n_col_label, removed_col_label,
-                          pct_col_label) {
+                          pct_col_label, shade_colours = NULL) {
 
   if (!.has_namespace("gt")) {
     rlang::abort(
@@ -526,12 +777,14 @@ as_attrition_table <- function(
   display <- .attrition_display(tbl, criterion_col_label,
                                 n_col_label, removed_col_label,
                                 pct_col_label)
-  df <- display$df
+  df          <- display$df
+  branch_cols <- display$branch_cols
+
+  if (is.null(shade_colours)) shade_colours <- rep(NA_character_, nrow(tbl))
 
   # Row indices
   header_rows  <- which(tbl$row_type == "header")
   final_rows   <- which(tbl$row_type == "final")
-  branch_rows  <- which(tbl$row_type == "branch")
   cat_rows     <- which(tbl$row_type == "category")
   step1_rows   <- which(tbl$row_type == "step" & tbl$indent_level == 1L)
   step2_rows   <- which(tbl$row_type == "step" & tbl$indent_level == 2L)
@@ -539,18 +792,22 @@ as_attrition_table <- function(
   # gt needs a numeric row selector -- add a row index
   df$.row <- seq_len(nrow(df))
 
+  # Column labels: base columns plus one per branch column (headed with the
+  # branch value itself).
+  label_values <- stats::setNames(
+    as.list(c(criterion_col_label, n_col_label, removed_col_label, pct_col_label,
+              branch_cols)),
+    c("label", "n", "n_removed", "pct_removed", branch_cols)
+  )
+
   gt_tbl <- gt::gt(df) |>
     # Hide the helper column
     gt::cols_hide(".row") |>
     # Column labels
-    gt::cols_label(
-      label       = criterion_col_label,
-      n           = n_col_label,
-      n_removed   = removed_col_label,
-      pct_removed = pct_col_label
-    ) |>
+    gt::cols_label(.list = label_values) |>
     # Alignment
-    gt::cols_align(align = "right",  columns = c("n", "n_removed", "pct_removed")) |>
+    gt::cols_align(align = "right",
+                   columns = c("n", "n_removed", "pct_removed", branch_cols)) |>
     gt::cols_align(align = "left",   columns = "label") |>
     # Column widths (px; gt uses px for HTML, approximately scales for other formats)
     gt::cols_width(
@@ -569,11 +826,6 @@ as_attrition_table <- function(
       style     = gt::cell_text(weight = "bold"),
       locations = gt::cells_body(rows = cat_rows, columns = "label")
     ) |>
-    # Branch rows: bold label, no background
-    gt::tab_style(
-      style     = gt::cell_text(weight = "bold"),
-      locations = gt::cells_body(rows = branch_rows, columns = "label")
-    ) |>
     # Indentation: uncategorised step rows (level 1)
     gt::tab_style(
       style     = gt::cell_text(indent = gt::px(12)),
@@ -583,11 +835,6 @@ as_attrition_table <- function(
     gt::tab_style(
       style     = gt::cell_text(indent = gt::px(24)),
       locations = gt::cells_body(rows = step2_rows, columns = "label")
-    ) |>
-    # Indentation: branch rows (level 1)
-    gt::tab_style(
-      style     = gt::cell_text(indent = gt::px(12)),
-      locations = gt::cells_body(rows = branch_rows, columns = "label")
     ) |>
     # Separator line above final row
     gt::tab_style(
@@ -616,6 +863,17 @@ as_attrition_table <- function(
       column_labels.vlines.color = "transparent"
     )
 
+  # -- Shading ----------------------------------------------------------------
+  for (i in seq_along(shade_colours)) {
+    if (!is.na(shade_colours[[i]])) {
+      gt_tbl <- gt::tab_style(
+        gt_tbl,
+        style     = gt::cell_fill(color = shade_colours[[i]]),
+        locations = gt::cells_body(rows = i, columns = c("n", "n_removed", "pct_removed"))
+      )
+    }
+  }
+
   gt_tbl
 }
 
@@ -626,7 +884,7 @@ as_attrition_table <- function(
 
 .attrition_huxtable <- function(tbl, criterion_col_label,
                                 n_col_label, removed_col_label,
-                                pct_col_label) {
+                                pct_col_label, shade_colours = NULL) {
 
   if (!.has_namespace("huxtable")) {
     rlang::abort(
@@ -637,13 +895,16 @@ as_attrition_table <- function(
   display <- .attrition_display(tbl, criterion_col_label,
                                 n_col_label, removed_col_label,
                                 pct_col_label)
-  df <- display$df
+  df          <- display$df
+  branch_cols <- display$branch_cols
+  n_cols      <- ncol(df)
+
+  if (is.null(shade_colours)) shade_colours <- rep(NA_character_, nrow(tbl))
 
   # Row indices: huxtable row 1 = column header (added by add_colnames = TRUE),
   # so data rows are offset by +1.
   header_rows  <- which(tbl$row_type == "header")   + 1L
   final_rows   <- which(tbl$row_type == "final")    + 1L
-  branch_rows  <- which(tbl$row_type == "branch")   + 1L
   cat_rows     <- which(tbl$row_type == "category") + 1L
   step1_rows   <- which(tbl$row_type == "step" & tbl$indent_level == 1L) + 1L
   step2_rows   <- which(tbl$row_type == "step" & tbl$indent_level == 2L) + 1L
@@ -653,9 +914,16 @@ as_attrition_table <- function(
     huxtable::set_contents(1, 1, criterion_col_label) |>
     huxtable::set_contents(1, 2, n_col_label) |>
     huxtable::set_contents(1, 3, removed_col_label) |>
-    huxtable::set_contents(1, 4, pct_col_label) |>
+    huxtable::set_contents(1, 4, pct_col_label)
+
+  # Branch column headers: headed with the branch value itself
+  for (k in seq_along(branch_cols)) {
+    ht <- huxtable::set_contents(ht, 1, 4L + k, branch_cols[k])
+  }
+
+  ht <- ht |>
     # Alignment
-    huxtable::set_align(huxtable::everywhere, 2:4, "right") |>
+    huxtable::set_align(huxtable::everywhere, 2:n_cols, "right") |>
     huxtable::set_align(huxtable::everywhere, 1,   "left") |>
     # Column header row: bold, no background
     huxtable::set_bold(1, huxtable::everywhere, TRUE) |>
@@ -663,12 +931,9 @@ as_attrition_table <- function(
     huxtable::set_bold(c(header_rows, final_rows), huxtable::everywhere, TRUE) |>
     # Category rows: bold label, no background
     huxtable::set_bold(cat_rows, 1, TRUE) |>
-    # Branch rows: bold label, no background
-    huxtable::set_bold(branch_rows, 1, TRUE) |>
     # Indentation via left padding (pts)
     huxtable::set_left_padding(step1_rows, 1, 12) |>
     huxtable::set_left_padding(step2_rows, 1, 24) |>
-    huxtable::set_left_padding(branch_rows, 1, 12) |>
     # APA-style borders: no outer box, no vertical borders
     # Top rule above header
     huxtable::set_top_border(1, huxtable::everywhere, 0.8) |>
@@ -676,7 +941,7 @@ as_attrition_table <- function(
     huxtable::set_bottom_border(1, huxtable::everywhere, 0.8) |>
     # Rule above final row
     huxtable::set_top_border(min(final_rows), huxtable::everywhere, 0.8) |>
-    # Bottom rule below last row (branch rows if present, else final row)
+    # Bottom rule below last row
     huxtable::set_bottom_border(nrow(df) + 1L, huxtable::everywhere, 0.8) |>
     # Remove all other borders (no outer box, no vertical borders, no row separators)
     huxtable::set_left_border(huxtable::everywhere, huxtable::everywhere, 0) |>
@@ -685,6 +950,427 @@ as_attrition_table <- function(
     huxtable::set_font_size(huxtable::everywhere, huxtable::everywhere, 12) |>
     huxtable::set_font(huxtable::everywhere, huxtable::everywhere, "Times New Roman") |>
     huxtable::set_width(1)
+
+  # -- Shading ----------------------------------------------------------------
+  for (i in seq_along(shade_colours)) {
+    if (!is.na(shade_colours[[i]])) {
+      ht <- huxtable::set_background_color(ht, i + 1L, 2:4, shade_colours[[i]])
+    }
+  }
+
+  ht
+}
+
+
+# ---------------------------------------------------------------------------
+# Grid construction -- pivots the long group_x/group_y tibble into a grid
+# ---------------------------------------------------------------------------
+
+# Builds a "grid" structure from the long-format grouped tibble: a list of
+# per-group_y blocks, each a data frame with the (identical, criteria-driven)
+# row skeleton plus one {n, n_removed, pct_removed, shade} column set per
+# group_x value (prefixed x1__, x2__, ...). This is consumed by the three
+# backend-specific *_grouped() renderers below.
+.attrition_build_grid <- function(tbl, group_x, group_y, shade_colours) {
+  has_x <- !is.null(group_x)
+  has_y <- !is.null(group_y)
+
+  x_vals <- if (has_x) unique(tbl$group_x) else NA_character_
+  y_vals <- if (has_y) unique(tbl$group_y) else NA_character_
+
+  first_mask <- rep(TRUE, nrow(tbl))
+  if (has_x) first_mask <- first_mask & (tbl$group_x == x_vals[[1]])
+  if (has_y) first_mask <- first_mask & (tbl$group_y == y_vals[[1]])
+  skeleton <- tbl[first_mask, c("row_type", "label", "indent_level")]
+  n_skel   <- nrow(skeleton)
+
+  blocks   <- list()
+  y_labels <- character(0)
+
+  for (yi in seq_along(y_vals)) {
+    y <- y_vals[[yi]]
+    block <- skeleton
+
+    for (xi in seq_along(x_vals)) {
+      x <- x_vals[[xi]]
+      mask <- rep(TRUE, nrow(tbl))
+      if (has_x) mask <- mask & (tbl$group_x == x)
+      if (has_y) mask <- mask & (tbl$group_y == y)
+
+      sub <- tbl[mask, ]
+      pfx <- paste0("x", xi, "__")
+      block[[paste0(pfx, "n")]]           <- sub$n
+      block[[paste0(pfx, "n_removed")]]   <- sub$n_removed
+      block[[paste0(pfx, "pct_removed")]] <- sub$pct_removed
+      block[[paste0(pfx, "shade")]]       <- shade_colours[mask]
+    }
+
+    blocks[[yi]]   <- block
+    y_labels[[yi]] <- if (has_y) y else NA_character_
+  }
+
+  list(
+    blocks   = blocks,
+    y_labels = y_labels,
+    x_labels = if (has_x) x_vals else NULL,
+    n_x      = max(length(x_vals), 1L),
+    n_skel   = n_skel,
+    has_x    = has_x,
+    has_y    = has_y
+  )
+}
+
+# Assembles the grid into (a) a raw data frame `df_full` (row_type,
+# indent_level, label, and one {n, n_removed, pct_removed, shade} set per
+# x value, plus synthetic "y_heading" rows inserted before each y block when
+# `has_y`), and (b) a character `display` data frame ready for the
+# backend-specific renderers. Shared across all three backends so styling
+# logic (row-type indices, header labels) is written once.
+.attrition_grid_assemble <- function(grid, group_x_label, group_y_label) {
+  n_x <- grid$n_x
+
+  body_rows <- list()
+  cursor    <- 0L
+
+  for (bi in seq_along(grid$blocks)) {
+    block <- grid$blocks[[bi]]
+
+    if (grid$has_y) {
+      heading <- block[1, , drop = FALSE]
+      value_cols <- setdiff(names(heading), c("row_type", "label", "indent_level"))
+      heading[1, value_cols] <- NA
+      heading$row_type     <- "y_heading"
+      heading$indent_level <- 0L
+      heading$label <- if (!is.null(group_y_label)) {
+        paste0(group_y_label, ": ", grid$y_labels[[bi]])
+      } else {
+        grid$y_labels[[bi]]
+      }
+      body_rows[[length(body_rows) + 1L]] <- heading
+      cursor <- cursor + 1L
+    }
+
+    body_rows[[length(body_rows) + 1L]] <- block
+    cursor <- cursor + nrow(block)
+  }
+
+  df_full <- do.call(rbind, body_rows)
+
+  display <- tibble::tibble(label = df_full$label)
+  for (xi in seq_len(n_x)) {
+    pfx     <- paste0("x", xi, "__")
+    n_col   <- df_full[[paste0(pfx, "n")]]
+    nr_col  <- df_full[[paste0(pfx, "n_removed")]]
+    pct_col <- df_full[[paste0(pfx, "pct_removed")]]
+
+    display[[paste0(pfx, "n")]] <- ifelse(is.na(n_col), "", as.character(n_col))
+    display[[paste0(pfx, "n_removed")]] <- dplyr::case_when(
+      is.na(nr_col) ~ "",
+      nr_col == 0L  ~ "\u2014",
+      TRUE          ~ as.character(nr_col)
+    )
+    display[[paste0(pfx, "pct_removed")]] <- ifelse(
+      is.na(pct_col), "", paste0(pct_col, "%")
+    )
+  }
+
+  x_headings <- if (grid$has_x) {
+    if (!is.null(group_x_label)) {
+      paste0(group_x_label, ": ", grid$x_labels)
+    } else {
+      grid$x_labels
+    }
+  } else {
+    character(0)
+  }
+
+  list(
+    df_full     = df_full,
+    display     = display,
+    n_x         = n_x,
+    has_x       = grid$has_x,
+    x_headings  = x_headings,
+    header_rows = which(df_full$row_type == "header"),
+    final_rows  = which(df_full$row_type == "final"),
+    cat_rows    = which(df_full$row_type == "category"),
+    step1_rows  = which(df_full$row_type == "step" & df_full$indent_level == 1L),
+    step2_rows  = which(df_full$row_type == "step" & df_full$indent_level == 2L),
+    yhead_rows  = which(df_full$row_type == "y_heading")
+  )
+}
+
+
+# ---------------------------------------------------------------------------
+# Grouped grid renderers
+# ---------------------------------------------------------------------------
+
+.attrition_flextable_grouped <- function(grid, criterion_col_label,
+                                         n_col_label, removed_col_label,
+                                         pct_col_label, group_x_label, group_y_label) {
+  if (!.has_namespace("flextable")) {
+    rlang::abort(
+      'The {flextable} package is required. Install it with: install.packages("flextable")'
+    )
+  }
+  if (!.has_namespace("officer")) {
+    rlang::abort(
+      'The {officer} package is required. Install it with: install.packages("officer")'
+    )
+  }
+
+  a   <- .attrition_grid_assemble(grid, group_x_label, group_y_label)
+  n_x <- a$n_x
+
+  header_values <- list(label = criterion_col_label)
+  for (xi in seq_len(n_x)) {
+    pfx <- paste0("x", xi, "__")
+    header_values[[paste0(pfx, "n")]]           <- n_col_label
+    header_values[[paste0(pfx, "n_removed")]]   <- removed_col_label
+    header_values[[paste0(pfx, "pct_removed")]] <- pct_col_label
+  }
+
+  border_dark <- officer::fp_border(color = "black", width = 1.0)
+  border_none <- officer::fp_border(color = "white", width = 0)
+
+  ft <- flextable::flextable(a$display) |>
+    flextable::set_header_labels(values = header_values)
+
+  if (a$has_x) {
+    top_values <- c("", unlist(lapply(a$x_headings, function(h) c(h, "", ""))))
+    ft <- flextable::add_header_row(ft, top = TRUE, values = top_values)
+    for (xi in seq_len(n_x)) {
+      cols <- c(paste0("x", xi, "__n"), paste0("x", xi, "__n_removed"),
+                paste0("x", xi, "__pct_removed"))
+      ft <- flextable::merge_at(ft, i = 1, j = cols, part = "header")
+    }
+    ft <- flextable::align(ft, i = 1, align = "center", part = "header")
+    ft <- flextable::bold(ft, i = 1, part = "header")
+  }
+
+  value_cols <- unlist(lapply(seq_len(n_x), function(xi) {
+    pfx <- paste0("x", xi, "__")
+    c(paste0(pfx, "n"), paste0(pfx, "n_removed"), paste0(pfx, "pct_removed"))
+  }))
+
+  ft <- ft |>
+    flextable::align(j = value_cols, align = "right", part = "all") |>
+    flextable::align(j = "label", align = "left", part = "all") |>
+    flextable::bold(part = "header") |>
+    flextable::bold(i = c(a$header_rows, a$final_rows)) |>
+    flextable::bold(i = a$cat_rows, j = "label") |>
+    flextable::bold(i = a$yhead_rows, j = "label") |>
+    flextable::padding(i = a$step1_rows, j = "label", padding.left = 12L, part = "body") |>
+    flextable::padding(i = a$step2_rows, j = "label", padding.left = 24L, part = "body") |>
+    flextable::hline_top(part = "head", border = border_dark) |>
+    flextable::hline_bottom(part = "head", border = border_dark) |>
+    flextable::hline_bottom(part = "body", border = border_dark) |>
+    flextable::vline(part = "all", border = border_none) |>
+    flextable::fontsize(size = 12, part = "all") |>
+    flextable::font(fontname = "Times New Roman", part = "all")
+
+  rule_rows <- sort(unique(c(a$final_rows - 1L, a$yhead_rows[a$yhead_rows > 1L] - 1L)))
+  rule_rows <- rule_rows[rule_rows >= 1L]
+  for (r in rule_rows) {
+    ft <- flextable::hline(ft, i = r, part = "body", border = border_dark)
+  }
+
+  for (xi in seq_len(n_x)) {
+    pfx       <- paste0("x", xi, "__")
+    shade_col <- a$df_full[[paste0(pfx, "shade")]]
+    cols      <- c(paste0(pfx, "n"), paste0(pfx, "n_removed"), paste0(pfx, "pct_removed"))
+    for (i in seq_along(shade_col)) {
+      if (!is.na(shade_col[[i]])) {
+        ft <- flextable::bg(ft, i = i, j = cols, bg = shade_col[[i]])
+      }
+    }
+  }
+
+  ft
+}
+
+
+.attrition_gt_grouped <- function(grid, criterion_col_label,
+                                  n_col_label, removed_col_label,
+                                  pct_col_label, group_x_label, group_y_label) {
+  if (!.has_namespace("gt")) {
+    rlang::abort(
+      'The {gt} package is required. Install it with: install.packages("gt")'
+    )
+  }
+
+  a   <- .attrition_grid_assemble(grid, group_x_label, group_y_label)
+  n_x <- a$n_x
+  df  <- a$display
+  df$.row <- seq_len(nrow(df))
+
+  label_values <- list(label = criterion_col_label)
+  for (xi in seq_len(n_x)) {
+    pfx <- paste0("x", xi, "__")
+    label_values[[paste0(pfx, "n")]]           <- n_col_label
+    label_values[[paste0(pfx, "n_removed")]]   <- removed_col_label
+    label_values[[paste0(pfx, "pct_removed")]] <- pct_col_label
+  }
+
+  value_cols <- unlist(lapply(seq_len(n_x), function(xi) {
+    pfx <- paste0("x", xi, "__")
+    c(paste0(pfx, "n"), paste0(pfx, "n_removed"), paste0(pfx, "pct_removed"))
+  }))
+
+  gt_tbl <- gt::gt(df) |>
+    gt::cols_hide(".row") |>
+    gt::cols_label(.list = label_values) |>
+    gt::cols_align(align = "right", columns = value_cols) |>
+    gt::cols_align(align = "left", columns = "label") |>
+    gt::tab_style(
+      style     = gt::cell_text(weight = "bold"),
+      locations = gt::cells_body(rows = c(a$header_rows, a$final_rows, a$yhead_rows))
+    ) |>
+    gt::tab_style(
+      style     = gt::cell_text(weight = "bold"),
+      locations = gt::cells_body(rows = a$cat_rows, columns = "label")
+    ) |>
+    gt::tab_style(
+      style     = gt::cell_text(indent = gt::px(12)),
+      locations = gt::cells_body(rows = a$step1_rows, columns = "label")
+    ) |>
+    gt::tab_style(
+      style     = gt::cell_text(indent = gt::px(24)),
+      locations = gt::cells_body(rows = a$step2_rows, columns = "label")
+    ) |>
+    gt::tab_style(
+      style     = gt::cell_text(weight = "bold"),
+      locations = gt::cells_column_labels()
+    ) |>
+    gt::tab_options(
+      table.font.size        = gt::px(12),
+      table.font.names       = "Times New Roman",
+      table.border.top.color = "black",
+      table.border.top.width = gt::px(1),
+      table_body.border.bottom.color = "black",
+      table_body.border.bottom.width = gt::px(1),
+      column_labels.border.bottom.color = "black",
+      column_labels.border.bottom.width = gt::px(1),
+      data_row.padding       = gt::px(4),
+      table_body.vlines.color = "transparent",
+      column_labels.vlines.color = "transparent"
+    )
+
+  if (a$has_x) {
+    for (xi in seq_len(n_x)) {
+      pfx  <- paste0("x", xi, "__")
+      cols <- c(paste0(pfx, "n"), paste0(pfx, "n_removed"), paste0(pfx, "pct_removed"))
+      gt_tbl <- gt::tab_spanner(gt_tbl, label = a$x_headings[[xi]], columns = cols)
+    }
+  }
+
+  rule_rows <- sort(unique(c(a$final_rows, a$yhead_rows[a$yhead_rows > 1L])))
+  for (r in rule_rows) {
+    gt_tbl <- gt::tab_style(
+      gt_tbl,
+      style     = gt::cell_borders(sides = "top", color = "black", weight = gt::px(1)),
+      locations = gt::cells_body(rows = r)
+    )
+  }
+
+  for (xi in seq_len(n_x)) {
+    pfx       <- paste0("x", xi, "__")
+    shade_col <- a$df_full[[paste0(pfx, "shade")]]
+    cols      <- c(paste0(pfx, "n"), paste0(pfx, "n_removed"), paste0(pfx, "pct_removed"))
+    for (i in seq_along(shade_col)) {
+      if (!is.na(shade_col[[i]])) {
+        gt_tbl <- gt::tab_style(
+          gt_tbl,
+          style     = gt::cell_fill(color = shade_col[[i]]),
+          locations = gt::cells_body(rows = i, columns = cols)
+        )
+      }
+    }
+  }
+
+  gt_tbl
+}
+
+
+.attrition_huxtable_grouped <- function(grid, criterion_col_label,
+                                        n_col_label, removed_col_label,
+                                        pct_col_label, group_x_label, group_y_label) {
+  if (!.has_namespace("huxtable")) {
+    rlang::abort(
+      'The {huxtable} package is required. Install it with: install.packages("huxtable")'
+    )
+  }
+
+  a      <- .attrition_grid_assemble(grid, group_x_label, group_y_label)
+  n_x    <- a$n_x
+  df     <- a$display
+  n_cols <- ncol(df)
+
+  ht <- huxtable::as_hux(df, add_colnames = TRUE)
+  ht <- huxtable::set_contents(ht, 1, 1, criterion_col_label)
+  col <- 2L
+  for (xi in seq_len(n_x)) {
+    ht <- huxtable::set_contents(ht, 1, col,       n_col_label)
+    ht <- huxtable::set_contents(ht, 1, col + 1L,  removed_col_label)
+    ht <- huxtable::set_contents(ht, 1, col + 2L,  pct_col_label)
+    col <- col + 3L
+  }
+
+  header_offset <- 1L
+  if (a$has_x) {
+    spanner_row <- c("", unlist(lapply(a$x_headings, function(h) c(h, "", ""))))
+    ht <- do.call(huxtable::insert_row, c(list(ht), as.list(spanner_row), list(after = 0)))
+    col <- 2L
+    for (xi in seq_len(n_x)) {
+      ht <- huxtable::merge_cells(ht, 1, col:(col + 2L))
+      col <- col + 3L
+    }
+    ht <- huxtable::set_align(ht, 1, huxtable::everywhere, "center")
+    ht <- huxtable::set_bold(ht, 1, huxtable::everywhere, TRUE)
+    header_offset <- 2L
+  }
+
+  ht <- huxtable::set_header_rows(ht, seq_len(header_offset), TRUE)
+
+  header_rows <- a$header_rows + header_offset
+  final_rows  <- a$final_rows  + header_offset
+  cat_rows    <- a$cat_rows    + header_offset
+  step1_rows  <- a$step1_rows  + header_offset
+  step2_rows  <- a$step2_rows  + header_offset
+  yhead_rows  <- a$yhead_rows  + header_offset
+
+  ht <- ht |>
+    huxtable::set_align(huxtable::everywhere, 2:n_cols, "right") |>
+    huxtable::set_align(huxtable::everywhere, 1, "left") |>
+    huxtable::set_bold(header_offset, huxtable::everywhere, TRUE) |>
+    huxtable::set_bold(c(header_rows, final_rows, yhead_rows), huxtable::everywhere, TRUE) |>
+    huxtable::set_bold(cat_rows, 1, TRUE) |>
+    huxtable::set_left_padding(step1_rows, 1, 12) |>
+    huxtable::set_left_padding(step2_rows, 1, 24) |>
+    huxtable::set_top_border(1, huxtable::everywhere, 0.8) |>
+    huxtable::set_bottom_border(header_offset, huxtable::everywhere, 0.8) |>
+    huxtable::set_bottom_border(nrow(df) + header_offset, huxtable::everywhere, 0.8) |>
+    huxtable::set_left_border(huxtable::everywhere, huxtable::everywhere, 0) |>
+    huxtable::set_right_border(huxtable::everywhere, huxtable::everywhere, 0) |>
+    huxtable::set_font_size(huxtable::everywhere, huxtable::everywhere, 12) |>
+    huxtable::set_font(huxtable::everywhere, huxtable::everywhere, "Times New Roman") |>
+    huxtable::set_width(1)
+
+  rule_rows <- sort(unique(c(final_rows, yhead_rows[a$yhead_rows > 1L])))
+  for (r in rule_rows) {
+    ht <- huxtable::set_top_border(ht, r, huxtable::everywhere, 0.8)
+  }
+
+  col <- 2L
+  for (xi in seq_len(n_x)) {
+    shade_col <- a$df_full[[paste0("x", xi, "__shade")]]
+    cols      <- col:(col + 2L)
+    for (i in seq_along(shade_col)) {
+      if (!is.na(shade_col[[i]])) {
+        ht <- huxtable::set_background_color(ht, i + header_offset, cols, shade_col[[i]])
+      }
+    }
+    col <- col + 3L
+  }
 
   ht
 }

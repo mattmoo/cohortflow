@@ -333,7 +333,7 @@ test_that("multi-step category has n_removed and pct_removed on category row", {
 })
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble -- branching
+# as_attrition_tibble -- branching (per-branch columns on the final row)
 # ---------------------------------------------------------------------------
 
 test_that("as_attrition_tibble() accepts branch_by parameter", {
@@ -341,45 +341,45 @@ test_that("as_attrition_tibble() accepts branch_by parameter", {
   out  <- as_attrition_tibble(flow, branch_by = "arm")
 
   expect_s3_class(out, "tbl_df")
-  expect_true("branch" %in% names(out))
+  cohort_data <- cohort(flow)
+  branch_values <- as.character(sort(unique(cohort_data$arm)))
+  expect_true(all(branch_values %in% names(out)))
 })
 
-test_that("branch_by creates one branch row per unique value", {
+test_that("branch_by creates one column per unique value", {
   flow <- make_flow_parallel_rct()
   out  <- as_attrition_tibble(flow, branch_by = "arm")
 
-  branch_rows <- out[out$row_type == "branch", ]
   cohort_data <- cohort(flow)
-  expected_branches <- length(unique(cohort_data$arm))
+  branch_values <- as.character(sort(unique(cohort_data$arm)))
 
-  expect_equal(nrow(branch_rows), expected_branches)
+  expect_true(all(branch_values %in% names(out)))
+  expect_equal(length(intersect(branch_values, names(out))), length(branch_values))
 })
 
 test_that("branch counts sum to final cohort size", {
   flow <- make_flow_parallel_rct()
   out  <- as_attrition_tibble(flow, branch_by = "arm")
 
-  branch_rows <- out[out$row_type == "branch", ]
-  final_row   <- out[out$row_type == "final", ]
+  cohort_data <- cohort(flow)
+  branch_values <- as.character(sort(unique(cohort_data$arm)))
+  final_row <- out[out$row_type == "final", ]
 
-  expect_equal(sum(branch_rows$n), final_row$n)
+  branch_total <- sum(vapply(branch_values, function(b) final_row[[b]], numeric(1L)))
+  expect_equal(branch_total, final_row$n)
 })
 
-test_that("branch rows have NA n_removed and pct_removed", {
+test_that("branch columns are NA except on the final row", {
   flow <- make_flow_parallel_rct()
   out  <- as_attrition_tibble(flow, branch_by = "arm")
 
-  branch_rows <- out[out$row_type == "branch", ]
-  expect_true(all(is.na(branch_rows$n_removed)))
-  expect_true(all(is.na(branch_rows$pct_removed)))
-})
+  cohort_data <- cohort(flow)
+  branch_values <- as.character(sort(unique(cohort_data$arm)))
+  non_final <- out[out$row_type != "final", ]
 
-test_that("branch rows have indent_level 1", {
-  flow <- make_flow_parallel_rct()
-  out  <- as_attrition_tibble(flow, branch_by = "arm")
-
-  branch_rows <- out[out$row_type == "branch", ]
-  expect_true(all(branch_rows$indent_level == 1L))
+  for (b in branch_values) {
+    expect_true(all(is.na(non_final[[b]])))
+  }
 })
 
 test_that("branch_by errors when column not found", {
@@ -406,15 +406,15 @@ test_that("count_by uses distinct counts", {
     count_by = "participant_id"
   )
 
-  branch_rows <- out[out$row_type == "branch", ]
   cohort_data <- cohort(flow)
+  branch_values <- as.character(sort(unique(cohort_data$sequence)))
+  final_row <- out[out$row_type == "final", ]
 
-  for (i in seq_len(nrow(branch_rows))) {
-    seq_val <- branch_rows$branch[i]
+  for (seq_val in branch_values) {
     expected_n <- dplyr::n_distinct(
       cohort_data$participant_id[cohort_data$sequence == seq_val]
     )
-    expect_equal(branch_rows$n[i], expected_n)
+    expect_equal(final_row[[seq_val]], expected_n)
   }
 })
 
@@ -426,11 +426,13 @@ test_that("count_by errors when column not found", {
   )
 })
 
-test_that("linear table has no branch rows when branch_by is NULL", {
+test_that("linear table has no branch columns when branch_by is NULL", {
   flow <- make_flow_categorised()
   out  <- as_attrition_tibble(flow)
 
-  expect_equal(sum(out$row_type == "branch"), 0L)
+  standard_cols <- c("row_type", "label", "indent_level", "n",
+                     "n_removed", "pct_removed", "branch")
+  expect_equal(setdiff(names(out), standard_cols), character(0L))
 })
 
 test_that("as_attrition_table() accepts branch_by parameter", {
@@ -456,4 +458,278 @@ test_that("as_attrition_table() with huxtable accepts branch_by", {
   flow <- make_flow_parallel_rct()
   ht   <- as_attrition_table(flow, backend = "huxtable", branch_by = "arm")
   expect_s3_class(ht, "huxtable")
+})
+
+# ---------------------------------------------------------------------------
+# as_attrition_tibble -- grouping (group_x / group_y)
+# ---------------------------------------------------------------------------
+
+test_that("group_x alone repeats the attrition block per group_x value", {
+  flow <- make_flow_stepped_wedge()
+  out  <- as_attrition_tibble(flow, group_x = "site_id")
+
+  x_vals <- sort(unique(flow$data$site_id))
+  expect_true(all(c("group_x", "group_y") %in% names(out)))
+  expect_true(all(is.na(out$group_y)))
+  expect_setequal(unique(out$group_x), x_vals)
+
+  # Each group_x value should have a full attrition block (same nrow)
+  block_sizes <- table(out$group_x)
+  expect_true(length(unique(as.integer(block_sizes))) == 1L)
+})
+
+test_that("group_y alone repeats the attrition block per group_y value", {
+  flow <- make_flow_stepped_wedge()
+  out  <- as_attrition_tibble(flow, group_y = "period")
+
+  y_vals <- sort(unique(flow$data$period))
+  expect_true(all(is.na(out$group_x)))
+  expect_setequal(unique(out$group_y), as.character(y_vals))
+})
+
+test_that("group_x and group_y together produce one block per combination", {
+  flow <- make_flow_stepped_wedge()
+  out  <- as_attrition_tibble(flow, group_x = "site_id", group_y = "period")
+
+  x_vals <- unique(flow$data$site_id)
+  y_vals <- unique(flow$data$period)
+  n_combos <- length(x_vals) * length(y_vals)
+
+  block_sizes <- table(paste(out$group_x, out$group_y))
+  expect_equal(length(block_sizes), n_combos)
+  expect_true(length(unique(as.integer(block_sizes))) == 1L)
+})
+
+test_that("grouped row skeleton (row_type/label/indent_level) is identical across blocks", {
+  flow <- make_flow_stepped_wedge()
+  out  <- as_attrition_tibble(flow, group_x = "site_id", group_y = "period")
+
+  skeletons <- split(out[c("row_type", "label", "indent_level")],
+                      paste(out$group_x, out$group_y))
+  first <- skeletons[[1]]
+  for (s in skeletons[-1]) {
+    rownames(s) <- NULL
+    rownames(first) <- NULL
+    expect_equal(s, first)
+  }
+})
+
+test_that("grouping errors when group_x column not found", {
+  flow <- make_flow_stepped_wedge()
+  expect_error(
+    as_attrition_tibble(flow, group_x = "nonexistent"),
+    "not found"
+  )
+})
+
+test_that("grouping errors when group_y column not found", {
+  flow <- make_flow_stepped_wedge()
+  expect_error(
+    as_attrition_tibble(flow, group_y = "nonexistent"),
+    "not found"
+  )
+})
+
+test_that("group_x/group_y cannot be combined with branch_by or count_by", {
+  flow <- make_flow_stepped_wedge()
+  expect_error(
+    as_attrition_tibble(flow, group_x = "site_id", branch_by = "arm"),
+    "cannot be combined"
+  )
+  expect_error(
+    as_attrition_table(flow, group_x = "site_id", branch_by = "arm"),
+    "cannot be combined"
+  )
+})
+
+test_that("grouped numbers within each block are internally consistent", {
+  flow <- make_flow_stepped_wedge()
+  out  <- as_attrition_tibble(flow, group_x = "site_id")
+
+  for (x in unique(out$group_x)) {
+    block <- out[out$group_x == x, ]
+    n_start <- block$n[block$row_type == "header"]
+    n_end   <- block$n[block$row_type == "final"]
+    step_removed <- sum(block$n_removed[block$row_type == "step"], na.rm = TRUE)
+    expect_equal(step_removed, n_start - n_end)
+  }
+})
+
+# ---------------------------------------------------------------------------
+# as_attrition_table -- grouped grid rendering
+# ---------------------------------------------------------------------------
+
+test_that("as_attrition_table() with flextable accepts group_x/group_y", {
+  skip_if_not_installed("flextable")
+  skip_if_not_installed("officer")
+
+  flow <- make_flow_stepped_wedge()
+  ft   <- as_attrition_table(flow, backend = "flextable",
+                             group_x = "site_id", group_y = "period")
+  expect_s3_class(ft, "flextable")
+})
+
+test_that("as_attrition_table() with gt accepts group_x/group_y", {
+  skip_if_not_installed("gt")
+
+  flow <- make_flow_stepped_wedge()
+  gt_tbl <- as_attrition_table(flow, backend = "gt",
+                               group_x = "site_id", group_y = "period")
+  expect_s3_class(gt_tbl, "gt_tbl")
+})
+
+test_that("as_attrition_table() with huxtable accepts group_x/group_y", {
+  skip_if_not_installed("huxtable")
+
+  flow <- make_flow_stepped_wedge()
+  ht <- as_attrition_table(flow, backend = "huxtable",
+                           group_x = "site_id", group_y = "period")
+  expect_s3_class(ht, "huxtable")
+})
+
+test_that("as_attrition_table() accepts group_x alone (no group_y)", {
+  skip_if_not_installed("flextable")
+  skip_if_not_installed("officer")
+
+  flow <- make_flow_stepped_wedge()
+  ft   <- as_attrition_table(flow, backend = "flextable", group_x = "site_id")
+  expect_s3_class(ft, "flextable")
+})
+
+test_that("as_attrition_table() accepts group_y alone (no group_x)", {
+  skip_if_not_installed("flextable")
+  skip_if_not_installed("officer")
+
+  flow <- make_flow_stepped_wedge()
+  ft   <- as_attrition_table(flow, backend = "flextable", group_y = "period")
+  expect_s3_class(ft, "flextable")
+})
+
+test_that("group_x_label / group_y_label prefix the grid headings", {
+  skip_if_not_installed("flextable")
+  skip_if_not_installed("officer")
+
+  flow <- make_flow_stepped_wedge()
+  ft   <- as_attrition_table(
+    flow, backend = "flextable",
+    group_x = "site_id", group_y = "period",
+    group_x_label = "Site", group_y_label = "Period"
+  )
+  expect_s3_class(ft, "flextable")
+})
+
+# ---------------------------------------------------------------------------
+# Shading -- .attrition_shade_colours() (internal helper)
+# ---------------------------------------------------------------------------
+
+test_that("shade = NULL and shade_fn = NULL produces all-NA colours", {
+  flow <- make_flow_categorised()
+  tbl  <- as_attrition_tibble(flow)
+  cols <- cohortflow:::.attrition_shade_colours(tbl, NULL, NULL, c("#FFFFFF", "#F8696B"))
+
+  expect_equal(length(cols), nrow(tbl))
+  expect_true(all(is.na(cols)))
+})
+
+test_that("shade = 'pct_removed' shades step/category rows only", {
+  flow <- make_flow_categorised()
+  tbl  <- as_attrition_tibble(flow)
+  cols <- cohortflow:::.attrition_shade_colours(tbl, "pct_removed", NULL, c("#FFFFFF", "#F8696B"))
+
+  expect_equal(length(cols), nrow(tbl))
+  shadeable <- tbl$row_type %in% c("step", "category") & !is.na(tbl$pct_removed)
+  expect_true(all(!is.na(cols[shadeable])))
+  expect_true(all(is.na(cols[tbl$row_type %in% c("header", "final")])))
+})
+
+test_that("shade = 'n_removed' produces valid hex colours", {
+  flow <- make_flow_categorised()
+  tbl  <- as_attrition_tibble(flow)
+  cols <- cohortflow:::.attrition_shade_colours(tbl, "n_removed", NULL, c("#FFFFFF", "#F8696B"))
+
+  non_na <- cols[!is.na(cols)]
+  expect_true(length(non_na) > 0L)
+  expect_true(all(grepl("^#[0-9A-Fa-f]{6}$", non_na)))
+})
+
+test_that("shade rejects invalid string values", {
+  flow <- make_flow_categorised()
+  tbl  <- as_attrition_tibble(flow)
+  expect_error(
+    cohortflow:::.attrition_shade_colours(tbl, "not_a_column", NULL, c("#FFFFFF", "#F8696B")),
+    "pct_removed.*n_removed"
+  )
+})
+
+test_that("shade_fn takes precedence over shade and is applied verbatim", {
+  flow <- make_flow_categorised()
+  tbl  <- as_attrition_tibble(flow)
+
+  fn <- function(t) ifelse(t$row_type == "final", "#00FF00", NA_character_)
+  cols <- cohortflow:::.attrition_shade_colours(tbl, "pct_removed", fn, c("#FFFFFF", "#F8696B"))
+
+  expect_equal(cols[tbl$row_type == "final"], "#00FF00")
+  expect_true(all(is.na(cols[tbl$row_type != "final"])))
+})
+
+test_that("shade_fn returning wrong length errors informatively", {
+  flow <- make_flow_categorised()
+  tbl  <- as_attrition_tibble(flow)
+
+  bad_fn <- function(t) c("#FFFFFF", "#000000")
+  expect_error(
+    cohortflow:::.attrition_shade_colours(tbl, NULL, bad_fn, c("#FFFFFF", "#F8696B")),
+    "same length"
+  )
+})
+
+test_that("as_attrition_table() accepts shade = 'pct_removed'", {
+  skip_if_not_installed("flextable")
+  skip_if_not_installed("officer")
+
+  flow <- make_flow_categorised()
+  ft   <- as_attrition_table(flow, shade = "pct_removed")
+  expect_s3_class(ft, "flextable")
+})
+
+test_that("as_attrition_table() accepts shade_fn", {
+  skip_if_not_installed("flextable")
+  skip_if_not_installed("officer")
+
+  flow <- make_flow_categorised()
+  fn <- function(t) {
+    ifelse(t$row_type == "step" & !is.na(t$pct_removed) & t$pct_removed > 2,
+           "#FFCCCC", NA_character_)
+  }
+  ft <- as_attrition_table(flow, shade_fn = fn)
+  expect_s3_class(ft, "flextable")
+})
+
+test_that("as_attrition_table() with gt accepts shade", {
+  skip_if_not_installed("gt")
+
+  flow <- make_flow_categorised()
+  gt_tbl <- as_attrition_table(flow, backend = "gt", shade = "n_removed")
+  expect_s3_class(gt_tbl, "gt_tbl")
+})
+
+test_that("as_attrition_table() with huxtable accepts shade", {
+  skip_if_not_installed("huxtable")
+
+  flow <- make_flow_categorised()
+  ht <- as_attrition_table(flow, backend = "huxtable", shade = "n_removed")
+  expect_s3_class(ht, "huxtable")
+})
+
+test_that("shade works together with group_x/group_y grid rendering", {
+  skip_if_not_installed("flextable")
+  skip_if_not_installed("officer")
+
+  flow <- make_flow_stepped_wedge()
+  ft <- as_attrition_table(
+    flow, backend = "flextable",
+    group_x = "site_id", group_y = "period",
+    shade = "pct_removed"
+  )
+  expect_s3_class(ft, "flextable")
 })
