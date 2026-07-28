@@ -461,7 +461,7 @@ test_that("as_attrition_table() with huxtable accepts branch_by", {
 })
 
 # ---------------------------------------------------------------------------
-# as_attrition_tibble -- grouping (group_x / group_y)
+# as_attrition_tibble -- grouping via group_x / group_y
 # ---------------------------------------------------------------------------
 
 test_that("group_x alone repeats the attrition block per group_x value", {
@@ -505,7 +505,7 @@ test_that("grouped row skeleton (row_type/label/indent_level) is identical acros
   out  <- as_attrition_tibble(flow, group_x = "site_id", group_y = "period")
 
   skeletons <- split(out[c("row_type", "label", "indent_level")],
-                      paste(out$group_x, out$group_y))
+                     paste(out$group_x, out$group_y))
   first <- skeletons[[1]]
   for (s in skeletons[-1]) {
     rownames(s) <- NULL
