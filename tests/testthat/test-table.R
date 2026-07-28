@@ -555,6 +555,88 @@ test_that("grouped numbers within each block are internally consistent", {
   }
 })
 
+test_that("NA values in group_x form their own 'Missing' group, not folded into every other group", {
+  flow <- make_flow_stepped_wedge()
+
+  # Introduce NAs into the grouping column on the underlying data.
+  na_idx <- seq_len(nrow(flow$data)) <= 20
+  flow$data$site_id[na_idx] <- NA
+  n_na <- sum(na_idx)
+
+  expect_true(n_na > 0L)
+
+  out    <- as_attrition_tibble(flow, group_x = "site_id")
+  x_vals <- sort(unique(flow$data$site_id))
+
+  # No group_x value should be NA -- the missing rows get an explicit label.
+  expect_false(any(is.na(out$group_x)))
+  expect_true("Missing" %in% unique(out$group_x))
+
+  # Every real (non-missing) group's "assessed" (header) N must match the
+  # true non-NA subset count -- i.e. must NOT include the NA rows.
+  for (x in x_vals) {
+    expected_n <- sum(flow$data$site_id == x, na.rm = TRUE)
+    block <- out[out$group_x == as.character(x), ]
+    header_n <- block$n[block$row_type == "header"]
+    expect_equal(header_n, expected_n)
+  }
+
+  # The "Missing" group's header N must equal the count of NA rows exactly.
+  missing_block <- out[out$group_x == "Missing", ]
+  expect_equal(missing_block$n[missing_block$row_type == "header"], n_na)
+
+  # Sanity check: total assessed across all group blocks (including
+  # "Missing") sums to exactly the full dataset -- no double-counting and
+  # no silent dropping.
+  total_assessed <- sum(out$n[out$row_type == "header"])
+  expect_equal(total_assessed, nrow(flow$data))
+})
+
+test_that("NA values in group_y form their own 'Missing' group, not folded into every other group", {
+  flow <- make_flow_stepped_wedge()
+
+  na_idx <- seq_len(nrow(flow$data)) <= 20
+  flow$data$period[na_idx] <- NA
+  n_na <- sum(na_idx)
+
+  expect_true(n_na > 0L)
+
+  out    <- as_attrition_tibble(flow, group_y = "period")
+  y_vals <- sort(unique(flow$data$period))
+
+  expect_false(any(is.na(out$group_y)))
+  expect_true("Missing" %in% unique(out$group_y))
+
+  for (y in y_vals) {
+    expected_n <- sum(flow$data$period == y, na.rm = TRUE)
+    block <- out[out$group_y == as.character(y), ]
+    header_n <- block$n[block$row_type == "header"]
+    expect_equal(header_n, expected_n)
+  }
+
+  missing_block <- out[out$group_y == "Missing", ]
+  expect_equal(missing_block$n[missing_block$row_type == "header"], n_na)
+
+  total_assessed <- sum(out$n[out$row_type == "header"])
+  expect_equal(total_assessed, nrow(flow$data))
+})
+
+test_that("group_na_label customises the label used for the missing-value group", {
+  flow <- make_flow_stepped_wedge()
+  na_idx <- seq_len(nrow(flow$data)) <= 20
+  flow$data$site_id[na_idx] <- NA
+
+  out <- as_attrition_tibble(flow, group_x = "site_id", group_na_label = "Unknown site")
+  expect_true("Unknown site" %in% unique(out$group_x))
+  expect_false("Missing" %in% unique(out$group_x))
+})
+
+test_that("grouping with no NA values does not introduce a spurious 'Missing' group", {
+  flow <- make_flow_stepped_wedge()
+  out  <- as_attrition_tibble(flow, group_x = "site_id")
+  expect_false("Missing" %in% unique(out$group_x))
+})
+
 # ---------------------------------------------------------------------------
 # as_attrition_table -- grouped grid rendering
 # ---------------------------------------------------------------------------

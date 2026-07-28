@@ -53,6 +53,12 @@
 #' directly if you want to build your own custom cross-tabulated output.
 #' `branch_by`/`count_by` cannot currently be combined with grouping.
 #'
+#' Rows where the grouping column itself is `NA` (e.g. missing ethnicity)
+#' are **not** silently dropped, and are never folded into every other
+#' group's counts. Instead they form their own explicit group, labelled by
+#' `group_na_label` (default `"Missing"`), so the grouped totals still sum
+#' to the full dataset.
+#'
 #' @param flow A `cf_flow` object produced by [apply_criteria()].
 #' @param show_categories Logical. When `TRUE` (default) steps with the same
 #'   `category` are collapsed under a single parent row. When `FALSE` one row
@@ -80,6 +86,10 @@
 #' @param group_y Optional column name (string), present in `flow$data`, used
 #'   to repeat the attrition table across the "row" direction (e.g. time
 #'   period). See the Grouping section.
+#' @param group_na_label Character string used to label the group formed by
+#'   `NA` values in `group_x`/`group_y` (see the Grouping section). Default
+#'   `"Missing"`. Ignored when the corresponding grouping column has no `NA`
+#'   values.
 #'
 #' @return A [tibble::tibble()] with columns:
 #' \describe{
@@ -122,7 +132,8 @@ as_attrition_tibble <- function(
   branch_by       = NULL,
   count_by        = NULL,
   group_x         = NULL,
-  group_y         = NULL
+  group_y         = NULL,
+  group_na_label  = "Missing"
 ) {
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
@@ -134,7 +145,8 @@ as_attrition_tibble <- function(
       rlang::abort("`branch_by`/`count_by` cannot be combined with `group_x`/`group_y`.")
     }
     return(.attrition_tibble_grouped(
-      flow, group_x, group_y, show_categories, assessed_label, final_label, digits
+      flow, group_x, group_y, show_categories, assessed_label, final_label,
+      digits, group_na_label
     ))
   }
 
@@ -322,7 +334,8 @@ as_attrition_tibble <- function(
 # identical across every block -- it depends only on the criteria pipeline,
 # never on the data -- so the blocks can later be pivoted into a grid.
 .attrition_tibble_grouped <- function(flow, group_x, group_y, show_categories,
-                                      assessed_label, final_label, digits) {
+                                      assessed_label, final_label, digits,
+                                      group_na_label = "Missing") {
   data <- flow$data
 
   if (!is.null(group_x) && !group_x %in% names(data)) {
@@ -332,18 +345,23 @@ as_attrition_tibble <- function(
     rlang::abort(sprintf("Column `%s` not found in data.", group_y))
   }
 
-  x_vals <- if (!is.null(group_x)) sort(unique(data[[group_x]])) else NA
-  y_vals <- if (!is.null(group_y)) sort(unique(data[[group_y]])) else NA
+  # Unique non-NA values, plus a sentinel `NA` appended at the end whenever
+  # the column actually contains missing values -- this makes "Missing" its
+  # own explicit group instead of either being silently dropped or (the
+  # original bug) leaking into every other group via `== ` producing NA
+  # matches under base R's `[` subsetting.
+  x_vals <- if (!is.null(group_x)) .attrition_group_values(data[[group_x]]) else NA
+  y_vals <- if (!is.null(group_y)) .attrition_group_values(data[[group_y]]) else NA
 
   blocks <- list()
   for (y in y_vals) {
     for (x in x_vals) {
       sub_data <- data
       if (!is.null(group_x)) {
-        sub_data <- sub_data[sub_data[[group_x]] == x, , drop = FALSE]
+        sub_data <- sub_data[.attrition_group_match(sub_data[[group_x]], x), , drop = FALSE]
       }
       if (!is.null(group_y)) {
-        sub_data <- sub_data[sub_data[[group_y]] == y, , drop = FALSE]
+        sub_data <- sub_data[.attrition_group_match(sub_data[[group_y]], y), , drop = FALSE]
       }
 
       sub_flow <- apply_criteria(sub_data, flow$criteria, id = ".cf_row_id")
@@ -355,14 +373,37 @@ as_attrition_tibble <- function(
         final_label     = final_label,
         digits          = digits
       )
-      block$group_x <- if (!is.null(group_x)) as.character(x) else NA_character_
-      block$group_y <- if (!is.null(group_y)) as.character(y) else NA_character_
+      block$group_x <- if (!is.null(group_x)) .attrition_group_label(x, group_na_label) else NA_character_
+      block$group_y <- if (!is.null(group_y)) .attrition_group_label(y, group_na_label) else NA_character_
 
       blocks <- c(blocks, list(block))
     }
   }
 
   do.call(rbind, blocks)
+}
+
+# Returns the sorted unique non-NA values of `x`, with a single `NA`
+# sentinel appended at the end if `x` contains any missing values. This
+# sentinel becomes its own explicit "Missing" group rather than being
+# dropped or (incorrectly) folded into every other group.
+.attrition_group_values <- function(x) {
+  vals <- sort(unique(x), na.last = NA)
+  if (anyNA(x)) vals <- c(vals, NA)
+  vals
+}
+
+# Row-match helper used for grouped subsetting: matches non-NA `value`
+# against `x` using `%in%` (never returns NA), and matches a `NA` sentinel
+# `value` against `is.na(x)`. This ensures every row -- including those
+# with a missing grouping value -- belongs to exactly one group.
+.attrition_group_match <- function(x, value) {
+  if (is.na(value)) is.na(x) else x %in% value
+}
+
+# Converts a group value (possibly the NA sentinel) to its display label.
+.attrition_group_label <- function(value, na_label) {
+  if (is.na(value)) na_label else as.character(value)
 }
 
 # ---------------------------------------------------------------------------
