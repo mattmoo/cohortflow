@@ -660,9 +660,13 @@ as_attrition_table <- function(
                                n_col_label, removed_col_label,
                                pct_col_label) {
 
+  # The final row's percentage is the percentage *retained*/*included*, not
+  # removed, so it is labelled explicitly (e.g. "83.5% included") to avoid
+  # reading as if it shared the "% removed" semantics of the column header
+  # above it.
   pct_str <- dplyr::case_when(
     tbl$row_type == "header"               ~ NA_character_,
-    tbl$row_type == "final"                ~ paste0(tbl$pct_removed, "%"),
+    tbl$row_type == "final"                ~ paste0(tbl$pct_removed, "% included"),
     is.na(tbl$pct_removed) | tbl$pct_removed == 0 ~ "\u2014",
     TRUE                                   ~ paste0(tbl$pct_removed, "%")
   )
@@ -1110,8 +1114,13 @@ as_attrition_table <- function(
       nr_col == 0L  ~ "\u2014",
       TRUE          ~ as.character(nr_col)
     )
-    display[[paste0(pfx, "pct_removed")]] <- ifelse(
-      is.na(pct_col), "", paste0(pct_col, "%")
+    # The final row's percentage is the percentage *retained*/*included*, not
+    # removed, so it is labelled explicitly (e.g. "83.5% included") to avoid
+    # reading as if it shared the "% removed" semantics of the column header.
+    display[[paste0(pfx, "pct_removed")]] <- dplyr::case_when(
+      is.na(pct_col)                    ~ "",
+      df_full$row_type == "final"       ~ paste0(pct_col, "% included"),
+      TRUE                               ~ paste0(pct_col, "%")
     )
   }
 
