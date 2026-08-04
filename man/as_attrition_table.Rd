@@ -57,12 +57,14 @@ Default \code{"Removed"}.}
 Default \code{"\% removed"}.}
 
 \item{branch_by}{Optional column name (string) for allocation branching.
-When \code{NULL} (default), the table has a single \code{n} column. When
-supplied, the surviving cohort is split by this column and the final
-row's total is broken out into one additional column per branch value
-(named after the branch value, e.g. \code{Control}, \code{Intervention}), each
-populated only on the final row. Use \code{final_label = "Randomised"} when
-appropriate. Cannot be combined with \code{group_x}/\code{group_y}.}
+When \code{NULL} (default), the table has a single \code{n} column unless the
+pipeline has a \code{\link[=randomise]{randomise()}} step, in which case its \code{arms} column is
+used automatically. When supplied (or defaulted), the surviving cohort
+is split by this column and the final row's total is broken out into
+one additional column per branch value (named after the branch value,
+e.g. \code{Control}, \code{Intervention}), each populated only on the final row.
+Use \code{final_label = "Randomised"} when appropriate. Cannot be combined
+with \code{group_x}/\code{group_y}.}
 
 \item{count_by}{Optional column name (string) for distinct counts. When
 supplied, counts are computed as \code{n_distinct(count_by)} rather than

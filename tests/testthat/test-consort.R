@@ -330,8 +330,108 @@ test_that("linear diagram has no branch boxes when branch_by is NULL", {
 })
 
 # ---------------------------------------------------------------------------
-# as_consort_diagram -- singleton category exclusion boxes
+# as_consort_diagram -- randomise() auto-detection
 # ---------------------------------------------------------------------------
+
+test_that("as_consort_diagram() auto-detects branch_by from a randomise() step", {
+  flow <- make_flow_randomise()
+  d <- as_consort_diagram(flow)
+
+  branch_boxes <- consort_layout(d)$branch_boxes
+  cohort_data  <- cohort(flow)
+  arm_values   <- as.character(sort(unique(cohort_data$arm)))
+
+  # One arm-label box + one box per post-randomisation step (Withdrew,
+  # Final) per arm.
+  expect_equal(nrow(branch_boxes), length(arm_values) * 3L)
+  expect_setequal(unique(branch_boxes$branch), arm_values)
+})
+
+test_that("explicit branch_by overrides the randomise() step default in as_consort_diagram()", {
+  flow <- make_flow_randomise()
+  d <- as_consort_diagram(flow, branch_by = "site_id")
+
+  branch_boxes <- consort_layout(d)$branch_boxes
+  cohort_data  <- cohort(flow)
+  site_values  <- as.character(sort(unique(cohort_data$site_id)))
+
+  expect_setequal(unique(branch_boxes$branch), site_values)
+})
+
+test_that("as_consort_diagram() splits the trunk at the randomise() step", {
+  # The shared trunk only contains steps up to and including the
+  # randomise() box; everything at or after it is drawn as its own
+  # per-arm sub-cascade instead of a single shared-trunk box.
+  flow <- make_flow_randomise()
+  d <- as_consort_diagram(flow)
+
+  main_boxes <- consort_layout(d)$main_boxes
+  # header + "Age recorded" + "Randomised" = 3 shared-trunk boxes
+  expect_equal(nrow(main_boxes), 3L)
+  expect_false(any(grepl("Withdrew after allocation", main_boxes$label)))
+  expect_false(any(grepl("Final cohort", main_boxes$label)))
+
+  branch_boxes <- consort_layout(d)$branch_boxes
+  expect_true(any(grepl("Withdrew after allocation", branch_boxes$label)))
+  expect_true(any(grepl("Final cohort", branch_boxes$label)))
+})
+
+test_that("as_consort_diagram() draws per-arm exclusion boxes after a randomise() step", {
+  flow <- make_flow_randomise()
+  d <- as_consort_diagram(flow)
+
+  branch_excl_boxes <- consort_layout(d)$branch_excl_boxes
+  cohort_data <- cohort(flow)
+  arm_values  <- as.character(sort(unique(cohort_data$arm)))
+
+  expect_gt(nrow(branch_excl_boxes), 0L)
+  expect_true(all(branch_excl_boxes$branch %in% arm_values))
+})
+
+test_that("as_consort_diagram() errors combining count_by with a randomise() split", {
+  flow <- make_flow_randomise()
+  expect_error(
+    as_consort_diagram(flow, count_by = "participant_id"),
+    "count_by.*randomise"
+  )
+})
+
+test_that("as_consort_diagram() does not overlap boxes across arms after a randomise() split", {
+  # Regression test: an arm's exclusion box sits to the right of that arm's
+  # own main-box column (see `.consort_build_cascade()`), so the spacing
+  # between arm columns must clear the *full* width of that exclusion box,
+  # not just half of it -- otherwise it overlaps the neighbouring arm's
+  # main boxes (visually, arrows/boxes from one arm crossing into the next).
+  # `make_flow_randomise_multistep()` has two post-randomisation exclusion
+  # steps (not just one), which is what actually exposes the bug -- a
+  # single sparse step leaves enough incidental vertical room to mask it.
+  flow <- make_flow_randomise_multistep()
+  d <- as_consort_diagram(flow)
+
+  layout <- consort_layout(d)
+  boxes  <- rbind(
+    layout$branch_boxes[c("x", "y", "w", "h", "branch")],
+    layout$branch_excl_boxes[c("x", "y", "w", "h", "branch")]
+  )
+  boxes <- boxes[!is.na(boxes$branch), , drop = FALSE]
+
+  overlaps <- function(a, b) {
+    (abs(a$x - b$x) * 2 < (a$w + b$w)) && (abs(a$y - b$y) * 2 < (a$h + b$h))
+  }
+
+  n <- nrow(boxes)
+  for (i in seq_len(n - 1L)) {
+    for (j in seq.int(i + 1L, n)) {
+      if (boxes$branch[i] == boxes$branch[j]) next
+      expect_false(
+        overlaps(boxes[i, ], boxes[j, ]),
+        info = sprintf("Box %d (branch %s) overlaps box %d (branch %s)",
+                       i, boxes$branch[i], j, boxes$branch[j])
+      )
+    }
+  }
+})
+
 
 test_that("singleton category with exclusions draws an exclusion box", {
   # Create a flow with a singleton category that has exclusions

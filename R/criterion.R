@@ -14,16 +14,25 @@
 #'     scalar logical. The result is broadcast back to all rows in each group.
 #'   * For `select_within`: evaluated per group; must return a logical vector
 #'     identifying which rows within the group to keep.
+#'   * For `randomise`: must be `NULL` (a randomise step never removes rows).
 #' @param label A short human-readable description of this criterion.
 #' @param type One of `"include"`, `"exclude"`, `"group_include"`,
-#'   `"group_exclude"`, or `"select_within"`.
+#'   `"group_exclude"`, `"select_within"`, or `"randomise"`.
 #' @param by For grouped step types (`group_include`, `group_exclude`,
-#'   `select_within`): a single character string naming the grouping column.
-#'   Ignored for row-wise types.
+#'   `select_within`): one or more character strings naming the grouping
+#'   column(s); supply more than one for composite (multi-column) grouping.
+#'   For `randomise`: one or more character strings naming the
+#'   randomisation unit column(s) (e.g. `"cluster_id"`). Ignored for
+#'   row-wise types.
 #' @param category An optional character string grouping this criterion with
 #'   others for display purposes (e.g. `"Valid age"` to group age-related steps
 #'   into one box in a CONSORT diagram). `NULL` (default) leaves the step
 #'   uncategorised (`NA` in output).
+#' @param arms For `type = "randomise"` only: a single character string
+#'   naming the column in the data that holds each unit's allocated arm
+#'   (e.g. `"arm"`). Used by [as_consort_diagram()]/[as_attrition_tibble()]
+#'   to default `branch_by` when not explicitly supplied. Must be `NULL` for
+#'   all other types.
 #'
 #' @return A `cf_criterion` object (an S3 list).
 #' @export
@@ -51,16 +60,32 @@
 #'   type  = "select_within",
 #'   by    = "participant_id"
 #' )
+#'
+#' # Randomisation marker (no predicate; excludes nothing)
+#' cf_criterion(
+#'   predicate = NULL,
+#'   label = "Randomised",
+#'   type  = "randomise",
+#'   by    = "cluster_id",
+#'   arms  = "arm"
+#' )
 cf_criterion <- function(predicate,
                          label,
                          type = c("include", "exclude",
                                   "group_include", "group_exclude",
-                                  "select_within"),
+                                  "select_within", "randomise"),
                          by       = NULL,
-                         category = NULL) {
+                         category = NULL,
+                         arms     = NULL) {
   type <- match.arg(type)
 
-  if (!is_formula(predicate) && !is.function(predicate)) {
+  if (is.null(predicate)) {
+    if (type != "randomise") {
+      cli_abort("{.arg predicate} must be a formula or a function.")
+    }
+  } else if (type == "randomise") {
+    cli_abort("{.arg predicate} must be `NULL` for type \"randomise\".")
+  } else if (!is_formula(predicate) && !is.function(predicate)) {
     cli_abort(
       c(
         "{.arg predicate} must be a formula or a function.",
@@ -73,7 +98,7 @@ cf_criterion <- function(predicate,
     cli_abort("{.arg label} must be a single non-empty string.")
   }
 
-  if (is_formula(predicate) && !is_one_sided(predicate)) {
+  if (!is.null(predicate) && is_formula(predicate) && !is_one_sided(predicate)) {
     cli_abort(
       c(
         "Formulas must be one-sided (e.g. {.code ~ age >= 18}).",
@@ -82,16 +107,26 @@ cf_criterion <- function(predicate,
     )
   }
 
-  grouped_types <- c("group_include", "group_exclude", "select_within")
+  grouped_types <- c("group_include", "group_exclude", "select_within", "randomise")
   if (type %in% grouped_types) {
-    if (is.null(by) || !is.character(by) || length(by) != 1L || !nzchar(by)) {
+    if (is.null(by) || !is.character(by) || length(by) == 0L ||
+          anyNA(by) || any(!nzchar(by))) {
       cli_abort(
         c(
-          "{.arg by} must be a single non-empty string for type {.val {type}}.",
-          "i" = "e.g. {.code by = \"cluster_id\"}"
+          "{.arg by} must be one or more non-empty strings for type {.val {type}}.",
+          "i" = "e.g. {.code by = \"cluster_id\"} or {.code by = c(\"cluster_id\", \"period\")}"
         )
       )
     }
+  }
+
+  if (type == "randomise") {
+    if (is.null(arms) || !is.character(arms) || length(arms) != 1L ||
+          is.na(arms) || !nzchar(arms)) {
+      cli_abort("{.arg arms} must be a single non-empty string for type \"randomise\".")
+    }
+  } else if (!is.null(arms)) {
+    cli_abort("{.arg arms} is only used for type \"randomise\".")
   }
 
   if (!is.null(category)) {
@@ -107,7 +142,8 @@ cf_criterion <- function(predicate,
       label     = label,
       type      = type,
       by        = by,
-      category  = category
+      category  = category,
+      arms      = arms
     ),
     class = "cf_criterion"
   )
@@ -125,6 +161,9 @@ is_one_sided <- function(f) length(f) == 2L
 
 # Pull a tidy string representation of the predicate for printing / YAML
 predicate_label <- function(predicate) {
+  if (is.null(predicate)) {
+    return("<none>")
+  }
   if (is_formula(predicate)) {
     paste(deparse(predicate[[2L]], width.cutoff = 60L), collapse = " ")
   } else {
@@ -146,14 +185,16 @@ predicate_label <- function(predicate) {
 #' @export
 print.cf_criterion <- function(x, ...) {
   type_sym  <- if (x$type %in% c("include", "group_include")) "+" else
-    if (x$type == "select_within") ">" else "-"
+    if (x$type == "select_within") ">" else
+    if (x$type == "randomise") "R" else "-"
   pred_str  <- predicate_label(x$predicate)
-  pred_type <- if (is_formula(x$predicate)) "~" else "f"
-  by_str    <- if (!is.null(x$by)) sprintf(" [by: %s]", x$by) else ""
+  pred_type <- if (is.null(x$predicate)) "-" else if (is_formula(x$predicate)) "~" else "f"
+  by_str    <- if (!is.null(x$by)) sprintf(" [by: %s]", paste(x$by, collapse = ", ")) else ""
+  arms_str  <- if (!is.null(x$arms)) sprintf(" [arms: %s]", x$arms) else ""
 
   cat(sprintf(
-    "[%s][%s] %s%s\n    %s\n",
-    type_sym, pred_type, x$label, by_str, pred_str
+    "[%s][%s] %s%s%s\n    %s\n",
+    type_sym, pred_type, x$label, by_str, arms_str, pred_str
   ))
   invisible(x)
 }
@@ -161,11 +202,13 @@ print.cf_criterion <- function(x, ...) {
 #' @export
 format.cf_criterion <- function(x, ...) {
   type_sym  <- if (x$type %in% c("include", "group_include")) "+" else
-    if (x$type == "select_within") ">" else "-"
+    if (x$type == "select_within") ">" else
+    if (x$type == "randomise") "R" else "-"
   pred_str  <- predicate_label(x$predicate)
-  pred_type <- if (is_formula(x$predicate)) "~" else "f"
-  by_str    <- if (!is.null(x$by)) sprintf(" [by: %s]", x$by) else ""
-  sprintf("[%s][%s] %s%s  (%s)", type_sym, pred_type, x$label, by_str, pred_str)
+  pred_type <- if (is.null(x$predicate)) "-" else if (is_formula(x$predicate)) "~" else "f"
+  by_str    <- if (!is.null(x$by)) sprintf(" [by: %s]", paste(x$by, collapse = ", ")) else ""
+  arms_str  <- if (!is.null(x$arms)) sprintf(" [arms: %s]", x$arms) else ""
+  sprintf("[%s][%s] %s%s%s  (%s)", type_sym, pred_type, x$label, by_str, arms_str, pred_str)
 }
 
 # ---------------------------------------------------------------------------
@@ -204,16 +247,17 @@ eval_group_criterion <- function(criterion, data) {
   stopifnot(criterion$type %in% c("group_include", "group_exclude"))
   by_col <- criterion$by
 
-  if (!by_col %in% names(data)) {
+  missing_by <- setdiff(by_col, names(data))
+  if (length(missing_by) > 0L) {
     cli_abort(c(
-      "Grouping column {.val {by_col}} not found in data.",
+      "Grouping column(s) {.val {missing_by}} not found in data.",
       "i" = "Criterion: {.val {criterion$label}}"
     ))
   }
 
   if (is_formula(criterion$predicate)) {
     # Evaluate in summarise() context using dplyr
-    grp <- dplyr::group_by(data, .data[[by_col]])
+    grp <- dplyr::group_by(data, dplyr::across(dplyr::all_of(by_col)))
     # while preserving the formula's own enclosing environment for user bindings.
     pred_env <- new.env(parent = environment(criterion$predicate))
     pred_env$n           <- dplyr::n
@@ -225,7 +269,7 @@ eval_group_criterion <- function(criterion, data) {
   } else {
     # Function receives the grouped data frame; must return a 1-row-per-group
     # tibble with columns: <by_col>, .pass
-    summary <- criterion$predicate(dplyr::group_by(data, .data[[by_col]]))
+    summary <- criterion$predicate(dplyr::group_by(data, dplyr::across(dplyr::all_of(by_col))))
     if (!".pass" %in% names(summary)) {
       cli_abort(c(
         "Function predicate for group criterion must return a data frame with a `.pass` column.",
@@ -234,9 +278,9 @@ eval_group_criterion <- function(criterion, data) {
     }
   }
 
-  # Broadcast scalar group result back to rows
-  pass_map <- stats::setNames(summary$.pass, summary[[by_col]])
-  pass_map[as.character(data[[by_col]])]
+  # Broadcast scalar group result back to rows, keyed on the (possibly composite) `by` column(s)
+  pass_map <- stats::setNames(summary$.pass, as.character(.composite_key(summary, by_col)))
+  pass_map[as.character(.composite_key(data, by_col))]
 }
 
 #' Evaluate a select_within criterion -- returns a logical vector (nrow(data))
@@ -245,9 +289,10 @@ eval_select_criterion <- function(criterion, data) {
   stopifnot(criterion$type == "select_within")
   by_col <- criterion$by
 
-  if (!by_col %in% names(data)) {
+  missing_by <- setdiff(by_col, names(data))
+  if (length(missing_by) > 0L) {
     cli_abort(c(
-      "Grouping column {.val {by_col}} not found in data.",
+      "Grouping column(s) {.val {missing_by}} not found in data.",
       "i" = "Criterion: {.val {criterion$label}}"
     ))
   }
@@ -257,7 +302,7 @@ eval_select_criterion <- function(criterion, data) {
   row_idx <- seq_len(nrow(data))
   keep    <- logical(nrow(data))
 
-  groups <- split(row_idx, data[[by_col]])
+  groups <- split(row_idx, .composite_key(data, by_col))
 
   for (grp_rows in groups) {
     grp_data <- data[grp_rows, , drop = FALSE]

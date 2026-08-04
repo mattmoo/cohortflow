@@ -7,18 +7,21 @@
 cf_hierarchy(...)
 }
 \arguments{
-\item{...}{Named character scalars mapping role labels to column names,
-e.g. \verb{participant = "participant_id", cluster = "cluster_id"}. At least
-one entry is required.}
+\item{...}{Named arguments mapping role labels to column names, e.g.
+\verb{participant = "participant_id", cluster = "cluster_id"}. A role's value
+may be a character vector of more than one column when the level is a
+composite (multi-column) key, e.g.
+\code{cluster_period = c("cluster_id", "period")} for a stepped-wedge design.
+At least one entry is required.}
 }
 \value{
-A \code{cf_hierarchy} object (a named character vector with additional
-class attribute).
+A \code{cf_hierarchy} object (a named list with additional class
+attribute).
 }
 \description{
 A \code{cf_hierarchy} describes how observational units are nested within each
 other (e.g., participants within clusters within sites). It is an ordered
-named character vector mapping role names to column names in the data.
+named list mapping role names to column name(s) in the data.
 }
 \details{
 The order of \code{...} is from the \strong{finest} (innermost) level to the
@@ -31,4 +34,9 @@ cf_hierarchy(participant = "pid", cluster = "cid")
 
 # Three-level: participants within clusters within sites
 cf_hierarchy(participant = "pid", cluster = "cluster_id", site = "site_id")
+
+# Composite (multi-column) level: stepped-wedge cluster-period
+cf_hierarchy(participant = "pid",
+             cluster_period = c("cluster_id", "period"),
+             cluster = "cluster_id")
 }

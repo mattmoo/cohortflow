@@ -85,12 +85,18 @@ formatting counts in box labels (e.g. \code{"1,234"} with the default
 \code{","}). Pass \code{""} to disable grouping (e.g. \code{"1234"}).}
 
 \item{branch_by}{Optional column name (string) for allocation branching.
-When \code{NULL} (default), the diagram is linear. When supplied, the
-surviving cohort is split by this column and branches are drawn below
-the final common-flow box, connected via a right-angle "elbow"
-connector (a trunk dropping from the final box, a horizontal crossbar,
-then a vertical arrow into each branch box). Use
-\code{final_label = "Randomised"} when appropriate.}
+When \code{NULL} (default), the diagram is linear unless the pipeline has a
+\code{\link[=randomise]{randomise()}} step, in which case its \code{arms} column is used
+automatically. When the pipeline has a \code{randomise()} step, the diagram
+is drawn as one shared trunk up to and including the randomisation box,
+which then splits (via a right-angle "elbow" connector) into one
+independent column of main boxes per arm for every step at or after
+randomisation -- so post-allocation exclusions are shown as per-arm
+sub-cascades rather than shared-trunk boxes. When there is no
+\code{randomise()} step, the surviving cohort is instead split by this
+column and a single box per branch is drawn below the final
+common-flow box (the historical behaviour), connected the same way.
+Use \code{final_label = "Randomised"} when appropriate.}
 
 \item{stage_by}{Optional column name (string) for ordered stages within
 each branch (e.g. crossover \code{period}). When \code{NULL} (default), no
@@ -102,7 +108,8 @@ each stage (e.g. crossover \code{arm}). Ignored when \code{stage_by} is \code{NU
 \item{count_by}{Optional column name (string) for distinct counts. When
 supplied, counts are computed as \code{n_distinct(count_by)} rather than
 \code{nrow()}. Essential for crossover data where one participant has
-several event rows.}
+several event rows. Not currently supported together with a
+\code{randomise()}-driven split (per-arm cascades always use row counts).}
 }
 \value{
 A \code{consort_diagram} object (a \code{ggplot2} \code{ggplot}), drawable via

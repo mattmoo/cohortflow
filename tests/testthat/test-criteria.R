@@ -118,3 +118,38 @@ test_that("cf_criteria() constructed with cf_criterion objects directly", {
 test_that("cf_criteria() errors if non-cf_criterion passed directly", {
   expect_error(cf_criteria(list(a = 1)), class = "rlang_error")
 })
+
+# ---------------------------------------------------------------------------
+# randomise()
+
+test_that("randomise() adds a randomise step with a default label", {
+  crit <- cf_criteria() |> randomise(by = "cluster_id", arms = "arm")
+  expect_equal(length(crit), 1L)
+  expect_equal(crit$steps[[1]]$type,  "randomise")
+  expect_equal(crit$steps[[1]]$label, "Randomised")
+  expect_equal(crit$steps[[1]]$by,    "cluster_id")
+  expect_equal(crit$steps[[1]]$arms,  "arm")
+  expect_null(crit$steps[[1]]$predicate)
+})
+
+test_that("randomise() accepts an explicit label", {
+  crit <- cf_criteria() |> randomise(by = "cluster_id", arms = "arm", label = "Allocation")
+  expect_equal(crit$steps[[1]]$label, "Allocation")
+})
+
+test_that("randomise() can be combined with other builders in a pipeline", {
+  crit <- cf_criteria() |>
+    include(~ eligible, label = "Eligible") |>
+    randomise(by = "cluster_id", arms = "arm") |>
+    exclude(~ withdrew, label = "Withdrew after allocation")
+
+  expect_equal(length(crit), 3L)
+  expect_equal(vapply(crit$steps, `[[`, character(1L), "type"),
+              c("include", "randomise", "exclude"))
+})
+
+test_that("print.cf_criteria() displays randomise steps without error", {
+  crit <- cf_criteria() |> randomise(by = "cluster_id", arms = "arm")
+  expect_output(print(crit), "Randomised")
+  expect_output(print(crit), "arms: arm")
+})

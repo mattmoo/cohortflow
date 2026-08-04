@@ -70,12 +70,14 @@
 #' @param digits Integer. Number of decimal places for `pct_removed`. Default
 #'   `1`.
 #' @param branch_by Optional column name (string) for allocation branching.
-#'   When `NULL` (default), the table has a single `n` column. When
-#'   supplied, the surviving cohort is split by this column and the final
-#'   row's total is broken out into one additional column per branch value
-#'   (named after the branch value, e.g. `Control`, `Intervention`), each
-#'   populated only on the final row. Use `final_label = "Randomised"` when
-#'   appropriate. Cannot be combined with `group_x`/`group_y`.
+#'   When `NULL` (default), the table has a single `n` column unless the
+#'   pipeline has a [randomise()] step, in which case its `arms` column is
+#'   used automatically. When supplied (or defaulted), the surviving cohort
+#'   is split by this column and the final row's total is broken out into
+#'   one additional column per branch value (named after the branch value,
+#'   e.g. `Control`, `Intervention`), each populated only on the final row.
+#'   Use `final_label = "Randomised"` when appropriate. Cannot be combined
+#'   with `group_x`/`group_y`.
 #' @param count_by Optional column name (string) for distinct counts. When
 #'   supplied, counts are computed as `n_distinct(count_by)` rather than
 #'   `nrow()`. Essential for crossover data where one participant has several
@@ -90,6 +92,15 @@
 #'   `NA` values in `group_x`/`group_y` (see the Grouping section). Default
 #'   `"Missing"`. Ignored when the corresponding grouping column has no `NA`
 #'   values.
+#' @param levels Optional; requires `flow` to have been built with
+#'   `apply_criteria(hierarchy = ...)`. When the default `character(0)`, this
+#'   argument is ignored and the row-count behaviour above is unchanged. When
+#'   `NULL`, one stacked block per hierarchy level is returned (finest to
+#'   coarsest), each with a `level` column and an additional `n_consequential`
+#'   column (see [apply_criteria()]'s `hierarchy` argument for the counting
+#'   rule). When a character vector of level name(s), only those levels are
+#'   returned, in the order given. Cannot be combined with `group_x`/`group_y`,
+#'   `branch_by`, or `count_by`.
 #'
 #' @return A [tibble::tibble()] with columns:
 #' \describe{
@@ -109,7 +120,11 @@
 #' final row with that branch's surviving count. When `group_x`/`group_y`
 #' are supplied, `group_x` and `group_y` character columns are appended (see
 #' the Grouping section) and the tibble contains one stacked block per group
-#' combination rather than a single block.
+#' combination rather than a single block. When the pipeline has a
+#' [randomise()] step, a `post_randomisation` logical column is appended
+#' (`TRUE` for header/final/step/category rows at or after that step,
+#' `FALSE` before it); this column is omitted entirely when there is no
+#' `randomise()` step, so existing pipelines see no schema change.
 #' @seealso [as_attrition_table()] for formatted table output.
 #' @export
 #'
@@ -133,10 +148,21 @@ as_attrition_tibble <- function(
   count_by        = NULL,
   group_x         = NULL,
   group_y         = NULL,
-  group_na_label  = "Missing"
+  group_na_label  = "Missing",
+  levels          = character(0)
 ) {
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
+  }
+
+  # -- Hierarchy-level path ---------------------------------------------------
+  if (!identical(levels, character(0))) {
+    if (!is.null(group_x) || !is.null(group_y) || !is.null(branch_by) || !is.null(count_by)) {
+      rlang::abort("`levels` cannot be combined with `group_x`/`group_y`/`branch_by`/`count_by`.")
+    }
+    return(.attrition_tibble_by_level(
+      flow, levels, show_categories, assessed_label, final_label, digits
+    ))
   }
 
   # -- Grouped path ----------------------------------------------------------
@@ -151,6 +177,13 @@ as_attrition_tibble <- function(
   }
 
   # -- Validate branching parameters ----------------------------------------
+  # A `randomise()` step (if present) supplies default `branch_by` (from its
+  # `arms` column) so callers don't have to repeat it at render time.
+  randomise_step <- .find_randomise_step(flow$steps)
+  if (is.null(branch_by) && !is.null(randomise_step)) {
+    branch_by <- randomise_step$arms
+  }
+
   if (!is.null(branch_by)) {
     cohort_data <- cohort(flow)
     if (!branch_by %in% names(cohort_data)) {
@@ -161,10 +194,26 @@ as_attrition_tibble <- function(
     rlang::abort("`count_by` requires `branch_by` to be specified.")
   }
 
+  .attrition_tibble_core(
+    flow, show_categories, assessed_label, final_label, digits,
+    branch_by, count_by
+  )
+}
+
+# Core row-building logic shared by the top-level `as_attrition_tibble()`
+# (after it has resolved `branch_by`'s `randomise()`-step default) and
+# `.attrition_tibble_grouped()` (which always calls this directly with
+# `branch_by = NULL, count_by = NULL`, bypassing randomise-step
+# auto-detection -- branching is not supported alongside `group_x`/`group_y`).
+.attrition_tibble_core <- function(flow, show_categories, assessed_label,
+                                   final_label, digits, branch_by, count_by) {
+  randomise_step <- .find_randomise_step(flow$steps)
+
   digits  <- as.integer(digits)
   steps   <- flow$steps
   n_start <- nrow(flow$data)
   n_end   <- n_start - sum(vapply(steps, `[[`, integer(1L), "n_fail"))
+  randomise_step_num <- if (!is.null(randomise_step)) randomise_step$step else NA_integer_
 
   rows <- list()
 
@@ -176,14 +225,15 @@ as_attrition_tibble <- function(
     n            = n_start,
     n_removed    = NA_integer_,
     pct_removed  = NA_real_,
-    branch       = NA_character_
+    branch       = NA_character_,
+    post_randomisation = if (is.na(randomise_step_num)) NA else FALSE
   )))
 
   # -- Step / category rows -------------------------------------------------
   if (show_categories) {
-    rows <- c(rows, .attrition_rows_categorised(steps, digits))
+    rows <- c(rows, .attrition_rows_categorised(steps, digits, randomise_step_num))
   } else {
-    rows <- c(rows, .attrition_rows_flat(steps, digits))
+    rows <- c(rows, .attrition_rows_flat(steps, digits, randomise_step_num))
   }
 
   # -- Final cohort row -----------------------------------------------------
@@ -194,10 +244,18 @@ as_attrition_tibble <- function(
     n            = n_end,
     n_removed    = NA_integer_,
     pct_removed  = round(100 * n_end / n_start, digits),
-    branch       = NA_character_
+    branch       = NA_character_,
+    post_randomisation = if (is.na(randomise_step_num)) NA else TRUE
   )))
 
   out <- do.call(rbind, rows)
+
+  # `post_randomisation` is only meaningful (and only added) when the
+  # pipeline actually has a `randomise()` step -- otherwise the column is
+  # dropped so the default schema is unchanged (backward compatible).
+  if (is.null(randomise_step)) {
+    out$post_randomisation <- NULL
+  }
 
   # -- Branch columns ---------------------------------------------------------
   if (!is.null(branch_by)) {
@@ -207,8 +265,9 @@ as_attrition_tibble <- function(
   out
 }
 
+
 # Build rows with category grouping
-.attrition_rows_categorised <- function(steps, digits) {
+.attrition_rows_categorised <- function(steps, digits, randomise_step_num = NA_integer_) {
   rows <- list()
   i    <- 1L
 
@@ -218,7 +277,9 @@ as_attrition_tibble <- function(
 
     if (is.null(cat) || is.na(cat)) {
       # Uncategorised step -- emit a single step row at level 1
-      rows <- c(rows, list(.make_step_row(s, indent_level = 1L, digits = digits)))
+      rows <- c(rows, list(.make_step_row(
+        s, indent_level = 1L, digits = digits, randomise_step_num = randomise_step_num
+      )))
       i <- i + 1L
     } else {
       # Collect all consecutive steps sharing this category
@@ -248,7 +309,12 @@ as_attrition_tibble <- function(
         n            = n_in_cat,
         n_removed    = if (is_singleton) NA_integer_ else n_fail_cat,
         pct_removed  = if (is_singleton) NA_real_    else pct_removed,
-        branch       = NA_character_
+        branch       = NA_character_,
+        post_randomisation = if (is.na(randomise_step_num)) {
+          NA
+        } else {
+          cat_steps[[1L]]$step >= randomise_step_num
+        }
       )))
 
       # Sub-rows for each step in category -- percentages are relative to
@@ -257,7 +323,8 @@ as_attrition_tibble <- function(
       # category are expressed as a percentage of the same denominator.
       for (cs in cat_steps) {
         rows <- c(rows, list(.make_step_row(
-          cs, indent_level = 2L, digits = digits, pct_denom = n_in_cat
+          cs, indent_level = 2L, digits = digits, pct_denom = n_in_cat,
+          randomise_step_num = randomise_step_num
         )))
       }
 
@@ -268,8 +335,9 @@ as_attrition_tibble <- function(
 }
 
 # Build flat rows (one per step, no category grouping)
-.attrition_rows_flat <- function(steps, digits) {
-  lapply(steps, .make_step_row, indent_level = 1L, digits = digits)
+.attrition_rows_flat <- function(steps, digits, randomise_step_num = NA_integer_) {
+  lapply(steps, .make_step_row, indent_level = 1L, digits = digits,
+         randomise_step_num = randomise_step_num)
 }
 
 # Add one column per unique branch value to the attrition tibble, populated
@@ -309,8 +377,11 @@ as_attrition_tibble <- function(
 # Build one step row. `pct_denom` is the denominator used for `pct_removed`
 # (defaults to the step's own entering N); pass a different value (e.g. the
 # category's entering N) to express the percentage relative to a shared
-# denominator across grouped steps.
-.make_step_row <- function(s, indent_level, digits, pct_denom = s$n_in) {
+# denominator across grouped steps. `randomise_step_num`, when not `NA`, adds
+# a `post_randomisation` column (`TRUE` for steps at or after that step
+# number).
+.make_step_row <- function(s, indent_level, digits, pct_denom = s$n_in,
+                          randomise_step_num = NA_integer_) {
   pct <- if (pct_denom > 0L) round(100 * s$n_fail / pct_denom, digits) else NA_real_
   tibble::tibble(
     row_type     = "step",
@@ -319,8 +390,20 @@ as_attrition_tibble <- function(
     n            = s$n_in,
     n_removed    = s$n_fail,
     pct_removed  = pct,
-    branch       = NA_character_
+    branch       = NA_character_,
+    post_randomisation = if (is.na(randomise_step_num)) NA else s$step >= randomise_step_num
   )
+}
+
+# Finds the first step of type "randomise" in a step-records list (each
+# element as recorded by `.run_criteria_steps()`), returning `NULL` if none
+# exists. Used to default `branch_by` and to compute `post_randomisation` in
+# `as_attrition_tibble()`, and to default `branch_by` in `as_consort_diagram()`.
+.find_randomise_step <- function(steps) {
+  for (s in steps) {
+    if (identical(s$type, "randomise")) return(s)
+  }
+  NULL
 }
 
 # ---------------------------------------------------------------------------
@@ -366,12 +449,13 @@ as_attrition_tibble <- function(
 
       sub_flow <- apply_criteria(sub_data, flow$criteria, id = ".cf_row_id")
 
-      block <- as_attrition_tibble(
-        sub_flow,
-        show_categories = show_categories,
-        assessed_label  = assessed_label,
-        final_label     = final_label,
-        digits          = digits
+      # Calls the core builder directly (not `as_attrition_tibble()`) so a
+      # `randomise()` step in `flow$criteria` never triggers branch-column
+      # auto-detection here -- branching is not supported alongside
+      # `group_x`/`group_y`.
+      block <- .attrition_tibble_core(
+        sub_flow, show_categories, assessed_label, final_label, digits,
+        branch_by = NULL, count_by = NULL
       )
       block$group_x <- if (!is.null(group_x)) .attrition_group_label(x, group_na_label) else NA_character_
       block$group_y <- if (!is.null(group_y)) .attrition_group_label(y, group_na_label) else NA_character_
@@ -404,6 +488,178 @@ as_attrition_tibble <- function(
 # Converts a group value (possibly the NA sentinel) to its display label.
 .attrition_group_label <- function(value, na_label) {
   if (is.na(value)) na_label else as.character(value)
+}
+
+# ---------------------------------------------------------------------------
+# Hierarchy-level data layer -- levels
+# ---------------------------------------------------------------------------
+
+# Builds one stacked attrition block per requested hierarchy level, each with
+# its own `level` column and an `n_consequential` column sourced from each
+# step's `hierarchy_counts` (see `.hierarchy_step_counts()` in R/hierarchy.R).
+.attrition_tibble_by_level <- function(flow, levels, show_categories,
+                                       assessed_label, final_label, digits) {
+  hierarchy <- flow$hierarchy
+  if (is.null(hierarchy)) {
+    rlang::abort(paste(
+      "`levels` requires `flow` to have a hierarchy;",
+      "pass `hierarchy = ` to `apply_criteria()`."
+    ))
+  }
+
+  level_names <- if (is.null(levels)) names(hierarchy) else levels
+  unknown <- setdiff(level_names, names(hierarchy))
+  if (length(unknown) > 0L) {
+    rlang::abort(sprintf("Unknown hierarchy level(s): %s.", paste(unknown, collapse = ", ")))
+  }
+
+  steps <- flow$steps
+  if (length(steps) > 0L && is.null(steps[[1L]]$hierarchy_counts)) {
+    rlang::abort(paste(
+      "`flow` has no per-level attrition counts;",
+      "re-run `apply_criteria()` with `hierarchy = ` to use `levels`."
+    ))
+  }
+
+  digits <- as.integer(digits)
+  blocks <- lapply(level_names, function(lvl) {
+    .attrition_tibble_one_level(flow, lvl, show_categories, assessed_label, final_label, digits)
+  })
+
+  do.call(rbind, blocks)
+}
+
+# Builds a single level's attrition block (header + step/category rows +
+# final row), sourcing entering/passing/failing counts from each step's
+# `hierarchy_counts` instead of `n_in`/`n_pass`/`n_fail`.
+.attrition_tibble_one_level <- function(flow, level_name, show_categories,
+                                        assessed_label, final_label, digits) {
+  hierarchy  <- flow$hierarchy
+  level_cols <- hierarchy[[level_name]]
+  steps      <- flow$steps
+  n_start    <- length(unique(.composite_key(flow$data, level_cols)))
+
+  level_steps <- lapply(steps, function(s) {
+    hc  <- s$hierarchy_counts
+    row <- hc[hc$level == level_name, , drop = FALSE]
+    list(
+      label           = s$label,
+      category        = s$category,
+      n_in            = row$n_risk[[1L]],
+      n_pass          = row$n_pass[[1L]],
+      n_fail          = row$n_fail[[1L]],
+      n_consequential = row$n_consequential[[1L]]
+    )
+  })
+
+  n_end <- if (length(level_steps) > 0L) {
+    level_steps[[length(level_steps)]]$n_pass
+  } else {
+    n_start
+  }
+
+  rows <- list(tibble::tibble(
+    row_type        = "header",
+    label           = assessed_label,
+    indent_level    = 0L,
+    n               = n_start,
+    n_removed       = NA_integer_,
+    n_consequential = NA_integer_,
+    pct_removed     = NA_real_,
+    branch          = NA_character_
+  ))
+
+  if (show_categories) {
+    rows <- c(rows, .attrition_level_rows_categorised(level_steps, digits))
+  } else {
+    rows <- c(rows, lapply(level_steps, .make_level_step_row, digits = digits))
+  }
+
+  rows <- c(rows, list(tibble::tibble(
+    row_type        = "final",
+    label           = final_label,
+    indent_level    = 0L,
+    n               = n_end,
+    n_removed       = NA_integer_,
+    n_consequential = NA_integer_,
+    pct_removed     = if (n_start > 0L) round(100 * n_end / n_start, digits) else NA_real_,
+    branch          = NA_character_
+  )))
+
+  out <- do.call(rbind, rows)
+  out$level <- level_name
+  out
+}
+
+# Build one level-step row. `pct_denom` is the denominator used for
+# `pct_removed` (defaults to the step's own entering N for this level); pass
+# a different value (e.g. the category's entering N) to express the
+# percentage relative to a shared denominator across grouped steps.
+.make_level_step_row <- function(s, digits, pct_denom = s$n_in) {
+  pct <- if (pct_denom > 0L) round(100 * s$n_fail / pct_denom, digits) else NA_real_
+  tibble::tibble(
+    row_type        = "step",
+    label           = s$label,
+    indent_level    = 1L,
+    n               = s$n_in,
+    n_removed       = s$n_fail,
+    n_consequential = s$n_consequential,
+    pct_removed     = pct,
+    branch          = NA_character_
+  )
+}
+
+# Build rows with category grouping for a single hierarchy level -- mirrors
+# `.attrition_rows_categorised()`, summing both `n_fail` and
+# `n_consequential` across the steps sharing a category.
+.attrition_level_rows_categorised <- function(level_steps, digits) {
+  rows <- list()
+  i    <- 1L
+
+  while (i <= length(level_steps)) {
+    s   <- level_steps[[i]]
+    cat <- s$category
+
+    if (is.null(cat) || is.na(cat)) {
+      rows <- c(rows, list(.make_level_step_row(s, digits = digits)))
+      i <- i + 1L
+    } else {
+      j <- i
+      while (j <= length(level_steps) &&
+               !is.null(level_steps[[j]]$category) &&
+               !is.na(level_steps[[j]]$category) &&
+               level_steps[[j]]$category == cat) {
+        j <- j + 1L
+      }
+      cat_steps <- level_steps[seq(i, j - 1L)]
+
+      n_in_cat     <- cat_steps[[1L]]$n_in
+      n_fail_cat   <- sum(vapply(cat_steps, `[[`, integer(1L), "n_fail"))
+      n_conseq_cat <- sum(vapply(cat_steps, `[[`, integer(1L), "n_consequential"))
+      pct_removed  <- if (n_in_cat > 0L) round(100 * n_fail_cat / n_in_cat, digits) else NA_real_
+      is_singleton <- length(cat_steps) == 1L
+
+      rows <- c(rows, list(tibble::tibble(
+        row_type        = "category",
+        label           = cat,
+        indent_level    = 1L,
+        n               = n_in_cat,
+        n_removed       = if (is_singleton) NA_integer_ else n_fail_cat,
+        n_consequential = if (is_singleton) NA_integer_ else n_conseq_cat,
+        pct_removed     = if (is_singleton) NA_real_    else pct_removed,
+        branch          = NA_character_
+      )))
+
+      for (cs in cat_steps) {
+        rows <- c(rows, list(.make_level_step_row(
+          cs, digits = digits, pct_denom = n_in_cat
+        )))
+      }
+
+      i <- j
+    }
+  }
+  rows
 }
 
 # ---------------------------------------------------------------------------

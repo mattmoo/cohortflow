@@ -2,17 +2,19 @@
 #'
 #' A `cf_flow` object is returned by [apply_criteria()]. It stores the
 #' original data (with an internal `.cf_row_id` column), the criteria pipeline
-#' that produced it, and a per-step record of attrition. Use [cohort()] to
-#' extract the surviving rows and [excluded()] to extract all removed rows with
-#' step metadata attached.
+#' that produced it, a per-step record of attrition, and (optionally) the
+#' `cf_hierarchy` used for per-level counting. Use [cohort()] to extract the
+#' surviving rows and [excluded()] to extract all removed rows with step
+#' metadata attached.
 #'
 #' @keywords internal
-new_cf_flow <- function(data, criteria, steps) {
+new_cf_flow <- function(data, criteria, steps, hierarchy = NULL) {
   structure(
     list(
-      data     = data,
-      criteria = criteria,
-      steps    = steps
+      data      = data,
+      criteria  = criteria,
+      steps     = steps,
+      hierarchy = hierarchy
     ),
     class = "cf_flow"
   )
@@ -41,13 +43,15 @@ print.cf_flow <- function(x, ...) {
       exclude       = "[-]",
       group_include = "[+]",
       group_exclude = "[-]",
-      select_within = "[>]"
+      select_within = "[>]",
+      randomise     = "[R]"
     )
-    by_str  <- if (!is.null(s$by)) sprintf(" by %s", s$by) else ""
-    cat_str <- if (!is.null(s$category)) sprintf(" {%s}", s$category) else ""
+    by_str   <- if (!is.null(s$by))   sprintf(" by %s", paste(s$by, collapse = ", ")) else ""
+    arms_str <- if (!is.null(s$arms)) sprintf(" arms %s", s$arms) else ""
+    cat_str  <- if (!is.null(s$category)) sprintf(" {%s}", s$category) else ""
     cat(sprintf(
-      "  %2d. %s %s%s%s\n       n_in: %d  kept: %d  removed: %d\n",
-      s$step, type_sym, s$label, by_str, cat_str,
+      "  %2d. %s %s%s%s%s\n       n_in: %d  kept: %d  removed: %d\n",
+      s$step, type_sym, s$label, by_str, arms_str, cat_str,
       s$n_in, s$n_pass, s$n_fail
     ))
   }
@@ -63,14 +67,56 @@ print.cf_flow <- function(x, ...) {
 #' column removed.
 #'
 #' @param flow A `cf_flow` object produced by [apply_criteria()].
+#' @param flag Logical. When `FALSE` (default), returns only the surviving
+#'   rows (the historical behaviour). When `TRUE`, returns **all** original
+#'   rows, in their original order, with attribution columns added instead of
+#'   filtering: `cf_included` (logical), `cf_excluded_step` (integer, `NA` if
+#'   included), `cf_excluded_label` (character, `NA` if included), and
+#'   `cf_excluded_category` (character, `NA` if uncategorised or included).
+#'   Useful when downstream code needs every row present (e.g. plotting a
+#'   full recording) while still knowing which rows count.
 #' @return A tibble.
 #' @export
-cohort <- function(flow) {
+cohort <- function(flow, flag = FALSE) {
   if (!inherits(flow, "cf_flow")) rlang::abort("`flow` must be a `cf_flow` object.")
+
+  if (flag) {
+    lookup_chunks <- lapply(flow$steps, function(s) {
+      if (length(s$excluded_ids) == 0L) return(NULL)
+      tibble::tibble(
+        .cf_row_id           = s$excluded_ids,
+        cf_excluded_step     = s$step,
+        cf_excluded_label    = s$label,
+        cf_excluded_category = if (is.null(s$category)) NA_character_ else s$category
+      )
+    })
+    lookup_chunks <- Filter(Negate(is.null), lookup_chunks)
+
+    flagged <- if (length(lookup_chunks) > 0L) {
+      dplyr::left_join(flow$data, do.call(rbind, lookup_chunks), by = ".cf_row_id")
+    } else {
+      flow$data$cf_excluded_step     <- NA_integer_
+      flow$data$cf_excluded_label    <- NA_character_
+      flow$data$cf_excluded_category <- NA_character_
+      flow$data
+    }
+    flagged$cf_included <- is.na(flagged$cf_excluded_step)
+    flagged$.cf_row_id  <- NULL
+    return(tibble::as_tibble(flagged))
+  }
+
   all_excluded_ids <- unlist(lapply(flow$steps, `[[`, "excluded_ids"))
   surviving <- flow$data[!flow$data$.cf_row_id %in% all_excluded_ids, , drop = FALSE]
   surviving$.cf_row_id <- NULL
   tibble::as_tibble(surviving)
+}
+
+# Like cohort(), but keeps `.cf_row_id` (needed internally by
+# continue_criteria(), which must be able to re-attach step records using the
+# same identifier).
+.surviving_with_id <- function(flow) {
+  all_excluded_ids <- unlist(lapply(flow$steps, `[[`, "excluded_ids"))
+  flow$data[!flow$data$.cf_row_id %in% all_excluded_ids, , drop = FALSE]
 }
 
 #' Extract excluded rows from a flow object

@@ -87,6 +87,19 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
 # Internal helpers
 
 .criterion_to_list <- function(crit, fn_refs = list()) {
+  if (is.null(crit$predicate)) {
+    return(list(
+      label    = crit$label,
+      type     = crit$type,
+      kind     = "none",
+      by       = crit$by,
+      expr     = NULL,
+      fn_ref   = NULL,
+      category = crit$category,
+      arms     = crit$arms
+    ))
+  }
+
   is_fn <- is.function(crit$predicate)
 
   if (!is_fn) {
@@ -98,7 +111,8 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
       by     = crit$by,
       expr   = expr_str,
       fn_ref = NULL,
-      category = crit$category
+      category = crit$category,
+      arms     = crit$arms
     ))
   }
 
@@ -134,15 +148,19 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     expr     = body_str,
     fn_args  = formals_str,
     fn_ref   = fn_ref_str,
-    category = crit$category
+    category = crit$category,
+    arms     = crit$arms
   )
 }
 
 .list_to_criterion <- function(s, envir = parent.frame()) {
-  kind   <- rlang::`%||%`(s$kind, "formula")
-  by_val <- rlang::`%||%`(s$by,   NULL)
+  kind     <- rlang::`%||%`(s$kind, "formula")
+  by_val   <- rlang::`%||%`(s$by,   NULL)
+  arms_val <- rlang::`%||%`(s$arms, NULL)
 
-  if (kind == "formula") {
+  if (kind == "none") {
+    pred <- NULL
+  } else if (kind == "formula") {
     expr <- parse(text = s$expr, keep.source = FALSE)[[1L]]
     pred <- stats::as.formula(call("~", expr), env = envir)
   } else {
@@ -160,5 +178,6 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     }
   }
 
-  cf_criterion(predicate = pred, label = s$label, type = s$type, by = by_val, category = s$category)
+  cf_criterion(predicate = pred, label = s$label, type = s$type, by = by_val,
+              category = s$category, arms = arms_val)
 }

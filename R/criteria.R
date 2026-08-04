@@ -90,7 +90,8 @@ exclude <- function(criteria, predicate, label, category = NULL) {
 #' removed.
 #'
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
-#' @param by A single column name (string) to group by.
+#' @param by One or more column names (character vector) to group by; supply
+#'   more than one for composite (multi-column) grouping.
 #' @param predicate A one-sided formula using summary functions (`n()`,
 #'   `mean()`, `n_distinct()`, etc.) or a function that receives a grouped
 #'   data frame and returns a tibble with columns `<by>` and `.pass`.
@@ -118,7 +119,8 @@ group_include <- function(criteria, by, predicate, label, category = NULL) {
 #' `TRUE` are removed (all their rows dropped).
 #'
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
-#' @param by A single column name (string) to group by.
+#' @param by One or more column names (character vector) to group by; supply
+#'   more than one for composite (multi-column) grouping.
 #' @param predicate A one-sided formula using summary functions, or a function.
 #' @param label A short human-readable description of this criterion.
 #' @param category An optional string grouping this step with others for
@@ -148,8 +150,9 @@ group_exclude <- function(criteria, by, predicate, label, category = NULL) {
 #' index operation per patient.
 #'
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
-#' @param by A single column name (string) defining the grouping (e.g.
-#'   `"participant_id"`).
+#' @param by One or more column names (character vector) defining the
+#'   grouping (e.g. `"participant_id"`); supply more than one for composite
+#'   (multi-column) grouping.
 #' @param predicate A one-sided formula evaluated within each group, or a
 #'   function that receives a group's rows as a data frame and returns a
 #'   logical vector.
@@ -169,6 +172,41 @@ select_within <- function(criteria, by, predicate, label, category = NULL) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label,
                        type = "select_within", by = by, category = category)
+  criteria$steps <- c(criteria$steps, list(crit))
+  criteria
+}
+
+#' Mark the randomisation/allocation point in a criteria pipeline
+#'
+#' `randomise()` records where allocation happens in the pipeline without
+#' excluding any rows (`n_fail` is always `0`). [as_consort_diagram()] and
+#' [as_attrition_tibble()] use its `by`/`arms` to default `branch_by` when
+#' not explicitly supplied, and steps at or after it are flagged
+#' `post_randomisation` in [as_attrition_tibble()]'s output.
+#'
+#' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
+#' @param by One or more column names (character vector) naming the
+#'   randomisation unit (e.g. `"cluster_id"` for cluster randomisation, or
+#'   the participant id for individual randomisation).
+#' @param arms A single column name (string) holding each unit's allocated
+#'   arm (e.g. `"arm"`).
+#' @param label A short human-readable description of this step. Default
+#'   `"Randomised"` (unlike other builders, a label is not required).
+#' @param category An optional string grouping this step with others for
+#'   display. `NULL` leaves it uncategorised.
+#'
+#' @return The updated `cf_criteria` object.
+#' @export
+#'
+#' @examples
+#' cf_criteria() |>
+#'   include(~ eligible, label = "Eligible clusters") |>
+#'   randomise(by = "cluster_id", arms = "arm") |>
+#'   exclude(~ withdrew, label = "Withdrew after allocation")
+randomise <- function(criteria, by, arms, label = "Randomised", category = NULL) {
+  criteria <- .ensure_criteria(criteria)
+  crit <- cf_criterion(predicate = NULL, label = label,
+                       type = "randomise", by = by, arms = arms, category = category)
   criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
@@ -202,15 +240,17 @@ print.cf_criteria <- function(x, ...) {
         exclude        = "-",
         group_include  = "+",
         group_exclude  = "-",
-        select_within  = ">"
+        select_within  = ">",
+        randomise      = "R"
       )
-      pred_type  <- if (is_formula(s$predicate)) "~" else "f"
+      pred_type  <- if (is.null(s$predicate)) "-" else if (is_formula(s$predicate)) "~" else "f"
       pred_str   <- predicate_label(s$predicate)
-      by_str     <- if (!is.null(s$by))       sprintf(" [by: %s]",  s$by)      else ""
+      by_str     <- if (!is.null(s$by))       sprintf(" [by: %s]",  paste(s$by, collapse = ", ")) else ""
+      arms_str   <- if (!is.null(s$arms))     sprintf(" [arms: %s]", s$arms) else ""
       cat_str    <- if (!is.null(s$category)) sprintf(" {%s}",      s$category) else ""
       type_label <- s$type
-      cat(sprintf("  %2d. [%s][%s] (%s)%s%s %s\n          %s\n",
-                  i, type_sym, pred_type, type_label, by_str, cat_str,
+      cat(sprintf("  %2d. [%s][%s] (%s)%s%s%s %s\n          %s\n",
+                  i, type_sym, pred_type, type_label, by_str, arms_str, cat_str,
                   s$label, pred_str))
     }
   }

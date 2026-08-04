@@ -158,3 +158,42 @@ test_that("import_criteria() round-trips select_within with by and category", {
   expect_equal(crit2$steps[[1]]$category, "Selection")
   expect_equal(crit2$steps[[1]]$type,     "select_within")
 })
+
+test_that("export_criteria() stores randomise steps with kind 'none' and no expr", {
+  crit <- cf_criteria() |> randomise(by = "cluster_id", arms = "arm")
+  yml  <- export_criteria(crit)
+  expect_true(grepl("type: randomise", yml))
+  expect_true(grepl("kind: none", yml))
+  expect_true(grepl("arms: arm", yml))
+})
+
+test_that("import_criteria() round-trips a randomise step", {
+  crit <- cf_criteria() |>
+    include(~ eligible, label = "Eligible") |>
+    randomise(by = "cluster_id", arms = "arm") |>
+    exclude(~ withdrew, label = "Withdrew after allocation")
+
+  yml   <- export_criteria(crit)
+  crit2 <- import_criteria(text = yml)
+
+  expect_equal(length(crit2), 3L)
+  expect_equal(crit2$steps[[2]]$type,  "randomise")
+  expect_equal(crit2$steps[[2]]$label, "Randomised")
+  expect_equal(crit2$steps[[2]]$by,    "cluster_id")
+  expect_equal(crit2$steps[[2]]$arms,  "arm")
+  expect_null(crit2$steps[[2]]$predicate)
+})
+
+test_that("re-imported randomise step round-trips through apply_criteria()", {
+  dat  <- mock_cluster_rct(n_clusters = 6, n_participants = 100, seed = 1)
+  crit <- cf_criteria() |>
+    include(~ !is.na(age), label = "Age recorded") |>
+    randomise(by = "cluster_id", arms = "arm")
+
+  yml   <- export_criteria(crit)
+  crit2 <- import_criteria(text = yml)
+
+  flow <- suppressMessages(apply_criteria(dat, crit2, id = "participant_id"))
+  expect_equal(flow$steps[[2]]$type,   "randomise")
+  expect_equal(flow$steps[[2]]$n_fail, 0L)
+})

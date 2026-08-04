@@ -32,4 +32,5 @@ Imports:
     grid,
     rlang,
     tibble,
+    utils,
     yaml

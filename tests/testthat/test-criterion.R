@@ -38,6 +38,63 @@ test_that("print.cf_criterion() runs without error", {
 })
 
 # ---------------------------------------------------------------------------
+# type = "randomise"
+
+test_that("cf_criterion() accepts type = 'randomise' with NULL predicate", {
+  crit <- cf_criterion(predicate = NULL, label = "Randomised", type = "randomise",
+                       by = "cluster_id", arms = "arm")
+  expect_s3_class(crit, "cf_criterion")
+  expect_null(crit$predicate)
+  expect_equal(crit$type, "randomise")
+  expect_equal(crit$by,   "cluster_id")
+  expect_equal(crit$arms, "arm")
+})
+
+test_that("cf_criterion() requires `by` for type = 'randomise'", {
+  expect_error(
+    cf_criterion(predicate = NULL, label = "Randomised", type = "randomise", arms = "arm"),
+    class = "rlang_error"
+  )
+})
+
+test_that("cf_criterion() requires `arms` for type = 'randomise'", {
+  expect_error(
+    cf_criterion(predicate = NULL, label = "Randomised", type = "randomise", by = "cluster_id"),
+    class = "rlang_error"
+  )
+})
+
+test_that("cf_criterion() requires a NULL predicate for type = 'randomise'", {
+  expect_error(
+    cf_criterion(~ TRUE, label = "Randomised", type = "randomise",
+                by = "cluster_id", arms = "arm"),
+    class = "rlang_error"
+  )
+})
+
+test_that("cf_criterion() requires a non-NULL predicate for other types", {
+  expect_error(
+    cf_criterion(predicate = NULL, label = "x", type = "include"),
+    class = "rlang_error"
+  )
+})
+
+test_that("cf_criterion() rejects `arms` for non-randomise types", {
+  expect_error(
+    cf_criterion(~ age >= 18, label = "Adults", type = "include", arms = "arm"),
+    class = "rlang_error"
+  )
+})
+
+test_that("print.cf_criterion() displays randomise steps without error", {
+  crit <- cf_criterion(predicate = NULL, label = "Randomised", type = "randomise",
+                       by = "cluster_id", arms = "arm")
+  expect_output(print(crit), "Randomised")
+  expect_output(print(crit), "\\[by: cluster_id\\]")
+  expect_output(print(crit), "\\[arms: arm\\]")
+})
+
+# ---------------------------------------------------------------------------
 # eval_criterion
 
 test_that("eval_criterion() works with a formula predicate", {

@@ -4,7 +4,7 @@ test_that("apply_criteria() returns a cf_flow object", {
     include(~ eligible_screen, label = "Screening")
   flow <- apply_criteria(dat, crit)
   expect_s3_class(flow, "cf_flow")
-  expect_named(flow, c("data", "criteria", "steps"))
+  expect_named(flow, c("data", "criteria", "steps", "hierarchy"))
 })
 
 
@@ -31,6 +31,34 @@ test_that("apply_criteria() uses supplied id column", {
   crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
   flow <- apply_criteria(dat, crit, id = "participant_id")
   expect_equal(flow$data$.cf_row_id, dat$participant_id)
+})
+
+test_that("apply_criteria() supports a composite (multi-column) id", {
+  dat  <- suppressWarnings(mock_cohortflow(50, seed = 1))
+  crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
+  flow <- apply_criteria(dat, crit, id = c("participant_id", "period"))
+  expect_equal(
+    flow$data$.cf_row_id,
+    paste(dat$participant_id, dat$period, sep = "\r")
+  )
+})
+
+test_that("apply_criteria() warns on a duplicated composite id", {
+  dat  <- suppressWarnings(mock_cohortflow(50, seed = 1))
+  crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
+  expect_warning(
+    apply_criteria(dat, crit, id = c("cluster_id", "site_id")),
+    "duplicate"
+  )
+})
+
+test_that("apply_criteria() errors naming a missing composite id column", {
+  dat  <- suppressWarnings(mock_cohortflow(50, seed = 1))
+  crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
+  expect_error(
+    apply_criteria(dat, crit, id = c("participant_id", "nonexistent")),
+    "nonexistent"
+  )
 })
 
 test_that("include() step keeps TRUE rows cumulatively", {
@@ -102,6 +130,44 @@ test_that("select_within() keeps only predicate-TRUE rows per group", {
   expect_true(all(cluster_counts <= 1))
 })
 
+test_that("group_include() supports a composite (multi-column) by", {
+  dat  <- suppressWarnings(mock_cohortflow(300, n_clusters = 5, seed = 7))
+  crit <- cf_criteria() |>
+    group_include(by = c("cluster_id", "period"), ~ n() >= 10,
+                  label = "Sufficient cluster-period size")
+  flow <- suppressMessages(apply_criteria(dat, crit))
+
+  surviving <- cohort(flow)
+  key_orig    <- paste(dat$cluster_id, dat$period)
+  orig_counts <- table(key_orig)
+  key_surv    <- unique(paste(surviving$cluster_id, surviving$period))
+  expect_true(all(orig_counts[key_surv] >= 10))
+})
+
+test_that("select_within() supports a composite (multi-column) by", {
+  dat <- suppressWarnings(mock_cohortflow(200, seed = 3))
+  crit <- cf_criteria() |>
+    include(~ !is.na(consent_date), label = "Has consent") |>
+    select_within(
+      by      = c("cluster_id", "period"),
+      label   = "First consent per cluster-period",
+      ~ consent_date == min(consent_date, na.rm = TRUE)
+    )
+  flow <- suppressMessages(apply_criteria(dat, crit))
+  surviving <- cohort(flow)
+
+  # Every surviving row must hold the minimum consent_date within its
+  # (cluster_id, period) group (computed on the pre-selection, non-NA data).
+  eligible <- dat[!is.na(dat$consent_date), ]
+  eligible_key <- paste(eligible$cluster_id, eligible$period)
+  min_by_key <- tapply(eligible$consent_date, eligible_key, min, na.rm = TRUE)
+
+  surv_key <- paste(surviving$cluster_id, surviving$period)
+  expect_true(all(surviving$consent_date == min_by_key[surv_key]))
+  # No group should retain more rows than it has ties for the minimum
+  expect_true(all(table(surv_key) <= table(eligible_key)[names(table(surv_key))]))
+})
+
 test_that("cohort() returns original columns without .cf_row_id", {
   dat  <- suppressWarnings(mock_cohortflow(100, seed = 1))
   crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
@@ -110,6 +176,40 @@ test_that("cohort() returns original columns without .cf_row_id", {
 
   expect_false(".cf_row_id" %in% names(out))
   expect_true(all(names(dat) %in% names(out)))
+})
+
+test_that("cohort(flag = TRUE) returns all rows with attribution", {
+  dat  <- suppressWarnings(mock_cohortflow(80, seed = 1))
+  crit <- cf_criteria() |>
+    include(~ eligible_screen, label = "Screening") |>
+    exclude(~ withdrew, label = "Withdrew", category = "Consent")
+  flow <- suppressMessages(apply_criteria(dat, crit))
+
+  flagged <- cohort(flow, flag = TRUE)
+  expect_equal(nrow(flagged), nrow(dat))
+  expect_false(".cf_row_id" %in% names(flagged))
+  expect_equal(sum(flagged$cf_included), nrow(cohort(flow)))
+  expect_true(all(is.na(flagged$cf_excluded_step[flagged$cf_included])))
+  expect_true(all(!is.na(flagged$cf_excluded_step[!flagged$cf_included])))
+})
+
+test_that("cohort(flag = TRUE) attributes to the first failing step only", {
+  dat  <- tibble::tibble(id = 1:3, a = c(TRUE, FALSE, FALSE), b = c(TRUE, TRUE, FALSE))
+  crit <- cf_criteria() |>
+    include(~ a, label = "A") |>
+    include(~ b, label = "B")
+  flow    <- apply_criteria(dat, crit, id = "id")
+  flagged <- cohort(flow, flag = TRUE)
+  expect_equal(flagged$cf_excluded_step, c(NA_integer_, 1L, 1L))
+})
+
+test_that("cohort(flag = TRUE) marks everyone included when nothing is excluded", {
+  dat  <- tibble::tibble(id = 1:5, x = TRUE)
+  crit <- cf_criteria() |> include(~ x, label = "All true")
+  flow <- apply_criteria(dat, crit, id = "id")
+  flagged <- cohort(flow, flag = TRUE)
+  expect_true(all(flagged$cf_included))
+  expect_true(all(is.na(flagged$cf_excluded_step)))
 })
 
 test_that("excluded() returns flat tibble with cf_step / cf_label / cf_type", {
@@ -173,4 +273,46 @@ test_that("multiple step types work together in one pipeline", {
   expect_equal(flow$steps[[3]]$type, "group_include")
   expect_equal(flow$steps[[5]]$type, "select_within")
   expect_lte(nrow(cohort(flow)), nrow(dat))
+})
+
+# ---------------------------------------------------------------------------
+# randomise() step type
+
+test_that("apply_criteria() passes all rows through a randomise() step unchanged", {
+  dat  <- mock_cluster_rct(n_clusters = 6, n_participants = 150, seed = 1)
+  crit <- cf_criteria() |>
+    include(~ !is.na(age), label = "Age recorded") |>
+    randomise(by = "cluster_id", arms = "arm")
+  flow <- suppressMessages(apply_criteria(dat, crit, id = "participant_id"))
+
+  randomise_step <- flow$steps[[2]]
+  expect_equal(randomise_step$type, "randomise")
+  expect_equal(randomise_step$n_fail, 0L)
+  expect_equal(randomise_step$n_in, randomise_step$n_pass)
+  expect_equal(randomise_step$by,   "cluster_id")
+  expect_equal(randomise_step$arms, "arm")
+  expect_length(randomise_step$excluded_ids, 0L)
+})
+
+test_that("apply_criteria() records `arms` only for randomise steps", {
+  dat  <- mock_cluster_rct(n_clusters = 6, n_participants = 150, seed = 1)
+  crit <- cf_criteria() |>
+    include(~ !is.na(age), label = "Age recorded") |>
+    randomise(by = "cluster_id", arms = "arm")
+  flow <- suppressMessages(apply_criteria(dat, crit, id = "participant_id"))
+
+  expect_null(flow$steps[[1]]$arms)
+  expect_equal(flow$steps[[2]]$arms, "arm")
+})
+
+test_that("randomise() steps after exclusions still see the reduced entering N", {
+  dat  <- mock_cluster_rct(n_clusters = 6, n_participants = 150, seed = 1)
+  crit <- cf_criteria() |>
+    exclude(~ withdrew, label = "Withdrew") |>
+    randomise(by = "cluster_id", arms = "arm") |>
+    include(~ !is.na(age), label = "Age recorded")
+  flow <- suppressMessages(apply_criteria(dat, crit, id = "participant_id"))
+
+  expect_equal(flow$steps[[2]]$n_in, flow$steps[[1]]$n_pass)
+  expect_equal(flow$steps[[3]]$n_in, flow$steps[[2]]$n_pass)
 })

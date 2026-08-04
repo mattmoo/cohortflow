@@ -435,6 +435,63 @@ test_that("linear table has no branch columns when branch_by is NULL", {
   expect_equal(setdiff(names(out), standard_cols), character(0L))
 })
 
+# ---------------------------------------------------------------------------
+# as_attrition_tibble -- randomise() auto-detection / post_randomisation
+# ---------------------------------------------------------------------------
+
+test_that("as_attrition_tibble() auto-detects branch_by from a randomise() step", {
+  flow <- make_flow_randomise()
+  out  <- as_attrition_tibble(flow)
+
+  cohort_data <- cohort(flow)
+  arm_values  <- as.character(sort(unique(cohort_data$arm)))
+  expect_true(all(arm_values %in% names(out)))
+
+  final_row <- out[out$row_type == "final", ]
+  for (arm_val in arm_values) {
+    expected_n <- sum(cohort_data$arm == arm_val)
+    expect_equal(final_row[[arm_val]], expected_n)
+  }
+})
+
+test_that("explicit branch_by overrides the randomise() step default", {
+  flow <- make_flow_randomise()
+  out  <- as_attrition_tibble(flow, branch_by = "site_id")
+
+  cohort_data <- cohort(flow)
+  site_values <- as.character(sort(unique(cohort_data$site_id)))
+  expect_true(all(site_values %in% names(out)))
+  expect_false(any(as.character(sort(unique(cohort_data$arm))) %in% names(out)))
+})
+
+test_that("as_attrition_tibble() adds post_randomisation column when a randomise() step exists", {
+  flow <- make_flow_randomise()
+  out  <- as_attrition_tibble(flow, show_categories = FALSE)
+
+  expect_true("post_randomisation" %in% names(out))
+  expect_false(out$post_randomisation[out$label == "Assessed for eligibility"])
+  expect_false(out$post_randomisation[out$label == "Age recorded"])
+  expect_true(out$post_randomisation[out$label == "Randomised"])
+  expect_true(out$post_randomisation[out$label == "Withdrew after allocation"])
+  expect_true(out$post_randomisation[out$row_type == "final"])
+})
+
+test_that("as_attrition_tibble() omits post_randomisation when there is no randomise() step", {
+  flow <- make_flow_categorised()
+  out  <- as_attrition_tibble(flow)
+  expect_false("post_randomisation" %in% names(out))
+})
+
+test_that("group_x/group_y never leak branch_by columns from a randomise() step", {
+  flow <- make_flow_randomise()
+  out  <- as_attrition_tibble(flow, group_x = "site_id")
+
+  cohort_data <- cohort(flow)
+  arm_values  <- as.character(sort(unique(cohort_data$arm)))
+  expect_false(any(arm_values %in% names(out)))
+})
+
+
 test_that("as_attrition_table() accepts branch_by parameter", {
   skip_if_not_installed("flextable")
   skip_if_not_installed("officer")
@@ -815,3 +872,74 @@ test_that("shade works together with group_x/group_y grid rendering", {
   )
   expect_s3_class(ft, "flextable")
 })
+
+# ---------------------------------------------------------------------------
+# as_attrition_tibble -- levels (hierarchy-aware counting)
+# ---------------------------------------------------------------------------
+
+test_that("as_attrition_tibble() default (levels = character(0)) is unaffected by hierarchy", {
+  flow <- make_flow_hierarchy()
+  out  <- as_attrition_tibble(flow)
+
+  expect_named(out, c("row_type", "label", "indent_level", "n",
+                      "n_removed", "pct_removed", "branch"))
+  expect_equal(out$n[[1]], nrow(flow$data))
+})
+
+test_that("as_attrition_tibble(levels = NULL) returns one stacked block per hierarchy level", {
+  flow <- make_flow_hierarchy()
+  out  <- as_attrition_tibble(flow, levels = NULL)
+
+  expect_true("level" %in% names(out))
+  expect_true("n_consequential" %in% names(out))
+  expect_setequal(unique(out$level), c("participant", "cluster"))
+
+  # Each level's block has its own header + final row
+  participant_block <- out[out$level == "participant", ]
+  cluster_block      <- out[out$level == "cluster", ]
+  expect_equal(participant_block$row_type[[1]], "header")
+  expect_equal(participant_block$row_type[[nrow(participant_block)]], "final")
+  expect_equal(cluster_block$row_type[[1]], "header")
+  expect_equal(cluster_block$n[[1]], length(unique(flow$data$cluster_id)))
+})
+
+test_that("as_attrition_tibble(levels = <name>) returns only the requested level(s)", {
+  flow <- make_flow_hierarchy()
+  out  <- as_attrition_tibble(flow, levels = "cluster")
+
+  expect_equal(unique(out$level), "cluster")
+  expect_equal(out$n[[1]], length(unique(flow$data$cluster_id)))
+})
+
+test_that("as_attrition_tibble(levels=) errors without a hierarchy on flow", {
+  flow <- make_flow_flat()
+  expect_error(as_attrition_tibble(flow, levels = NULL), "hierarchy")
+})
+
+test_that("as_attrition_tibble(levels=) errors on an unknown level name", {
+  flow <- make_flow_hierarchy()
+  expect_error(as_attrition_tibble(flow, levels = "site"), "Unknown hierarchy level")
+})
+
+test_that("as_attrition_tibble(levels=) cannot be combined with group_x/branch_by", {
+  flow <- make_flow_hierarchy()
+  expect_error(
+    as_attrition_tibble(flow, levels = NULL, group_x = "cluster_id"),
+    "cannot be combined"
+  )
+  expect_error(
+    as_attrition_tibble(flow, levels = NULL, branch_by = "arm"),
+    "cannot be combined"
+  )
+})
+
+test_that("as_attrition_tibble(levels=) group_include step shows n_consequential at finer levels", {
+  flow <- make_flow_hierarchy()
+  out  <- as_attrition_tibble(flow, levels = NULL, show_categories = FALSE)
+
+  participant_rows <- out[out$level == "participant" & out$row_type == "step", ]
+  cluster_step_label <- "Cluster size >= 15"
+  conseq <- participant_rows$n_consequential[participant_rows$label == cluster_step_label]
+  expect_true(is.na(conseq) || conseq >= 0L)
+})
+

@@ -13,7 +13,9 @@ as_attrition_tibble(
   branch_by = NULL,
   count_by = NULL,
   group_x = NULL,
-  group_y = NULL
+  group_y = NULL,
+  group_na_label = "Missing",
+  levels = character(0)
 )
 }
 \arguments{
@@ -33,12 +35,14 @@ Default \code{"Final cohort"}.}
 \code{1}.}
 
 \item{branch_by}{Optional column name (string) for allocation branching.
-When \code{NULL} (default), the table has a single \code{n} column. When
-supplied, the surviving cohort is split by this column and the final
-row's total is broken out into one additional column per branch value
-(named after the branch value, e.g. \code{Control}, \code{Intervention}), each
-populated only on the final row. Use \code{final_label = "Randomised"} when
-appropriate. Cannot be combined with \code{group_x}/\code{group_y}.}
+When \code{NULL} (default), the table has a single \code{n} column unless the
+pipeline has a \code{\link[=randomise]{randomise()}} step, in which case its \code{arms} column is
+used automatically. When supplied (or defaulted), the surviving cohort
+is split by this column and the final row's total is broken out into
+one additional column per branch value (named after the branch value,
+e.g. \code{Control}, \code{Intervention}), each populated only on the final row.
+Use \code{final_label = "Randomised"} when appropriate. Cannot be combined
+with \code{group_x}/\code{group_y}.}
 
 \item{count_by}{Optional column name (string) for distinct counts. When
 supplied, counts are computed as \code{n_distinct(count_by)} rather than
@@ -52,6 +56,21 @@ site). See the Grouping section.}
 \item{group_y}{Optional column name (string), present in \code{flow$data}, used
 to repeat the attrition table across the "row" direction (e.g. time
 period). See the Grouping section.}
+
+\item{group_na_label}{Character string used to label the group formed by
+\code{NA} values in \code{group_x}/\code{group_y} (see the Grouping section). Default
+\code{"Missing"}. Ignored when the corresponding grouping column has no \code{NA}
+values.}
+
+\item{levels}{Optional; requires \code{flow} to have been built with
+\code{apply_criteria(hierarchy = ...)}. When the default \code{character(0)}, this
+argument is ignored and the row-count behaviour above is unchanged. When
+\code{NULL}, one stacked block per hierarchy level is returned (finest to
+coarsest), each with a \code{level} column and an additional \code{n_consequential}
+column (see \code{\link[=apply_criteria]{apply_criteria()}}'s \code{hierarchy} argument for the counting
+rule). When a character vector of level name(s), only those levels are
+returned, in the order given. Cannot be combined with \code{group_x}/\code{group_y},
+\code{branch_by}, or \code{count_by}.}
 }
 \value{
 A \code{\link[tibble:tibble]{tibble::tibble()}} with columns:
@@ -72,7 +91,11 @@ value is appended (named after the branch value), populated only on the
 final row with that branch's surviving count. When \code{group_x}/\code{group_y}
 are supplied, \code{group_x} and \code{group_y} character columns are appended (see
 the Grouping section) and the tibble contains one stacked block per group
-combination rather than a single block.
+combination rather than a single block. When the pipeline has a
+\code{\link[=randomise]{randomise()}} step, a \code{post_randomisation} logical column is appended
+(\code{TRUE} for header/final/step/category rows at or after that step,
+\code{FALSE} before it); this column is omitted entirely when there is no
+\code{randomise()} step, so existing pipelines see no schema change.
 }
 \description{
 Produces a flat tibble describing the attrition at each step (or category)
@@ -117,6 +140,12 @@ row belongs to (\code{NA} for the ungrouped dimension). This long format is
 the input to the grid layout produced by \code{as_attrition_table()}; use it
 directly if you want to build your own custom cross-tabulated output.
 \code{branch_by}/\code{count_by} cannot currently be combined with grouping.
+
+Rows where the grouping column itself is \code{NA} (e.g. missing ethnicity)
+are \strong{not} silently dropped, and are never folded into every other
+group's counts. Instead they form their own explicit group, labelled by
+\code{group_na_label} (default \code{"Missing"}), so the grouped totals still sum
+to the full dataset.
 }
 
 \examples{

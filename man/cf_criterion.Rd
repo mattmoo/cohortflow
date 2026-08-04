@@ -7,9 +7,11 @@
 cf_criterion(
   predicate,
   label,
-  type = c("include", "exclude", "group_include", "group_exclude", "select_within"),
+  type = c("include", "exclude", "group_include", "group_exclude", "select_within",
+    "randomise"),
   by = NULL,
-  category = NULL
+  category = NULL,
+  arms = NULL
 )
 }
 \arguments{
@@ -22,21 +24,31 @@ vector of length \code{nrow(data)}.
 scalar logical. The result is broadcast back to all rows in each group.
 \item For \code{select_within}: evaluated per group; must return a logical vector
 identifying which rows within the group to keep.
+\item For \code{randomise}: must be \code{NULL} (a randomise step never removes rows).
 }}
 
 \item{label}{A short human-readable description of this criterion.}
 
 \item{type}{One of \code{"include"}, \code{"exclude"}, \code{"group_include"},
-\code{"group_exclude"}, or \code{"select_within"}.}
+\code{"group_exclude"}, \code{"select_within"}, or \code{"randomise"}.}
 
 \item{by}{For grouped step types (\code{group_include}, \code{group_exclude},
-\code{select_within}): a single character string naming the grouping column.
-Ignored for row-wise types.}
+\code{select_within}): one or more character strings naming the grouping
+column(s); supply more than one for composite (multi-column) grouping.
+For \code{randomise}: one or more character strings naming the
+randomisation unit column(s) (e.g. \code{"cluster_id"}). Ignored for
+row-wise types.}
 
 \item{category}{An optional character string grouping this criterion with
 others for display purposes (e.g. \code{"Valid age"} to group age-related steps
 into one box in a CONSORT diagram). \code{NULL} (default) leaves the step
 uncategorised (\code{NA} in output).}
+
+\item{arms}{For \code{type = "randomise"} only: a single character string
+naming the column in the data that holds each unit's allocated arm
+(e.g. \code{"arm"}). Used by \code{\link[=as_consort_diagram]{as_consort_diagram()}}/\code{\link[=as_attrition_tibble]{as_attrition_tibble()}}
+to default \code{branch_by} when not explicitly supplied. Must be \code{NULL} for
+all other types.}
 }
 \value{
 A \code{cf_criterion} object (an S3 list).
@@ -70,5 +82,14 @@ cf_criterion(
   label = "Index operation",
   type  = "select_within",
   by    = "participant_id"
+)
+
+# Randomisation marker (no predicate; excludes nothing)
+cf_criterion(
+  predicate = NULL,
+  label = "Randomised",
+  type  = "randomise",
+  by    = "cluster_id",
+  arms  = "arm"
 )
 }

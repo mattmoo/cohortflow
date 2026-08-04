@@ -4,16 +4,41 @@
 \alias{apply_criteria}
 \title{Apply a criteria pipeline to a data frame}
 \usage{
-apply_criteria(data, criteria, id = NULL)
+apply_criteria(
+  data,
+  criteria,
+  id = NULL,
+  expected = NULL,
+  by = NULL,
+  hierarchy = NULL
+)
 }
 \arguments{
 \item{data}{A data frame.}
 
 \item{criteria}{A \code{cf_criteria} object.}
 
-\item{id}{A single column name (string) to use as the row identifier. If
+\item{id}{One or more column names (character vector) to use as the row
+identifier; supply more than one for a composite (multi-column) key. If
 \code{NULL} (default), the function looks for \code{.cf_row_id} in \code{data}; if not
 found, a sequential integer is added.}
+
+\item{expected}{Optional data frame (typically built with \code{\link[=cf_expected]{cf_expected()}})
+listing every observational unit that is expected to exist, e.g. one row
+per participant. When supplied, \code{data} is right-joined onto \code{expected}
+(by \code{by}) \emph{before} any steps are evaluated, so units with no matching row
+in \code{data} are added as all-\code{NA} (except for the \code{by} column(s)) and are
+counted correctly as failing the first step that requires non-missing
+data. Requires \code{by}.}
+
+\item{by}{Column name(s) shared by \code{data} and \code{expected} used to join them.
+Required, and only used, when \code{expected} is supplied.}
+
+\item{hierarchy}{Optional \code{cf_hierarchy} describing how rows nest into
+coarser units (e.g. participants within clusters). When supplied, every
+hierarchy column is validated against \code{data}, and each step record
+additionally stores the number of distinct units at risk/passing/failing
+at every level (see \code{\link[=as_attrition_tibble]{as_attrition_tibble()}}'s \code{levels} argument).}
 }
 \value{
 A \code{cf_flow} object.
@@ -40,6 +65,7 @@ and \code{id} is \code{NULL}, a sequential integer identifier is added automatic
    \code{group_include} \tab Per-group scalar (summarise context) \tab Keep rows in groups where result is \code{TRUE} \cr
    \code{group_exclude} \tab Per-group scalar (summarise context) \tab Drop rows in groups where result is \code{TRUE} \cr
    \code{select_within} \tab Per-group logical vector \tab Keep \code{TRUE} rows within each group \cr
+   \code{randomise} \tab None (\code{predicate = NULL}) \tab Passes every row through unchanged; records the randomisation unit (\code{by}) and arm column (\code{arms}) for use by \code{\link[=as_consort_diagram]{as_consort_diagram()}}/\code{\link[=as_attrition_tibble]{as_attrition_tibble()}} \cr
 }
 }
 
