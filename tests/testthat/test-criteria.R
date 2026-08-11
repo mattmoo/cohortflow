@@ -120,7 +120,7 @@ test_that("cf_criteria() errors if non-cf_criterion passed directly", {
 })
 
 # ---------------------------------------------------------------------------
-# randomise()
+# randomise() -- criterion builder
 
 test_that("randomise() adds a randomise step with a default label", {
   crit <- cf_criteria() |> randomise(by = "cluster_id", arms = "arm")
@@ -145,7 +145,7 @@ test_that("randomise() can be combined with other builders in a pipeline", {
 
   expect_equal(length(crit), 3L)
   expect_equal(vapply(crit$steps, `[[`, character(1L), "type"),
-              c("include", "randomise", "exclude"))
+               c("include", "randomise", "exclude"))
 })
 
 test_that("print.cf_criteria() displays randomise steps without error", {
