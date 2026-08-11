@@ -13,7 +13,7 @@ Define and apply inclusion/exclusion criteria for cohort studies, then generate 
 - Build readable criteria pipelines with formulas or functions
 - Apply criteria step-by-step to a dataset
 - Extract final cohort and excluded records
-- Produce attrition tables as a tibble or formatted table (`flextable`, `gt`, `huxtable`)
+- Produce attrition tables as a tibble or formatted table (`flextable`, `gt`, `huxtable`), including per-hierarchy-level CONSORT cluster reporting
 - Render a CONSORT-style flow diagram summarising participant flow
 - Export/import criteria pipelines as YAML for reproducibility
 
@@ -132,6 +132,43 @@ as_attrition_table(
   }
 )
 ```
+
+## Hierarchy levels (cluster / within-person CONSORT)
+
+For designs where observational units nest inside a coarser unit -- a
+cluster-randomised trial (participants inside clusters) or a within-person
+design (trials inside participants) -- pass `hierarchy` to `apply_criteria()`
+via `cf_hierarchy()`, then request per-level attrition with `levels`. This is
+the reporting form required by the CONSORT cluster extension (Campbell,
+Elbourne & Altman, BMJ 2004;328:702-8): losses at each stage counted at both
+the unit of analysis and the unit of recruitment.
+
+```r
+cl <- mock_cluster_rct(n_clusters = 20, seed = 1)
+h  <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+
+crit <- cf_criteria() |>
+  include(~ !is.na(age), label = "Age recorded") |>
+  group_exclude(by = "cluster_id", ~ dplyr::n() < 10, label = "Cluster too small") |>
+  exclude(~ withdrew,    label = "Withdrew consent")
+
+flow_cl <- apply_criteria(cl, crit, hierarchy = h)
+
+# Plain tibble: one stacked block per level
+as_attrition_tibble(flow_cl, levels = c("participant", "cluster"))
+
+# Formatted table: one column block per level on the same row
+as_attrition_table(
+  flow_cl,
+  levels       = c("participant", "cluster"),
+  level_labels = c(participant = "Participants", cluster = "Clusters")
+)
+```
+
+Each criterion row reads across both levels at once, e.g. *"Cluster too
+small -- 42 participants removed, 3 clusters removed"*. Shading
+(`shade`/`shade_fn`) is computed per level. `levels` cannot be combined with
+`group_x`/`group_y`/`branch_by`/`count_by`.
 
 ## Reproducibility with YAML
 
