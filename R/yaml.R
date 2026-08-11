@@ -179,5 +179,5 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
   }
 
   cf_criterion(predicate = pred, label = s$label, type = s$type, by = by_val,
-              category = s$category, arms = arms_val)
+               category = s$category, arms = arms_val)
 }

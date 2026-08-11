@@ -381,7 +381,7 @@ as_attrition_tibble <- function(
 # a `post_randomisation` column (`TRUE` for steps at or after that step
 # number).
 .make_step_row <- function(s, indent_level, digits, pct_denom = s$n_in,
-                          randomise_step_num = NA_integer_) {
+                           randomise_step_num = NA_integer_) {
   pct <- if (pct_denom > 0L) round(100 * s$n_fail / pct_denom, digits) else NA_real_
   tibble::tibble(
     row_type     = "step",
@@ -570,7 +570,7 @@ as_attrition_tibble <- function(
   ))
 
   if (show_categories) {
-    rows <- c(rows, .attrition_level_rows_categorised(level_steps, digits))
+    rows <- c(rows, .level_rows_categorised(level_steps, digits))
   } else {
     rows <- c(rows, lapply(level_steps, .make_level_step_row, digits = digits))
   }
@@ -612,7 +612,7 @@ as_attrition_tibble <- function(
 # Build rows with category grouping for a single hierarchy level -- mirrors
 # `.attrition_rows_categorised()`, summing both `n_fail` and
 # `n_consequential` across the steps sharing a category.
-.attrition_level_rows_categorised <- function(level_steps, digits) {
+.level_rows_categorised <- function(level_steps, digits) {
   rows <- list()
   i    <- 1L
 
@@ -855,7 +855,7 @@ as_attrition_table <- function(
       )
     }
 
-    level_labels_resolved <- .attrition_resolve_level_labels(levels, level_labels)
+    level_labels_resolved <- .resolve_level_labels(levels, level_labels)
 
     if (length(levels) > 3L) {
       message(sprintf(
@@ -1791,7 +1791,7 @@ as_attrition_table <- function(
 # to the level names as-is. Aborts naming the mismatch when `level_labels`
 # doesn't fully cover `levels` -- a silent partial fallback would be a
 # confusing way to discover a typo in a level name.
-.attrition_resolve_level_labels <- function(levels, level_labels) {
+.resolve_level_labels <- function(levels, level_labels) {
   if (is.null(level_labels)) {
     return(stats::setNames(levels, levels))
   }

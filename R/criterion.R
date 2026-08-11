@@ -186,7 +186,7 @@ predicate_label <- function(predicate) {
 print.cf_criterion <- function(x, ...) {
   type_sym  <- if (x$type %in% c("include", "group_include")) "+" else
     if (x$type == "select_within") ">" else
-    if (x$type == "randomise") "R" else "-"
+      if (x$type == "randomise") "R" else "-"
   pred_str  <- predicate_label(x$predicate)
   pred_type <- if (is.null(x$predicate)) "-" else if (is_formula(x$predicate)) "~" else "f"
   by_str    <- if (!is.null(x$by)) sprintf(" [by: %s]", paste(x$by, collapse = ", ")) else ""
@@ -203,7 +203,7 @@ print.cf_criterion <- function(x, ...) {
 format.cf_criterion <- function(x, ...) {
   type_sym  <- if (x$type %in% c("include", "group_include")) "+" else
     if (x$type == "select_within") ">" else
-    if (x$type == "randomise") "R" else "-"
+      if (x$type == "randomise") "R" else "-"
   pred_str  <- predicate_label(x$predicate)
   pred_type <- if (is.null(x$predicate)) "-" else if (is_formula(x$predicate)) "~" else "f"
   by_str    <- if (!is.null(x$by)) sprintf(" [by: %s]", paste(x$by, collapse = ", ")) else ""

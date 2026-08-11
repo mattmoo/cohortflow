@@ -20,7 +20,7 @@
 #'
 #' @examples
 #' cf_expected(participant_id = 1:3, visit = c("baseline", "3mo"))
-cf_expected <- function(..., stringsAsFactors = FALSE) {
+cf_expected <- function(..., stringsAsFactors = FALSE) { # nolint: object_name_linter.
   args <- list(...)
 
   if (length(args) == 0L) {

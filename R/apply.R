@@ -19,7 +19,7 @@
 #' | `group_include` | Per-group scalar (summarise context) | Keep rows in groups where result is `TRUE` |
 #' | `group_exclude` | Per-group scalar (summarise context) | Drop rows in groups where result is `TRUE` |
 #' | `select_within` | Per-group logical vector | Keep `TRUE` rows within each group |
-#' | `randomise` | None (`predicate = NULL`) | Passes every row through unchanged; records the randomisation unit (`by`) and arm column (`arms`) for use by [as_consort_diagram()]/[as_attrition_tibble()] |
+#' | `randomise` | None (`predicate = NULL`) | Records the randomisation unit and arm column for downstream reporting |
 #'
 #' @param data A data frame.
 #' @param criteria A `cf_criteria` object.
