@@ -38,7 +38,7 @@ test_that("print.cf_criterion() runs without error", {
 })
 
 # ---------------------------------------------------------------------------
-# type = "randomise"
+# cf_criterion() -- randomise type
 
 test_that("cf_criterion() accepts type = 'randomise' with NULL predicate", {
   crit <- cf_criterion(predicate = NULL, label = "Randomised", type = "randomise",
@@ -67,7 +67,7 @@ test_that("cf_criterion() requires `arms` for type = 'randomise'", {
 test_that("cf_criterion() requires a NULL predicate for type = 'randomise'", {
   expect_error(
     cf_criterion(~ TRUE, label = "Randomised", type = "randomise",
-                by = "cluster_id", arms = "arm"),
+                 by = "cluster_id", arms = "arm"),
     class = "rlang_error"
   )
 })

@@ -58,8 +58,8 @@ test_that("cf_hierarchy() rejects non-character values", {
 
 test_that("cf_hierarchy() supports composite (multi-column) levels", {
   h <- cf_hierarchy(participant = "pid",
-                     cluster_period = c("cluster_id", "period"),
-                     cluster = "cluster_id")
+                    cluster_period = c("cluster_id", "period"),
+                    cluster = "cluster_id")
   expect_s3_class(h, "cf_hierarchy")
   expect_equal(h[["cluster_period"]], c("cluster_id", "period"))
   expect_equal(h["participant"], c(participant = "pid"))
@@ -175,4 +175,3 @@ test_that("continue_criteria() preserves and continues hierarchy counting", {
   last_step <- flow2$steps[[length(flow2$steps)]]
   expect_false(is.null(last_step$hierarchy_counts))
 })
-

@@ -942,4 +942,3 @@ test_that("as_attrition_tibble(levels=) group_include step shows n_consequential
   conseq <- participant_rows$n_consequential[participant_rows$label == cluster_step_label]
   expect_true(is.na(conseq) || conseq >= 0L)
 })
-
