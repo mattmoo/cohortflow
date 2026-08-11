@@ -57,8 +57,8 @@ test_that("cf_hierarchy() rejects non-character values", {
 })
 
 test_that("cf_hierarchy() supports composite (multi-column) levels", {
-  h <- cf_hierarchy(participant = "pid",
-                    cluster_period = c("cluster_id", "period"),
+  h <- cf_hierarchy(participant = "pid", 
+                    cluster_period = c("cluster_id", "period"), 
                     cluster = "cluster_id")
   expect_s3_class(h, "cf_hierarchy")
   expect_equal(h[["cluster_period"]], c("cluster_id", "period"))

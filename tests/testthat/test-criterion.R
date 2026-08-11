@@ -38,7 +38,7 @@ test_that("print.cf_criterion() runs without error", {
 })
 
 # ---------------------------------------------------------------------------
-# cf_criterion() -- randomise type
+# cf_criterion -- randomise type
 
 test_that("cf_criterion() accepts type = 'randomise' with NULL predicate", {
   crit <- cf_criterion(predicate = NULL, label = "Randomised", type = "randomise",
