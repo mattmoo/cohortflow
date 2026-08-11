@@ -707,6 +707,30 @@ as_attrition_tibble <- function(
 #'   vector of colours (or `NA`) the same length as the tibble, one colour
 #'   per row. `shade_fn` takes precedence over `shade` if both are supplied.
 #'
+#' @section Hierarchy levels (`levels`):
+#' Supplying `levels` repeats the N / Removed / % removed columns once per
+#' hierarchy level, so a single criterion row reports its effect at every
+#' level side by side -- the reporting form required by the CONSORT cluster
+#' extension (Campbell, Elbourne & Altman, BMJ 2004;328:702-8) and the
+#' within-person extension, where losses at each stage are counted at both
+#' the unit of analysis and the unit of recruitment. For example, with a
+#' cluster-randomised trial where participants nest inside clusters:
+#' ```r
+#' h <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+#' flow <- apply_criteria(dat, crit, hierarchy = h)
+#' as_attrition_table(
+#'   flow,
+#'   levels       = c("participant", "cluster"),
+#'   level_labels = c(participant = "Participants", cluster = "Clusters")
+#' )
+#' ```
+#' produces one row per criterion with a column block for participants and a
+#' column block for clusters, e.g. *"Cluster too small -- 42 participants
+#' removed, 3 clusters removed"*. Shading (`shade`/`shade_fn`) is computed
+#' *per level* -- each level's colour gradient is scaled across that level's
+#' own values, not across all levels combined. `levels` cannot be combined
+#' with `group_x`/`group_y`/`branch_by`/`count_by`.
+#'
 #' @inheritParams as_attrition_tibble
 #' @param backend Character string: `"flextable"` (default), `"gt"`, or
 #'   `"huxtable"`.
@@ -717,12 +741,30 @@ as_attrition_tibble <- function(
 #'   Default `"Removed"`.
 #' @param pct_col_label Column header for the percentage column.
 #'   Default `"% removed"`.
+#' @param consequential_col_label Column header for the optional
+#'   "consequential" column shown per level when `levels` is supplied and
+#'   `show_consequential` resolves to `TRUE`. Default `"Consequential"`.
 #' @param group_x_label Optional prefix label for `group_x` column headings
 #'   (e.g. `"Site"` to show `"Site: A"`). Default `NULL` (show the group
 #'   value alone).
 #' @param group_y_label Optional prefix label for `group_y` row headings
 #'   (e.g. `"Period"` to show `"Period: 1"`). Default `NULL` (show the group
 #'   value alone).
+#' @param level_labels Optional display names for the column blocks produced
+#'   by `levels`. Either a vector positionally aligned with `levels`, or a
+#'   vector named by level (e.g. `c(trial = "Trials", participant =
+#'   "Participants")`). Default `NULL`, which uses the level names as-is --
+#'   level names are user-chosen and are not auto-pluralised or title-cased,
+#'   since guessing would be as likely to surprise as to help; supply
+#'   `level_labels` to get "Trials" from a level named `trial`. Ignored
+#'   unless `levels` is supplied.
+#' @param show_consequential Logical, or `NULL` (default). Controls whether
+#'   an extra "consequential" column is shown per level, reporting units
+#'   lost only because a `group_include()`/`group_exclude()` group they
+#'   belonged to was removed (see `levels` on [as_attrition_tibble()]). When
+#'   `NULL`, the column is included only if the underlying data has any
+#'   non-zero value for it, so pipelines without group-level criteria render
+#'   unchanged. Ignored unless `levels` is supplied.
 #' @param shade Optional character string: `"pct_removed"` or `"n_removed"`.
 #'   When supplied, shades the N/Removed/% cells of step and category rows
 #'   with an automatic colour gradient based on that column's value. Default
@@ -738,7 +780,9 @@ as_attrition_tibble <- function(
 #'   column per branch value is added after the percentage column, headed
 #'   with the branch value itself and populated only on the final row. When
 #'   `group_x`/`group_y` are supplied, the table is a repeated grid as
-#'   described in the Grouping section.
+#'   described in the Grouping section. When `levels` is supplied, the table
+#'   has one N/Removed/% column block per level, as described in the
+#'   Hierarchy levels section.
 #' @seealso [as_attrition_tibble()] for the underlying plain-tibble data layer.
 #' @export
 #'
@@ -765,32 +809,88 @@ as_attrition_tibble <- function(
 #' flow_sw <- apply_criteria(sw, crit, id = "event_id")
 #' as_attrition_table(flow_sw, group_x = "site_id", group_y = "period")
 #'
+#' # Hierarchy levels: cluster CONSORT reporting
+#' cl <- mock_cluster_rct(n_clusters = 20, seed = 1)
+#' h  <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+#' flow_cl <- apply_criteria(cl, crit, hierarchy = h)
+#' as_attrition_table(flow_cl, levels = c("participant", "cluster"))
+#'
 #' # Save to Word
 #' ft <- as_attrition_table(flow)
 #' flextable::save_as_docx(ft, path = "attrition.docx")
 #' }
 as_attrition_table <- function(
   flow,
-  backend             = c("flextable", "gt", "huxtable"),
-  show_categories     = TRUE,
-  assessed_label      = "Assessed for eligibility",
-  final_label         = "Final cohort",
-  digits              = 1L,
-  criterion_col_label = "Criterion",
-  n_col_label         = "N",
-  removed_col_label   = "Removed",
-  pct_col_label       = "% removed",
-  branch_by           = NULL,
-  count_by            = NULL,
-  group_x             = NULL,
-  group_y             = NULL,
-  group_x_label       = NULL,
-  group_y_label       = NULL,
-  shade               = NULL,
-  shade_fn            = NULL,
-  shade_palette       = c("#FFFFFF", "#F8696B")
+  backend                 = c("flextable", "gt", "huxtable"),
+  show_categories         = TRUE,
+  assessed_label          = "Assessed for eligibility",
+  final_label             = "Final cohort",
+  digits                  = 1L,
+  criterion_col_label     = "Criterion",
+  n_col_label             = "N",
+  removed_col_label       = "Removed",
+  pct_col_label           = "% removed",
+  consequential_col_label = "Consequential",
+  branch_by               = NULL,
+  count_by                = NULL,
+  group_x                 = NULL,
+  group_y                 = NULL,
+  group_x_label           = NULL,
+  group_y_label           = NULL,
+  levels                  = character(0),
+  level_labels            = NULL,
+  show_consequential      = NULL,
+  shade                   = NULL,
+  shade_fn                = NULL,
+  shade_palette           = c("#FFFFFF", "#F8696B")
 ) {
   backend <- match.arg(backend)
+
+  # -- Hierarchy-level grid path ------------------------------------------
+  if (!identical(levels, character(0))) {
+    if (!is.null(group_x) || !is.null(group_y) ||
+          !is.null(branch_by) || !is.null(count_by)) {
+      rlang::abort(
+        "`levels` cannot be combined with `group_x`/`group_y`/`branch_by`/`count_by`."
+      )
+    }
+
+    level_labels_resolved <- .attrition_resolve_level_labels(levels, level_labels)
+
+    if (length(levels) > 3L) {
+      message(sprintf(
+        paste("as_attrition_table(): rendering %d hierarchy levels produces a",
+              "wide table (%d columns); consider fewer levels for readability."),
+        length(levels), 1L + 3L * length(levels)
+      ))
+    }
+
+    tbl <- as_attrition_tibble(
+      flow,
+      show_categories = show_categories,
+      assessed_label  = assessed_label,
+      final_label     = final_label,
+      digits          = digits,
+      levels          = levels
+    )
+
+    grid <- .attrition_build_level_grid(
+      tbl, levels, level_labels_resolved, shade, shade_fn, shade_palette,
+      show_consequential
+    )
+
+    return(switch(backend,
+      flextable = .attrition_flextable_levels(grid, criterion_col_label,
+                                              n_col_label, removed_col_label,
+                                              pct_col_label, consequential_col_label),
+      gt        = .attrition_gt_levels(grid, criterion_col_label,
+                                       n_col_label, removed_col_label,
+                                       pct_col_label, consequential_col_label),
+      huxtable  = .attrition_huxtable_levels(grid, criterion_col_label,
+                                             n_col_label, removed_col_label,
+                                             pct_col_label, consequential_col_label)
+    ))
+  }
 
   # -- Grouped grid path -------------------------------------------------
   if (!is.null(group_x) || !is.null(group_y)) {
@@ -1676,6 +1776,428 @@ as_attrition_table <- function(
       }
     }
     col <- col + 3L
+  }
+
+  ht
+}
+
+
+# ---------------------------------------------------------------------------
+# Hierarchy-level grid construction -- pivots the long levels tibble into a
+# grid with one column block per level
+# ---------------------------------------------------------------------------
+
+# Resolves `level_labels` (positional or named) against `levels`, defaulting
+# to the level names as-is. Aborts naming the mismatch when `level_labels`
+# doesn't fully cover `levels` -- a silent partial fallback would be a
+# confusing way to discover a typo in a level name.
+.attrition_resolve_level_labels <- function(levels, level_labels) {
+  if (is.null(level_labels)) {
+    return(stats::setNames(levels, levels))
+  }
+
+  nm <- names(level_labels)
+  if (!is.null(nm) && any(nzchar(nm))) {
+    unknown <- setdiff(nm, levels)
+    if (length(unknown) > 0L) {
+      rlang::abort(sprintf(
+        "`level_labels` names not found in `levels`: %s.",
+        paste(unknown, collapse = ", ")
+      ))
+    }
+    missing <- setdiff(levels, nm)
+    if (length(missing) > 0L) {
+      rlang::abort(sprintf(
+        "`level_labels` is missing an entry for level(s): %s.",
+        paste(missing, collapse = ", ")
+      ))
+    }
+    return(stats::setNames(as.character(level_labels[levels]), levels))
+  }
+
+  if (length(level_labels) != length(levels)) {
+    rlang::abort(sprintf(
+      "`level_labels` must have length %d (one per level in `levels`), got %d.",
+      length(levels), length(level_labels)
+    ))
+  }
+  stats::setNames(as.character(level_labels), levels)
+}
+
+# Builds a "grid" structure from the long-format `levels` tibble (see
+# `.attrition_tibble_by_level()`): a single data frame with the (identical,
+# criteria-driven) row skeleton plus one {n, n_removed, pct_removed[,
+# n_consequential]} column set per level, prefixed by level name. This is
+# consumed by the three backend-specific *_levels() renderers below.
+#
+# `.attrition_tibble_one_level()` builds rows from the same `flow$steps` for
+# every level, so the row sequence (row_type/label/indent_level) is
+# identical across levels -- the pivot below depends on this. It is asserted
+# rather than assumed, so a future change to row construction fails loudly.
+.attrition_build_level_grid <- function(tbl, levels, level_labels, shade,
+                                        shade_fn, shade_palette,
+                                        show_consequential = NULL) {
+  row_keys <- lapply(split(tbl, tbl$level), function(d) {
+    paste(d$row_type, d$label, d$indent_level, sep = "\r")
+  })
+  if (length(unique(row_keys)) > 1L) {
+    rlang::abort("Attrition rows differ across hierarchy levels; cannot align.")
+  }
+
+  # `n_consequential` is populated as 0L (not NA) on ordinary step rows --
+  # only group_include()/group_exclude() steps ever record a non-zero value
+  # (see `.hierarchy_step_counts()`) -- so "any non-NA" would be true for
+  # almost every pipeline. Auto-detection instead looks for an actual
+  # non-zero loss, which is what makes the column informative.
+  has_conseq_col <- "n_consequential" %in% names(tbl)
+  show_conseq <- if (is.null(show_consequential)) {
+    has_conseq_col && any(!is.na(tbl$n_consequential) & tbl$n_consequential != 0L)
+  } else {
+    isTRUE(show_consequential)
+  }
+
+  first_lvl <- levels[[1L]]
+  skeleton  <- tbl[tbl$level == first_lvl, c("row_type", "label", "indent_level")]
+
+  df            <- tibble::tibble(label = skeleton$label)
+  level_cols    <- list()
+  shade_colours <- list()
+
+  for (lvl in levels) {
+    sub <- tbl[tbl$level == lvl, ]
+
+    # Reuse `.attrition_display()` on just the standard columns so its
+    # em-dash / "% included" formatting logic stays the single source of
+    # truth -- `level`/`n_consequential` would otherwise be misread as
+    # per-branch columns by `.attrition_display()`.
+    disp <- .attrition_display(
+      sub[c("row_type", "label", "indent_level", "n", "n_removed",
+            "pct_removed", "branch")],
+      "", "", "", ""
+    )
+
+    n_col   <- paste0("n_", lvl)
+    rem_col <- paste0("removed_", lvl)
+    pct_col <- paste0("pct_", lvl)
+
+    df[[n_col]]   <- disp$df$n
+    df[[rem_col]] <- disp$df$n_removed
+    df[[pct_col]] <- disp$df$pct_removed
+
+    cols <- c(n = n_col, n_removed = rem_col, pct_removed = pct_col)
+
+    if (show_conseq) {
+      conseq_col <- paste0("consequential_", lvl)
+      df[[conseq_col]] <- dplyr::case_when(
+        sub$row_type %in% c("header", "final") ~ NA_character_,
+        is.na(sub$n_consequential)              ~ NA_character_,
+        sub$n_consequential == 0L               ~ "\u2014",
+        TRUE                                    ~ as.character(sub$n_consequential)
+      )
+      cols <- c(cols, n_consequential = conseq_col)
+    }
+
+    level_cols[[lvl]]    <- cols
+    # Shading is computed per level: each level's colour gradient is scaled
+    # across that level's own pct_removed/n_removed values, not across all
+    # levels combined.
+    shade_colours[[lvl]] <- .attrition_shade_colours(sub, shade, shade_fn, shade_palette)
+  }
+
+  list(
+    df                 = df,
+    row_type           = skeleton$row_type,
+    indent_level       = skeleton$indent_level,
+    levels             = levels,
+    level_labels       = level_labels,
+    level_cols         = level_cols,
+    shade_colours      = shade_colours,
+    show_consequential = show_conseq
+  )
+}
+
+
+# ---------------------------------------------------------------------------
+# Hierarchy-level grid renderers
+# ---------------------------------------------------------------------------
+
+.attrition_flextable_levels <- function(grid, criterion_col_label,
+                                        n_col_label, removed_col_label,
+                                        pct_col_label, consequential_col_label) {
+  if (!.has_namespace("flextable")) {
+    rlang::abort(
+      'The {flextable} package is required. Install it with: install.packages("flextable")'
+    )
+  }
+  if (!.has_namespace("officer")) {
+    rlang::abort(
+      'The {officer} package is required. Install it with: install.packages("officer")'
+    )
+  }
+
+  df           <- grid$df
+  row_type     <- grid$row_type
+  indent_level <- grid$indent_level
+
+  header_rows <- which(row_type == "header")
+  final_rows  <- which(row_type == "final")
+  cat_rows    <- which(row_type == "category")
+  step1_rows  <- which(row_type == "step" & indent_level == 1L)
+  step2_rows  <- which(row_type == "step" & indent_level == 2L)
+
+  border_dark <- officer::fp_border(color = "black", width = 1.0)
+  border_none <- officer::fp_border(color = "white", width = 0)
+
+  header_values <- list(label = criterion_col_label)
+  for (lvl in grid$levels) {
+    cols <- grid$level_cols[[lvl]]
+    header_values[[cols[["n"]]]]           <- n_col_label
+    header_values[[cols[["n_removed"]]]]   <- removed_col_label
+    header_values[[cols[["pct_removed"]]]] <- pct_col_label
+    if ("n_consequential" %in% names(cols)) {
+      header_values[[cols[["n_consequential"]]]] <- consequential_col_label
+    }
+  }
+
+  ft <- flextable::flextable(df) |>
+    flextable::set_header_labels(values = header_values)
+
+  top_values <- ""
+  for (lvl in grid$levels) {
+    ncols_lvl  <- length(grid$level_cols[[lvl]])
+    top_values <- c(top_values, grid$level_labels[[lvl]], rep("", ncols_lvl - 1L))
+  }
+  ft <- flextable::add_header_row(ft, top = TRUE, values = top_values)
+  for (lvl in grid$levels) {
+    ft <- flextable::merge_at(ft, i = 1, j = unname(grid$level_cols[[lvl]]), part = "header")
+  }
+  ft <- flextable::align(ft, i = 1, align = "center", part = "header")
+  ft <- flextable::bold(ft, i = 1, part = "header")
+
+  value_cols <- unlist(lapply(grid$levels, function(lvl) unname(grid$level_cols[[lvl]])))
+
+  ft <- ft |>
+    flextable::align(j = value_cols, align = "right", part = "all") |>
+    flextable::align(j = "label", align = "left", part = "all") |>
+    flextable::bold(part = "header") |>
+    flextable::bold(i = c(header_rows, final_rows)) |>
+    flextable::bold(i = cat_rows, j = "label") |>
+    flextable::padding(i = step1_rows, j = "label", padding.left = 12L, part = "body") |>
+    flextable::padding(i = step2_rows, j = "label", padding.left = 24L, part = "body") |>
+    flextable::hline_top(part = "head", border = border_dark) |>
+    flextable::hline_bottom(part = "head", border = border_dark) |>
+    flextable::hline(i = min(final_rows) - 1L, part = "body", border = border_dark) |>
+    flextable::hline_bottom(part = "body", border = border_dark) |>
+    flextable::vline(part = "all", border = border_none) |>
+    flextable::fontsize(size = 12, part = "all") |>
+    flextable::font(fontname = "Times New Roman", part = "all") |>
+    flextable::width(j = "label", width = 3.5)
+
+  col_w <- c(n = 0.6, n_removed = 0.9, pct_removed = 1.0, n_consequential = 0.9)
+  for (lvl in grid$levels) {
+    cols <- grid$level_cols[[lvl]]
+    for (nm in names(cols)) {
+      ft <- flextable::width(ft, j = cols[[nm]], width = col_w[[nm]])
+    }
+  }
+
+  for (lvl in grid$levels) {
+    cols      <- unname(grid$level_cols[[lvl]])
+    shade_col <- grid$shade_colours[[lvl]]
+    for (i in seq_along(shade_col)) {
+      if (!is.na(shade_col[[i]])) {
+        ft <- flextable::bg(ft, i = i, j = cols, bg = shade_col[[i]])
+      }
+    }
+  }
+
+  ft
+}
+
+
+.attrition_gt_levels <- function(grid, criterion_col_label,
+                                 n_col_label, removed_col_label,
+                                 pct_col_label, consequential_col_label) {
+  if (!.has_namespace("gt")) {
+    rlang::abort(
+      'The {gt} package is required. Install it with: install.packages("gt")'
+    )
+  }
+
+  df           <- grid$df
+  df$.row      <- seq_len(nrow(df))
+  row_type     <- grid$row_type
+  indent_level <- grid$indent_level
+
+  header_rows <- which(row_type == "header")
+  final_rows  <- which(row_type == "final")
+  cat_rows    <- which(row_type == "category")
+  step1_rows  <- which(row_type == "step" & indent_level == 1L)
+  step2_rows  <- which(row_type == "step" & indent_level == 2L)
+
+  label_values <- list(label = criterion_col_label)
+  for (lvl in grid$levels) {
+    cols <- grid$level_cols[[lvl]]
+    label_values[[cols[["n"]]]]           <- n_col_label
+    label_values[[cols[["n_removed"]]]]   <- removed_col_label
+    label_values[[cols[["pct_removed"]]]] <- pct_col_label
+    if ("n_consequential" %in% names(cols)) {
+      label_values[[cols[["n_consequential"]]]] <- consequential_col_label
+    }
+  }
+
+  value_cols <- unlist(lapply(grid$levels, function(lvl) unname(grid$level_cols[[lvl]])))
+
+  gt_tbl <- gt::gt(df) |>
+    gt::cols_hide(".row") |>
+    gt::cols_label(.list = label_values) |>
+    gt::cols_align(align = "right", columns = value_cols) |>
+    gt::cols_align(align = "left",  columns = "label") |>
+    gt::tab_style(
+      style     = gt::cell_text(weight = "bold"),
+      locations = gt::cells_body(rows = c(header_rows, final_rows))
+    ) |>
+    gt::tab_style(
+      style     = gt::cell_text(weight = "bold"),
+      locations = gt::cells_body(rows = cat_rows, columns = "label")
+    ) |>
+    gt::tab_style(
+      style     = gt::cell_text(indent = gt::px(12)),
+      locations = gt::cells_body(rows = step1_rows, columns = "label")
+    ) |>
+    gt::tab_style(
+      style     = gt::cell_text(indent = gt::px(24)),
+      locations = gt::cells_body(rows = step2_rows, columns = "label")
+    ) |>
+    gt::tab_style(
+      style     = gt::cell_text(weight = "bold"),
+      locations = gt::cells_column_labels()
+    ) |>
+    gt::tab_style(
+      style     = gt::cell_borders(sides = "top", color = "black", weight = gt::px(1)),
+      locations = gt::cells_body(rows = min(final_rows))
+    ) |>
+    gt::tab_options(
+      table.font.size        = gt::px(12),
+      table.font.names       = "Times New Roman",
+      table.border.top.color = "black",
+      table.border.top.width = gt::px(1),
+      table_body.border.bottom.color = "black",
+      table_body.border.bottom.width = gt::px(1),
+      column_labels.border.bottom.color = "black",
+      column_labels.border.bottom.width = gt::px(1),
+      data_row.padding       = gt::px(4),
+      table_body.vlines.color = "transparent",
+      column_labels.vlines.color = "transparent"
+    )
+
+  for (lvl in grid$levels) {
+    cols   <- unname(grid$level_cols[[lvl]])
+    gt_tbl <- gt::tab_spanner(gt_tbl, label = grid$level_labels[[lvl]], columns = cols)
+  }
+
+  for (lvl in grid$levels) {
+    cols      <- unname(grid$level_cols[[lvl]])
+    shade_col <- grid$shade_colours[[lvl]]
+    for (i in seq_along(shade_col)) {
+      if (!is.na(shade_col[[i]])) {
+        gt_tbl <- gt::tab_style(
+          gt_tbl,
+          style     = gt::cell_fill(color = shade_col[[i]]),
+          locations = gt::cells_body(rows = i, columns = cols)
+        )
+      }
+    }
+  }
+
+  gt_tbl
+}
+
+
+.attrition_huxtable_levels <- function(grid, criterion_col_label,
+                                       n_col_label, removed_col_label,
+                                       pct_col_label, consequential_col_label) {
+  if (!.has_namespace("huxtable")) {
+    rlang::abort(
+      'The {huxtable} package is required. Install it with: install.packages("huxtable")'
+    )
+  }
+
+  df           <- grid$df
+  n_cols       <- ncol(df)
+  row_type     <- grid$row_type
+  indent_level <- grid$indent_level
+
+  ht <- huxtable::as_hux(df, add_colnames = TRUE)
+  ht <- huxtable::set_contents(ht, 1, 1, criterion_col_label)
+
+  col <- 2L
+  for (lvl in grid$levels) {
+    cols <- grid$level_cols[[lvl]]
+    ht <- huxtable::set_contents(ht, 1, col,      n_col_label)
+    ht <- huxtable::set_contents(ht, 1, col + 1L, removed_col_label)
+    ht <- huxtable::set_contents(ht, 1, col + 2L, pct_col_label)
+    col <- col + 3L
+    if ("n_consequential" %in% names(cols)) {
+      ht  <- huxtable::set_contents(ht, 1, col, consequential_col_label)
+      col <- col + 1L
+    }
+  }
+
+  spanner_row <- ""
+  for (lvl in grid$levels) {
+    ncols_lvl   <- length(grid$level_cols[[lvl]])
+    spanner_row <- c(spanner_row, grid$level_labels[[lvl]], rep("", ncols_lvl - 1L))
+  }
+  ht <- do.call(huxtable::insert_row, c(list(ht), as.list(spanner_row), list(after = 0)))
+
+  col <- 2L
+  for (lvl in grid$levels) {
+    ncols_lvl <- length(grid$level_cols[[lvl]])
+    ht <- huxtable::merge_cells(ht, 1, col:(col + ncols_lvl - 1L))
+    col <- col + ncols_lvl
+  }
+  ht <- huxtable::set_align(ht, 1, huxtable::everywhere, "center")
+  ht <- huxtable::set_bold(ht, 1, huxtable::everywhere, TRUE)
+
+  header_offset <- 2L
+  ht <- huxtable::set_header_rows(ht, seq_len(header_offset), TRUE)
+
+  header_rows <- which(row_type == "header")   + header_offset
+  final_rows  <- which(row_type == "final")    + header_offset
+  cat_rows    <- which(row_type == "category") + header_offset
+  step1_rows  <- which(row_type == "step" & indent_level == 1L) + header_offset
+  step2_rows  <- which(row_type == "step" & indent_level == 2L) + header_offset
+
+  ht <- ht |>
+    huxtable::set_align(huxtable::everywhere, 2:n_cols, "right") |>
+    huxtable::set_align(huxtable::everywhere, 1, "left") |>
+    huxtable::set_bold(header_offset, huxtable::everywhere, TRUE) |>
+    huxtable::set_bold(c(header_rows, final_rows), huxtable::everywhere, TRUE) |>
+    huxtable::set_bold(cat_rows, 1, TRUE) |>
+    huxtable::set_left_padding(step1_rows, 1, 12) |>
+    huxtable::set_left_padding(step2_rows, 1, 24) |>
+    huxtable::set_top_border(1, huxtable::everywhere, 0.8) |>
+    huxtable::set_bottom_border(header_offset, huxtable::everywhere, 0.8) |>
+    huxtable::set_top_border(min(final_rows), huxtable::everywhere, 0.8) |>
+    huxtable::set_bottom_border(nrow(df) + header_offset, huxtable::everywhere, 0.8) |>
+    huxtable::set_left_border(huxtable::everywhere, huxtable::everywhere, 0) |>
+    huxtable::set_right_border(huxtable::everywhere, huxtable::everywhere, 0) |>
+    huxtable::set_font_size(huxtable::everywhere, huxtable::everywhere, 12) |>
+    huxtable::set_font(huxtable::everywhere, huxtable::everywhere, "Times New Roman") |>
+    huxtable::set_width(1)
+
+  col <- 2L
+  for (lvl in grid$levels) {
+    ncols_lvl <- length(grid$level_cols[[lvl]])
+    shade_col <- grid$shade_colours[[lvl]]
+    cols      <- col:(col + ncols_lvl - 1L)
+    for (i in seq_along(shade_col)) {
+      if (!is.na(shade_col[[i]])) {
+        ht <- huxtable::set_background_color(ht, i + header_offset, cols, shade_col[[i]])
+      }
+    }
+    col <- col + ncols_lvl
   }
 
   ht
