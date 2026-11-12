@@ -206,7 +206,7 @@ as_attrition_tibble <- function(
     indent_level = 0L,
     n            = n_end,
     n_removed    = NA_integer_,
-    pct_removed  = round(100 * n_end / n_start, digits),
+    pct_removed  = if (n_start > 0L) round(100 * n_end / n_start, digits) else NA_real_,
     branch       = NA_character_
   )))
 
@@ -725,6 +725,8 @@ as_attrition_table <- function(
   # above it.
   pct_str <- dplyr::case_when(
     tbl$row_type == "header"               ~ NA_character_,
+    # An NA final percentage (zero-row flow) must not render as "NA% included"
+    tbl$row_type == "final" & is.na(tbl$pct_removed) ~ NA_character_,
     tbl$row_type == "final"                ~ paste0(tbl$pct_removed, "% included"),
     is.na(tbl$pct_removed) | tbl$pct_removed == 0 ~ "\u2014",
     TRUE                                   ~ paste0(tbl$pct_removed, "%")

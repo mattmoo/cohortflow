@@ -382,6 +382,20 @@ test_that("branch columns are NA except on the final row", {
   }
 })
 
+test_that("zero-row flows give an NA final percentage and no NaN in the display", {
+  d    <- tibble::tibble(id = integer(0), x = numeric(0))
+  crit <- cf_criteria() |> include(~ x > 0, label = "pos")
+  flow <- apply_criteria(d, crit, id = "id")
+  out  <- as_attrition_tibble(flow)
+
+  expect_true(is.na(out$pct_removed[out$row_type == "final"]))
+  expect_false(any(is.nan(out$pct_removed)))
+
+  disp <- cohortflow:::.attrition_display(out, "Criterion", "N", "Removed", "% removed")$df
+  expect_false(any(grepl("NaN|NA%", disp$pct_removed)))
+  expect_true(is.na(disp$pct_removed[out$row_type == "final"]))
+})
+
 test_that("non-consecutive categories warn and still produce separate rows", {
   d    <- tibble::tibble(id = 1:10, x = 1:10)
   crit <- cf_criteria() |>
