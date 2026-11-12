@@ -392,3 +392,20 @@ test_that("randomise() steps after exclusions still see the reduced entering N",
   expect_equal(flow$steps[[2]]$n_in, flow$steps[[1]]$n_pass)
   expect_equal(flow$steps[[3]]$n_in, flow$steps[[2]]$n_pass)
 })
+
+# ---------------------------------------------------------------------------
+# NA semantics (documented in ?include): locked so they are not incidental
+
+test_that("include() removes rows whose predicate is NA", {
+  dat  <- data.frame(id = 1:4, x = c(TRUE, FALSE, NA, TRUE))
+  flow <- apply_criteria(dat, cf_criteria() |> include(~ x, label = "x"), id = "id")
+  expect_identical(cohort(flow)$id, c(1L, 4L))
+  expect_identical(excluded(flow)$id, c(2L, 3L))
+})
+
+test_that("exclude() keeps rows whose predicate is NA", {
+  dat  <- data.frame(id = 1:4, x = c(TRUE, FALSE, NA, TRUE))
+  flow <- apply_criteria(dat, cf_criteria() |> exclude(~ x, label = "x"), id = "id")
+  expect_identical(cohort(flow)$id, c(2L, 3L))
+  expect_identical(excluded(flow)$id, c(1L, 4L))
+})

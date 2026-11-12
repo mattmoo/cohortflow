@@ -22,6 +22,24 @@ The updated \code{cf_criteria} object.
 \description{
 Add an exclusion criterion to a criteria pipeline
 }
+\section{Missing values}{
+
+A predicate that evaluates to \code{NA} for a row is treated differently by the
+two step types, and the difference changes denominators:
+\itemize{
+\item \code{include()} treats \code{NA} as failing: the row is \strong{removed}. Write
+\code{include(~ age >= 18)} and rows with missing \code{age} are excluded here.
+\item \code{exclude()} treats \code{NA} as not matching: the row is \strong{kept}. Write
+\code{exclude(~ withdrew)} and rows with missing \code{withdrew} stay in.
+}
+
+To make the intent explicit, handle \code{NA} in the predicate itself, e.g.
+\code{include(~ !is.na(age) & age >= 18)} or \code{exclude(~ is.na(withdrew) | withdrew)}.
+Grouped steps (\code{\link[=group_include]{group_include()}}, \code{\link[=group_exclude]{group_exclude()}}, \code{\link[=select_within]{select_within()}})
+always remove rows whose \code{by} value is \code{NA}. To see the raw predicate
+values, \code{NA} included, use \code{\link[=criteria_status]{criteria_status()}} with \code{mode = "independent"}.
+}
+
 \examples{
 cf_criteria() |>
   include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>

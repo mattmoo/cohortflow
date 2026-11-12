@@ -39,6 +39,21 @@ cf_criteria <- function(...) {
 
 #' Add an inclusion criterion to a criteria pipeline
 #'
+#' @section Missing values:
+#' A predicate that evaluates to `NA` for a row is treated differently by the
+#' two step types, and the difference changes denominators:
+#'
+#' * `include()` treats `NA` as failing: the row is **removed**. Write
+#'   `include(~ age >= 18)` and rows with missing `age` are excluded here.
+#' * `exclude()` treats `NA` as not matching: the row is **kept**. Write
+#'   `exclude(~ withdrew)` and rows with missing `withdrew` stay in.
+#'
+#' To make the intent explicit, handle `NA` in the predicate itself, e.g.
+#' `include(~ !is.na(age) & age >= 18)` or `exclude(~ is.na(withdrew) | withdrew)`.
+#' Grouped steps ([group_include()], [group_exclude()], [select_within()])
+#' always remove rows whose `by` value is `NA`. To see the raw predicate
+#' values, `NA` included, use [criteria_status()] with `mode = "independent"`.
+#'
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
 #' @param predicate A one-sided formula or a function evaluated row-wise.
 #' @param label A short human-readable description of this criterion.
@@ -61,6 +76,7 @@ include <- function(criteria, predicate, label, category = NULL) {
 
 #' Add an exclusion criterion to a criteria pipeline
 #'
+#' @inheritSection include Missing values
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
 #' @param predicate A one-sided formula or a function evaluated row-wise.
 #' @param label A short human-readable description of this criterion.
