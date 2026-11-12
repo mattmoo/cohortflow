@@ -123,6 +123,9 @@ apply_criteria <- function(data, criteria, id = NULL, expected = NULL, by = NULL
     before <- current   # snapshot pre-step rows, needed for hierarchy counting
     n_in   <- nrow(current)
 
+    # The per-type NA policy here is deliberate and differs from the raw
+    # pass/NA values in .status_independent() (R/criteria-status.R); keep the
+    # two in step when adding a step type.
     keep <- switch(s$type,
       include = {
         result <- eval_criterion(s, current)

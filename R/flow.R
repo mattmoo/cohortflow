@@ -101,6 +101,7 @@ print.cf_flow <- function(x, ...) {
 #' @param label Optional exact step label.
 #' @param category Optional category name (last step in that category).
 #' @return A tibble.
+#' @seealso [criteria_status()] for each row's result on every criterion.
 #' @examples
 #' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 #' crit <- cf_criteria() |>

@@ -18,6 +18,7 @@ Depends:
     R (>= 4.1.0)
 Roxygen: list(markdown = TRUE)
 Suggests:
+    data.table,
     flextable,
     gt,
     huxtable,

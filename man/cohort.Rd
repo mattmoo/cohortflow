@@ -72,3 +72,6 @@ cohort(flow, label = "Passed screening") # same, explicit
 nrow(cohort(flow, step_number = 0))     # the starting data
 excluded(flow, at = 2)                  # removed by steps 1-2
 }
+\seealso{
+\code{\link[=criteria_status]{criteria_status()}} for each row's result on every criterion.
+}
