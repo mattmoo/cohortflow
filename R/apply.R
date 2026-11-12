@@ -27,6 +27,10 @@
 #' | `group_exclude` | Per-group scalar (summarise context) | Drop rows in groups where result is `TRUE` |
 #' | `select_within` | Per-group logical vector | Keep `TRUE` rows within each group |
 #'
+#' Rows whose `by` value is `NA` cannot be assigned to a group and are always
+#' removed by grouped step types (`group_include`, `group_exclude`,
+#' `select_within`).
+#'
 #' @param data A data frame.
 #' @param criteria A `cf_criteria` object.
 #' @param id A single column name (string) to use as the row identifier. If
@@ -84,7 +88,9 @@ apply_criteria <- function(data, criteria, id = NULL) {
       },
       group_exclude = {
         result <- eval_group_criterion(s, current)
-        !(result & !is.na(result))
+        # Rows with an NA group key are removed, matching group_include and
+        # select_within (otherwise `!(NA & FALSE)` would keep them).
+        !(result & !is.na(result)) & !is.na(current[[s$by]])
       },
       select_within = {
         result <- eval_select_criterion(s, current)

@@ -48,6 +48,11 @@ identifier.
    \code{group_exclude} \tab Per-group scalar (summarise context) \tab Drop rows in groups where result is \code{TRUE} \cr
    \code{select_within} \tab Per-group logical vector \tab Keep \code{TRUE} rows within each group \cr
 }
+
+
+Rows whose \code{by} value is \code{NA} cannot be assigned to a group and are always
+removed by grouped step types (\code{group_include}, \code{group_exclude},
+\code{select_within}).
 }
 
 \examples{

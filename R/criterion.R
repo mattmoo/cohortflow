@@ -19,7 +19,8 @@
 #'   `"group_exclude"`, or `"select_within"`.
 #' @param by For grouped step types (`group_include`, `group_exclude`,
 #'   `select_within`): a single character string naming the grouping column.
-#'   Ignored for row-wise types.
+#'   Ignored for row-wise types. Rows whose `by` value is `NA` cannot be
+#'   assigned to a group and are always removed by grouped step types.
 #' @param category An optional character string grouping this criterion with
 #'   others for display purposes (e.g. `"Valid age"` to group age-related steps
 #'   into one box in a CONSORT diagram). `NULL` (default) leaves the step
@@ -278,7 +279,10 @@ eval_select_criterion <- function(criterion, data) {
   row_idx <- seq_len(nrow(data))
   keep    <- logical(nrow(data))
 
-  groups <- split(row_idx, data[[by_col]])
+  # split() drops rows whose `by` value is NA, so they are never visited and
+  # their `keep` entry stays FALSE: by design, rows that cannot be assigned
+  # to a group are always removed by grouped step types.
+  groups <- split(row_idx, data[[by_col]], drop = TRUE)
 
   for (grp_rows in groups) {
     grp_data <- data[grp_rows, , drop = FALSE]

@@ -60,6 +60,34 @@ test_that("apply_criteria() aborts on a non-unique existing .cf_row_id", {
   expect_error(apply_criteria(d, crit), "missing", class = "rlang_error")
 })
 
+test_that("group_include removes rows with an NA group key", {
+  d    <- tibble::tibble(id = 1:5, grp = c("a", "a", NA, "b", "b"))
+  crit <- cf_criteria() |> group_include(by = "grp", ~ n() >= 1, label = "Any size")
+  flow <- apply_criteria(d, crit, id = "id")
+  ex   <- excluded(flow)
+  expect_equal(ex$id, 3L)
+  expect_equal(ex$cf_step, 1L)
+})
+
+test_that("group_exclude removes rows with an NA group key", {
+  d    <- tibble::tibble(id = 1:5, grp = c("a", "a", NA, "b", "b"))
+  crit <- cf_criteria() |> group_exclude(by = "grp", ~ n() > 10, label = "Huge groups")
+  flow <- apply_criteria(d, crit, id = "id")
+  ex   <- excluded(flow)
+  expect_equal(ex$id, 3L)
+  expect_equal(ex$cf_step, 1L)
+  expect_equal(nrow(cohort(flow)), 4L)
+})
+
+test_that("select_within removes rows with an NA group key", {
+  d    <- tibble::tibble(id = 1:5, grp = c("a", "a", NA, "b", "b"))
+  crit <- cf_criteria() |> select_within(by = "grp", ~ rep(TRUE, length(id)), label = "Keep all")
+  flow <- apply_criteria(d, crit, id = "id")
+  ex   <- excluded(flow)
+  expect_equal(ex$id, 3L)
+  expect_equal(ex$cf_step, 1L)
+})
+
 test_that("include() step keeps TRUE rows cumulatively", {
   dat  <- suppressWarnings(mock_cohortflow(200, seed = 42))
   crit <- cf_criteria() |>
