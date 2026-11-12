@@ -14,7 +14,8 @@ as_attrition_tibble(
   count_by = NULL,
   group_x = NULL,
   group_y = NULL,
-  group_na_label = "Missing"
+  group_na_label = "Missing",
+  branch_na_label = "Missing"
 )
 }
 \arguments{
@@ -39,7 +40,8 @@ supplied, the surviving cohort is split by this column and the final
 row's total is broken out into one additional column per branch value
 (named after the branch value, e.g. \code{Control}, \code{Intervention}), each
 populated only on the final row. Use \code{final_label = "Randomised"} when
-appropriate. Cannot be combined with \code{group_x}/\code{group_y}.}
+appropriate. Cannot be combined with \code{group_x}/\code{group_y}. Rows whose
+branch value is \code{NA} form their own branch, labelled \code{branch_na_label}.}
 
 \item{count_by}{Optional column name (string) for distinct counts. When
 supplied, counts are computed as \code{n_distinct(count_by)} rather than
@@ -58,6 +60,11 @@ period). See the Grouping section.}
 \code{NA} values in \code{group_x}/\code{group_y} (see the Grouping section). Default
 \code{"Missing"}. Ignored when the corresponding grouping column has no \code{NA}
 values.}
+
+\item{branch_na_label}{Character string used to label the branch formed by
+\code{NA} values in \code{branch_by} (and, in \code{\link[=as_consort_diagram]{as_consort_diagram()}}, the stage
+formed by \code{NA} values in \code{stage_by}). Default \code{"Missing"}. Ignored when
+the column has no \code{NA} values.}
 }
 \value{
 A \code{\link[tibble:tibble]{tibble::tibble()}} with columns:

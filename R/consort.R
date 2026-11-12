@@ -288,7 +288,8 @@ as_consort_diagram <- function(
   branch_by        = NULL,
   stage_by         = NULL,
   stage_label_by   = NULL,
-  count_by         = NULL
+  count_by         = NULL,
+  branch_na_label  = "Missing"
 ) {
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
@@ -464,8 +465,11 @@ as_consort_diagram <- function(
       nrow
     }
 
-    # Split cohort by branch_by
-    branch_values <- sort(unique(cohort_data[[branch_by]]))
+    # Split cohort by branch_by -- NA values form their own trailing branch
+    # (labelled `branch_na_label`) rather than leaking into every branch.
+    branch_values <- .cf_group_values(cohort_data[[branch_by]])
+    branch_labels <- vapply(branch_values, .cf_group_label, character(1L),
+                            na_label = branch_na_label, USE.NAMES = FALSE)
     n_branches <- length(branch_values)
 
     final_box <- main_df[nrow(main_df), ]
@@ -481,10 +485,10 @@ as_consort_diagram <- function(
     # First compute each branch box's label/dims (position comes next)
     branch_dims_list <- vector("list", n_branches)
     for (b in seq_len(n_branches)) {
-      branch_val  <- branch_values[b]
-      branch_data <- cohort_data[cohort_data[[branch_by]] == branch_val, ]
+      branch_data <- cohort_data[.cf_group_match(cohort_data[[branch_by]], branch_values[b]), ,
+                                 drop = FALSE]
       branch_n    <- count_fn(branch_data)
-      label <- sprintf("%s\n(n=%s)", branch_val, .format_n(branch_n, big_mark))
+      label <- sprintf("%s\n(n=%s)", branch_labels[b], .format_n(branch_n, big_mark))
       branch_dims_list[[b]] <- .consort_box_dims(label, wrap_width = wrap_width)
     }
 
@@ -504,7 +508,6 @@ as_consort_diagram <- function(
     branch_arrow_rows <- list()
 
     for (b in seq_len(n_branches)) {
-      branch_val <- branch_values[b]
       dims <- branch_dims_list[[b]]
 
       branch_rows[[b]] <- data.frame(
@@ -514,7 +517,7 @@ as_consort_diagram <- function(
         w = dims$w,
         h = dims$h,
         label = dims$label,
-        branch = as.character(branch_val),
+        branch = branch_labels[b],
         stringsAsFactors = FALSE
       )
 
@@ -557,19 +560,21 @@ as_consort_diagram <- function(
       row_idx <- 1L
 
       for (b in seq_len(n_branches)) {
-        branch_val <- branch_values[b]
-        branch_data <- cohort_data[cohort_data[[branch_by]] == branch_val, ]
+        branch_data <- cohort_data[.cf_group_match(cohort_data[[branch_by]], branch_values[b]), ,
+                                   drop = FALSE]
 
-        # Get unique stages in order
-        stages <- sort(unique(branch_data[[stage_by]]))
+        # Get unique stages in order (an NA stage, if any, comes last)
+        stages <- .cf_group_values(branch_data[[stage_by]])
         n_stages <- length(stages)
 
         stage_y_start <- branch_y - branch_df$h[b] / 2 - 0.06
         stage_spacing <- 0.08
 
         for (s in seq_len(n_stages)) {
-          stage_val <- stages[s]
-          stage_data <- branch_data[branch_data[[stage_by]] == stage_val, ]
+          stage_val   <- stages[s]
+          stage_name  <- .cf_group_label(stage_val, branch_na_label)
+          stage_data  <- branch_data[.cf_group_match(branch_data[[stage_by]], stage_val), ,
+                                     drop = FALSE]
 
           # Label: use stage_label_by if provided, otherwise stage value
           if (!is.null(stage_label_by)) {
@@ -577,7 +582,7 @@ as_consort_diagram <- function(
             labels <- stage_data[[stage_label_by]]
             stage_label <- names(sort(table(labels), decreasing = TRUE))[1]
           } else {
-            stage_label <- as.character(stage_val)
+            stage_label <- stage_name
           }
 
           stage_n <- count_fn(stage_data)
@@ -593,8 +598,8 @@ as_consort_diagram <- function(
             w = dims$w,
             h = dims$h,
             label = dims$label,
-            branch = as.character(branch_val),
-            stage = as.character(stage_val),
+            branch = branch_labels[b],
+            stage = stage_name,
             stringsAsFactors = FALSE
           )
 

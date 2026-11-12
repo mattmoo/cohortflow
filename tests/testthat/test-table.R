@@ -382,6 +382,34 @@ test_that("branch columns are NA except on the final row", {
   }
 })
 
+test_that("NA branch values form their own column and are not double-counted", {
+  d  <- tibble::tibble(x = 1:6, arm = c("A", "B", NA, "A", "B", NA))
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  out <- as_attrition_tibble(fl, branch_by = "arm")
+  final_row <- out[out$row_type == "final", ]
+
+  expect_equal(final_row$A, 2L)
+  expect_equal(final_row$B, 2L)
+  expect_equal(final_row$Missing, 2L)
+  expect_equal(final_row$A + final_row$B + final_row$Missing, final_row$n)
+})
+
+test_that("branch_na_label renames the NA branch column", {
+  d  <- tibble::tibble(x = 1:6, arm = c("A", "B", NA, "A", "B", NA))
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  out <- as_attrition_tibble(fl, branch_by = "arm", branch_na_label = "Unknown arm")
+
+  expect_true("Unknown arm" %in% names(out))
+  expect_false("Missing" %in% names(out))
+  expect_equal(out[out$row_type == "final", ][["Unknown arm"]], 2L)
+})
+
+test_that("no Missing branch column when branch_by has no NA", {
+  flow <- make_flow_parallel_rct()
+  out  <- as_attrition_tibble(flow, branch_by = "arm")
+  expect_false("Missing" %in% names(out))
+})
+
 test_that("branch_by errors when column not found", {
   flow <- make_flow_categorised()
   expect_error(

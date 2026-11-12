@@ -17,6 +17,7 @@ as_attrition_table(
   pct_col_label = "\% removed",
   branch_by = NULL,
   count_by = NULL,
+  branch_na_label = "Missing",
   group_x = NULL,
   group_y = NULL,
   group_x_label = NULL,
@@ -62,12 +63,18 @@ supplied, the surviving cohort is split by this column and the final
 row's total is broken out into one additional column per branch value
 (named after the branch value, e.g. \code{Control}, \code{Intervention}), each
 populated only on the final row. Use \code{final_label = "Randomised"} when
-appropriate. Cannot be combined with \code{group_x}/\code{group_y}.}
+appropriate. Cannot be combined with \code{group_x}/\code{group_y}. Rows whose
+branch value is \code{NA} form their own branch, labelled \code{branch_na_label}.}
 
 \item{count_by}{Optional column name (string) for distinct counts. When
 supplied, counts are computed as \code{n_distinct(count_by)} rather than
 \code{nrow()}. Essential for crossover data where one participant has several
 event rows.}
+
+\item{branch_na_label}{Character string used to label the branch formed by
+\code{NA} values in \code{branch_by} (and, in \code{\link[=as_consort_diagram]{as_consort_diagram()}}, the stage
+formed by \code{NA} values in \code{stage_by}). Default \code{"Missing"}. Ignored when
+the column has no \code{NA} values.}
 
 \item{group_x}{Optional column name (string), present in \code{flow$data}, used
 to repeat the attrition table across the "column" direction (e.g. trial

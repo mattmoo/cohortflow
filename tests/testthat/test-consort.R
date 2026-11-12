@@ -321,6 +321,56 @@ test_that("count_by uses distinct counts", {
   }
 })
 
+test_that("NA branch values get their own branch box", {
+  d  <- tibble::tibble(x = 1:6, arm = c("A", "B", NA, "A", "B", NA))
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  dg <- as_consort_diagram(fl, branch_by = "arm")
+
+  branch_boxes <- consort_layout(dg)$branch_boxes
+  expect_equal(nrow(branch_boxes), 3L)
+  expect_equal(branch_boxes$branch, c("A", "B", "Missing"))
+  counts <- as.integer(gsub(".*\\(n=([0-9,]+)\\).*", "\\1", branch_boxes$label))
+  expect_equal(counts, c(2L, 2L, 2L))
+  expect_equal(sum(counts), nrow(cohort(fl)))
+})
+
+test_that("branch_na_label renames the NA branch box", {
+  d  <- tibble::tibble(x = 1:6, arm = c("A", "B", NA, "A", "B", NA))
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  dg <- as_consort_diagram(fl, branch_by = "arm", branch_na_label = "Unknown arm")
+
+  branch_boxes <- consort_layout(dg)$branch_boxes
+  expect_true("Unknown arm" %in% branch_boxes$branch)
+  expect_false("Missing" %in% branch_boxes$branch)
+})
+
+test_that("no Missing branch box when branch_by has no NA", {
+  flow <- make_flow_parallel_rct()
+  dg   <- as_consort_diagram(flow, branch_by = "arm")
+  expect_false("Missing" %in% consort_layout(dg)$branch_boxes$branch)
+})
+
+test_that("NA stage values get their own stage box and stage counts sum to branch counts", {
+  d <- tibble::tibble(
+    x      = 1:8,
+    arm    = c("A", "A", "A", "A", "B", "B", "B", "B"),
+    period = c(1, 2, NA, 1, 1, 2, 2, NA)
+  )
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  dg <- as_consort_diagram(fl, branch_by = "arm", stage_by = "period")
+
+  lay    <- consort_layout(dg)
+  stages <- lay$stage_boxes
+  get_n  <- function(lbl) as.integer(gsub(".*\\(n=([0-9,]+)\\).*", "\\1", lbl))
+
+  expect_equal(stages$stage[stages$branch == "A"], c("1", "2", "Missing"))
+  expect_equal(stages$stage[stages$branch == "B"], c("1", "2", "Missing"))
+  for (b in c("A", "B")) {
+    branch_n <- get_n(lay$branch_boxes$label[lay$branch_boxes$branch == b])
+    expect_equal(sum(get_n(stages$label[stages$branch == b])), branch_n)
+  }
+})
+
 test_that("linear diagram has no branch boxes when branch_by is NULL", {
   flow <- make_flow_categorised()
   d <- as_consort_diagram(flow)

@@ -25,7 +25,8 @@ as_consort_diagram(
   branch_by = NULL,
   stage_by = NULL,
   stage_label_by = NULL,
-  count_by = NULL
+  count_by = NULL,
+  branch_na_label = "Missing"
 )
 }
 \arguments{
@@ -103,6 +104,11 @@ each stage (e.g. crossover \code{arm}). Ignored when \code{stage_by} is \code{NU
 supplied, counts are computed as \code{n_distinct(count_by)} rather than
 \code{nrow()}. Essential for crossover data where one participant has
 several event rows.}
+
+\item{branch_na_label}{Character string used to label the branch formed by
+\code{NA} values in \code{branch_by} (and, in \code{\link[=as_consort_diagram]{as_consort_diagram()}}, the stage
+formed by \code{NA} values in \code{stage_by}). Default \code{"Missing"}. Ignored when
+the column has no \code{NA} values.}
 }
 \value{
 A \code{consort_diagram} object (a \code{ggplot2} \code{ggplot}), drawable via

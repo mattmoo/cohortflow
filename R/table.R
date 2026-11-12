@@ -75,7 +75,8 @@
 #'   row's total is broken out into one additional column per branch value
 #'   (named after the branch value, e.g. `Control`, `Intervention`), each
 #'   populated only on the final row. Use `final_label = "Randomised"` when
-#'   appropriate. Cannot be combined with `group_x`/`group_y`.
+#'   appropriate. Cannot be combined with `group_x`/`group_y`. Rows whose
+#'   branch value is `NA` form their own branch, labelled `branch_na_label`.
 #' @param count_by Optional column name (string) for distinct counts. When
 #'   supplied, counts are computed as `n_distinct(count_by)` rather than
 #'   `nrow()`. Essential for crossover data where one participant has several
@@ -90,6 +91,10 @@
 #'   `NA` values in `group_x`/`group_y` (see the Grouping section). Default
 #'   `"Missing"`. Ignored when the corresponding grouping column has no `NA`
 #'   values.
+#' @param branch_na_label Character string used to label the branch formed by
+#'   `NA` values in `branch_by` (and, in [as_consort_diagram()], the stage
+#'   formed by `NA` values in `stage_by`). Default `"Missing"`. Ignored when
+#'   the column has no `NA` values.
 #'
 #' @return A [tibble::tibble()] with columns:
 #' \describe{
@@ -133,7 +138,8 @@ as_attrition_tibble <- function(
   count_by        = NULL,
   group_x         = NULL,
   group_y         = NULL,
-  group_na_label  = "Missing"
+  group_na_label  = "Missing",
+  branch_na_label = "Missing"
 ) {
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
@@ -201,7 +207,7 @@ as_attrition_tibble <- function(
 
   # -- Branch columns ---------------------------------------------------------
   if (!is.null(branch_by)) {
-    out <- .attrition_add_branch_columns(out, flow, branch_by, count_by)
+    out <- .attrition_add_branch_columns(out, flow, branch_by, count_by, branch_na_label)
   }
 
   out
@@ -276,8 +282,11 @@ as_attrition_tibble <- function(
 # only on the final row with that branch's surviving count. Column names are
 # the branch values themselves (e.g. "Control", "Intervention"), so the N
 # column is effectively split into per-branch columns on the final row
-# rather than adding extra rows below it.
-.attrition_add_branch_columns <- function(tbl, flow, branch_by, count_by) {
+# rather than adding extra rows below it. Rows with an `NA` branch value form
+# their own column, named `branch_na_label`, so the branch columns always sum
+# to the final row's total.
+.attrition_add_branch_columns <- function(tbl, flow, branch_by, count_by,
+                                          branch_na_label = "Missing") {
   cohort_data <- cohort(flow)
 
   # Count function: distinct count_by or nrow
@@ -291,14 +300,15 @@ as_attrition_tibble <- function(
   }
 
   # Split cohort by branch_by
-  branch_values <- sort(unique(cohort_data[[branch_by]]))
+  branch_values <- .cf_group_values(cohort_data[[branch_by]])
   final_idx     <- which(tbl$row_type == "final")
 
-  for (branch_val in branch_values) {
-    branch_data <- cohort_data[cohort_data[[branch_by]] == branch_val, ]
+  for (b in seq_along(branch_values)) {
+    branch_val  <- branch_values[b]
+    branch_data <- cohort_data[.cf_group_match(cohort_data[[branch_by]], branch_val), , drop = FALSE]
     branch_n    <- count_fn(branch_data)
 
-    col_name <- as.character(branch_val)
+    col_name <- .cf_group_label(branch_val, branch_na_label)
     tbl[[col_name]] <- NA_integer_
     tbl[[col_name]][final_idx] <- branch_n
   }
@@ -350,18 +360,18 @@ as_attrition_tibble <- function(
   # own explicit group instead of either being silently dropped or (the
   # original bug) leaking into every other group via `== ` producing NA
   # matches under base R's `[` subsetting.
-  x_vals <- if (!is.null(group_x)) .attrition_group_values(data[[group_x]]) else NA
-  y_vals <- if (!is.null(group_y)) .attrition_group_values(data[[group_y]]) else NA
+  x_vals <- if (!is.null(group_x)) .cf_group_values(data[[group_x]]) else NA
+  y_vals <- if (!is.null(group_y)) .cf_group_values(data[[group_y]]) else NA
 
   blocks <- list()
   for (y in y_vals) {
     for (x in x_vals) {
       sub_data <- data
       if (!is.null(group_x)) {
-        sub_data <- sub_data[.attrition_group_match(sub_data[[group_x]], x), , drop = FALSE]
+        sub_data <- sub_data[.cf_group_match(sub_data[[group_x]], x), , drop = FALSE]
       }
       if (!is.null(group_y)) {
-        sub_data <- sub_data[.attrition_group_match(sub_data[[group_y]], y), , drop = FALSE]
+        sub_data <- sub_data[.cf_group_match(sub_data[[group_y]], y), , drop = FALSE]
       }
 
       sub_flow <- apply_criteria(sub_data, flow$criteria, id = ".cf_row_id")
@@ -373,8 +383,8 @@ as_attrition_tibble <- function(
         final_label     = final_label,
         digits          = digits
       )
-      block$group_x <- if (!is.null(group_x)) .attrition_group_label(x, group_na_label) else NA_character_
-      block$group_y <- if (!is.null(group_y)) .attrition_group_label(y, group_na_label) else NA_character_
+      block$group_x <- if (!is.null(group_x)) .cf_group_label(x, group_na_label) else NA_character_
+      block$group_y <- if (!is.null(group_y)) .cf_group_label(y, group_na_label) else NA_character_
 
       blocks <- c(blocks, list(block))
     }
@@ -383,11 +393,16 @@ as_attrition_tibble <- function(
   do.call(rbind, blocks)
 }
 
+# The `.cf_group_*()` helpers below are shared by every place that subsets
+# data by the values of a column (group_x/group_y here; branch_by and
+# stage_by in the attrition table and CONSORT diagram), so NA handling is
+# identical everywhere.
+#
 # Returns the sorted unique non-NA values of `x`, with a single `NA`
 # sentinel appended at the end if `x` contains any missing values. This
 # sentinel becomes its own explicit "Missing" group rather than being
 # dropped or (incorrectly) folded into every other group.
-.attrition_group_values <- function(x) {
+.cf_group_values <- function(x) {
   vals <- sort(unique(x), na.last = NA)
   if (anyNA(x)) vals <- c(vals, NA)
   vals
@@ -397,12 +412,12 @@ as_attrition_tibble <- function(
 # against `x` using `%in%` (never returns NA), and matches a `NA` sentinel
 # `value` against `is.na(x)`. This ensures every row -- including those
 # with a missing grouping value -- belongs to exactly one group.
-.attrition_group_match <- function(x, value) {
+.cf_group_match <- function(x, value) {
   if (is.na(value)) is.na(x) else x %in% value
 }
 
 # Converts a group value (possibly the NA sentinel) to its display label.
-.attrition_group_label <- function(value, na_label) {
+.cf_group_label <- function(value, na_label) {
   if (is.na(value)) na_label else as.character(value)
 }
 
@@ -526,6 +541,7 @@ as_attrition_table <- function(
   pct_col_label       = "% removed",
   branch_by           = NULL,
   count_by            = NULL,
+  branch_na_label     = "Missing",
   group_x             = NULL,
   group_y             = NULL,
   group_x_label       = NULL,
@@ -579,7 +595,8 @@ as_attrition_table <- function(
     final_label     = final_label,
     digits          = digits,
     branch_by       = branch_by,
-    count_by        = count_by
+    count_by        = count_by,
+    branch_na_label = branch_na_label
   )
 
   shade_colours <- .attrition_shade_colours(tbl, shade, shade_fn, shade_palette)
