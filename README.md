@@ -19,17 +19,26 @@ Define and apply inclusion/exclusion criteria for cohort studies, then generate 
 
 ## Installation
 
-Install from source locally:
-
-```r
-install.packages("path/to/cohortflow", repos = NULL, type = "source")
-```
-
-Or install from GitHub (replace with your repo path):
+Install the development version from GitHub:
 
 ```r
 # install.packages("remotes")
 remotes::install_github("mattmoo/cohortflow")
+```
+
+The table backends (`flextable`, `gt`, `huxtable`) are optional. To install
+them along with the package:
+
+```r
+remotes::install_github("mattmoo/cohortflow", dependencies = TRUE)
+```
+
+Check which build you have with `packageVersion("cohortflow")`.
+
+To install from a local copy of the source instead:
+
+```r
+install.packages("path/to/cohortflow", repos = NULL, type = "source")
 ```
 
 ## Quick start
