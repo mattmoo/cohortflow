@@ -168,6 +168,30 @@ test_that("eval_group_criterion() errors when fn does not return .pass column", 
   expect_error(cohortflow:::eval_group_criterion(crit, d), class = "rlang_error")
 })
 
+test_that("eval_group_criterion() errors when .pass is not logical", {
+  d <- data.frame(grp = c("a", "a", "b"), x = 1:3)
+  crit <- cf_criterion(~ n(), label = "Numeric pass", type = "group_include", by = "grp")
+  expect_error(cohortflow:::eval_group_criterion(crit, d), "logical", class = "rlang_error")
+
+  fn <- function(g) dplyr::summarise(g, .pass = dplyr::n(), .groups = "drop")
+  crit_fn <- cf_criterion(fn, label = "Numeric pass fn", type = "group_include", by = "grp")
+  expect_error(cohortflow:::eval_group_criterion(crit_fn, d), "logical", class = "rlang_error")
+})
+
+test_that("eval_group_criterion() errors when summary lacks the by column", {
+  fn <- function(g) data.frame(.pass = c(TRUE, FALSE))
+  crit <- cf_criterion(fn, label = "No by col", type = "group_include", by = "grp")
+  d <- data.frame(grp = c("a", "a", "b"), x = 1:3)
+  expect_error(cohortflow:::eval_group_criterion(crit, d), "grouping column", class = "rlang_error")
+})
+
+test_that("eval_group_criterion() errors when summary has duplicate group rows", {
+  fn <- function(g) data.frame(grp = c("a", "a", "b"), .pass = c(TRUE, FALSE, TRUE))
+  crit <- cf_criterion(fn, label = "Dup groups", type = "group_include", by = "grp")
+  d <- data.frame(grp = c("a", "a", "b"), x = 1:3)
+  expect_error(cohortflow:::eval_group_criterion(crit, d), "one row per group", class = "rlang_error")
+})
+
 # ---------------------------------------------------------------------------
 # eval_select_criterion
 

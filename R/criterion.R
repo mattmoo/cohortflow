@@ -234,6 +234,27 @@ eval_group_criterion <- function(criterion, data) {
     }
   }
 
+  if (!is.logical(summary$.pass)) {
+    cli_abort(c(
+      "Group criterion must produce a logical `.pass` value per group.",
+      "x" = sprintf("`.pass` is of class <%s>.", paste(class(summary$.pass), collapse = "/")),
+      "i" = sprintf("Criterion: \"%s\"", criterion$label)
+    ))
+  }
+  if (!by_col %in% names(summary)) {
+    cli_abort(c(
+      sprintf("Group criterion result must contain the grouping column `%s`.", by_col),
+      "i" = sprintf("Criterion: \"%s\"", criterion$label)
+    ))
+  }
+  if (anyDuplicated(summary[[by_col]])) {
+    cli_abort(c(
+      "Group criterion must return exactly one row per group.",
+      "x" = sprintf("Duplicate values found in `%s` of the returned summary.", by_col),
+      "i" = sprintf("Criterion: \"%s\"", criterion$label)
+    ))
+  }
+
   # Broadcast scalar group result back to rows
   pass_map <- stats::setNames(summary$.pass, summary[[by_col]])
   pass_map[as.character(data[[by_col]])]
