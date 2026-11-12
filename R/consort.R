@@ -321,25 +321,63 @@ as_consort_diagram <- function(
   n_main <- length(groups)
 
   top      <- 0.94
-  bottom   <- 0.06
-  main_y   <- if (n_main > 1L) seq(top, bottom, length.out = n_main) else 0.5
   main_x   <- 0.24
   gap_x    <- 0.08
+  gap_y    <- 0.06   # minimum vertical gap between consecutive main boxes
+  gap_pad  <- 0.02   # clearance above/below an exclusion box within its gap
   text_pad <- 0.015
 
-  # -- Pass 1: main boxes -- positions are known up-front (fixed x, main_y[i])
+  # -- Pass 1: main box labels/dims -----------------------------------------
   # Each box displays the *surviving* count after that row's own exclusions
   # are removed (r$n - n_removed), not the entering count, so that a box's
   # exclusions are always shown branching off *before* the box in the main
   # flow (matching standard CONSORT convention) rather than appearing to
   # have already happened without being drawn.
-  main_rows <- vector("list", n_main)
+  main_dims <- vector("list", n_main)
   for (i in seq_len(n_main)) {
     r <- groups[[i]]$row
     n_removed <- .consort_group_removal(groups[[i]])$n_removed
     n_survive <- r$n - n_removed
     label <- sprintf("%s\n(n=%s)", r$label, .format_n(n_survive, big_mark))
-    dims  <- .consort_box_dims(label, wrap_width = wrap_width)
+    main_dims[[i]] <- .consort_box_dims(label, wrap_width = wrap_width)
+  }
+  main_h <- vapply(main_dims, `[[`, numeric(1L), "h")
+
+  # -- Pass 2: exclusion box label/dims (position depends on max width) -----
+  # Computing dims for every exclusion box before positioning lets us place
+  # the whole column of exclusion boxes just far enough right of the widest
+  # main-flow box (`gap_x` clearance), rather than at a fixed x -- this is
+  # what keeps the diagram from leaving excess whitespace on the right when
+  # box content is narrow. The heights also drive the vertical layout below.
+  excl_info <- vector("list", n_main)
+  for (i in seq_len(n_main)) {
+    g <- groups[[i]]
+    if (.consort_has_exclusions(g)) {
+      excl_label <- paste(.consort_excl_lines(g, digits, big_mark), collapse = "\n")
+      excl_info[[i]] <- .consort_box_dims(excl_label, wrap_width = wrap_width)
+    }
+  }
+
+  # -- Vertical layout: stack main boxes top-down from their content --------
+  # The gap above box i is at least `gap_y`, and when box i has an exclusion
+  # box (centred on the connector between box i-1 and box i) the gap is
+  # widened to fit it with `gap_pad` clearance, so neither main boxes nor
+  # exclusion boxes can overlap however long the pipeline is. The plot's
+  # y-limits are derived from the box extents afterwards.
+  main_y <- numeric(n_main)
+  if (n_main > 0L) main_y[1L] <- top - main_h[1L] / 2
+  for (i in seq_len(n_main)[-1L]) {
+    gap_i <- if (!is.null(excl_info[[i]])) {
+      max(gap_y, excl_info[[i]]$h + 2 * gap_pad)
+    } else {
+      gap_y
+    }
+    main_y[i] <- main_y[i - 1L] - main_h[i - 1L] / 2 - gap_i - main_h[i] / 2
+  }
+
+  main_rows <- vector("list", n_main)
+  for (i in seq_len(n_main)) {
+    dims <- main_dims[[i]]
     main_rows[[i]] <- data.frame(
       id = paste0("main_box_", i), x = main_x, y = main_y[i],
       w = dims$w, h = dims$h, label = dims$label,
@@ -364,21 +402,6 @@ as_consort_diagram <- function(
     .consort_empty_df(c("id", "x", "y0", "y1"))
   }
 
-  # -- Pass 2: exclusion box label/dims (position depends on max width) -----
-  # Computing dims for every exclusion box before positioning lets us place
-  # the whole column of exclusion boxes just far enough right of the widest
-  # main-flow box (`gap_x` clearance), rather than at a fixed x -- this is
-  # what keeps the diagram from leaving excess whitespace on the right when
-  # box content is narrow.
-  excl_info <- vector("list", n_main)
-  for (i in seq_len(n_main)) {
-    g <- groups[[i]]
-    if (.consort_has_exclusions(g)) {
-      excl_label <- paste(.consort_excl_lines(g, digits, big_mark), collapse = "\n")
-      excl_info[[i]] <- .consort_box_dims(excl_label, wrap_width = wrap_width)
-    }
-  }
-
   has_excl_idx <- !vapply(excl_info, is.null, logical(1L))
   # Left edge shared by every exclusion box, rather than a shared centre --
   # each box is then positioned so its *left* edge sits here and it only
@@ -399,16 +422,21 @@ as_consort_diagram <- function(
       excl_dims <- excl_info[[i]]
       excl_x    <- excl_x_left + excl_dims$w / 2
 
-      # Branch the exclusion arrow off the main vertical connector at the
-      # midpoint between the *previous* main box and this one, so it
+      # Branch the exclusion arrow off the midpoint of the main vertical
+      # connector between the *previous* main box and this one, so it
       # visibly comes out *before* the box whose survivor count already
       # reflects the exclusion (classic CONSORT style: exclusions are
       # shown leaving the flow before the box that represents what's left
-      # after them), meeting the vertical trunk at a right angle. For the
-      # first main box (no "previous" box above it -- not expected in
-      # practice since the header row never has exclusions), fall back to
-      # branching level with the box itself.
-      branch_y <- if (i > 1L) mean(c(main_y[i - 1L], main_y[i])) else main_y[i]
+      # after them), meeting the vertical trunk at a right angle. The gap
+      # was sized above so the exclusion box centred here fits within it.
+      # For the first main box (no "previous" box above it -- not expected
+      # in practice since the header row never has exclusions), fall back
+      # to branching level with the box itself.
+      branch_y <- if (i > 1L) {
+        mean(c(main_y[i - 1L] - main_h[i - 1L] / 2, main_y[i] + main_h[i] / 2))
+      } else {
+        main_y[i]
+      }
 
       excl_arrow_rows[[length(excl_arrow_rows) + 1L]] <- data.frame(
         id = paste0("excl_arrow_", i),

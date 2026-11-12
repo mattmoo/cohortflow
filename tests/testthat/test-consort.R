@@ -321,6 +321,49 @@ test_that("count_by uses distinct counts", {
   }
 })
 
+test_that("main boxes never overlap in a long (14-step) pipeline", {
+  d    <- tibble::tibble(id = 1:200, x = 1:200)
+  crit <- cf_criteria()
+  for (k in 1:14) {
+    crit <- include(crit, rlang::new_formula(NULL, rlang::expr(x > !!(k * 5))),
+                    label = paste("Step", k))
+  }
+  flow <- apply_criteria(d, crit, id = "id")
+  main <- consort_layout(as_consort_diagram(flow))$main_boxes
+
+  expect_gte(nrow(main), 14L)
+  gaps <- (main$y[-nrow(main)] - main$h[-nrow(main)] / 2) - (main$y[-1L] + main$h[-1L] / 2)
+  expect_true(all(gaps > 0))
+})
+
+test_that("a tall exclusion box fits between the main boxes above and below it", {
+  d    <- tibble::tibble(id = 1:100, x = 1:100)
+  crit <- cf_criteria() |> include(~ x > 1, label = "Pre", category = "First")
+  for (k in 1:6) {
+    crit <- include(crit, rlang::new_formula(NULL, rlang::expr(x > !!(k * 5))),
+                    label = paste("Reason", k), category = "Six reasons")
+  }
+  flow <- apply_criteria(d, crit, id = "id")
+  lay  <- consort_layout(as_consort_diagram(flow))
+  main <- lay$main_boxes
+  excl <- lay$excl_boxes
+
+  # The six-reason category is the third main box (header, First, Six reasons)
+  ex <- excl[excl$id == "excl_box_3", ]
+  expect_equal(nrow(ex), 1L)
+  above_bottom <- main$y[2] - main$h[2] / 2
+  below_top    <- main$y[3] + main$h[3] / 2
+  expect_lt(ex$y + ex$h / 2, above_bottom)
+  expect_gt(ex$y - ex$h / 2, below_top)
+
+  # Exclusion boxes never overlap each other either
+  excl <- excl[order(-excl$y), ]
+  if (nrow(excl) > 1L) {
+    egaps <- (excl$y[-nrow(excl)] - excl$h[-nrow(excl)] / 2) - (excl$y[-1L] + excl$h[-1L] / 2)
+    expect_true(all(egaps > 0))
+  }
+})
+
 test_that("NA branch values get their own branch box", {
   d  <- tibble::tibble(x = 1:6, arm = c("A", "B", NA, "A", "B", NA))
   fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
