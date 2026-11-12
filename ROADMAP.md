@@ -150,7 +150,7 @@ These are not in the current backlog but would add significant value:
 
 ### Criteria Management
 - [ ] **Criteria versioning** — Tag criteria sets with a version/date so pipeline changes are auditable
-- [ ] **Criteria validation** — Pre-flight check that all formula variables exist in the supplied dataset before applying. High priority: a forgotten join in a staged `continue_criteria()` pipeline (Milestone 6.4) currently fails deep inside `eval_criterion()` with a message that doesn't name the criterion or the missing variable.
+- [x] **Criteria validation** — *Done:* exported `check_criteria(criteria, data)`, run automatically by `apply_criteria()` (after `expected`) and `continue_criteria()` (after `join`, with step numbers continuing the flow), aborts naming each step's number, label and missing formula variables / `by` / `arms` columns; formula-environment bindings, dplyr helpers and `pkg::fn` / `obj$field` are not flagged; function predicates are skipped. Original brief: Pre-flight check that all formula variables exist in the supplied dataset before applying. High priority: a forgotten join in a staged `continue_criteria()` pipeline (Milestone 6.4) currently fails deep inside `eval_criterion()` with a message that doesn't name the criterion or the missing variable.
 - [ ] **Criteria summary printing** — Human-readable summary of what each criterion does (beyond the label)
 
 ### Data Handling

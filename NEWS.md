@@ -50,6 +50,14 @@
   naming, `keep_data`, and output as a tibble, data.table or logical matrix.
   `data.table` is a new suggested package.
 
+* New `check_criteria(criteria, data)` checks before evaluation that every
+  formula predicate, `by` and `arms` refers only to columns in `data`, and
+  aborts naming each offending step's number, label and missing column(s).
+  `apply_criteria()` and `continue_criteria()` run it automatically, so a
+  forgotten `join` in a staged pipeline now fails up front instead of with
+  `object 'x' not found` inside evaluation. Names bound in the formula's
+  environment are allowed; function predicates are not checked.
+
 * `cf_flow` objects record the `id` column(s) passed to `apply_criteria()`
   (older flow objects still work).
 
