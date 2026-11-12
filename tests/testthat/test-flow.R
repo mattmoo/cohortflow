@@ -162,3 +162,39 @@ test_that("at works across a continue_criteria() stage boundary", {
   expect_lt(nrow(cohort(f2, at = 2)), nrow(cohort(f2, at = 1)))
   expect_identical(cohort(f2, at = "Older"), cohort(f2))
 })
+
+# ---------------------------------------------------------------------------
+# Recorded id column(s)
+
+test_that("apply_criteria() records the id column(s) on the flow", {
+  dat  <- mock_crossover(n_participants = 20, seed = 1)
+  crit <- cf_criteria() |> include(~ !is.na(age), label = "Age recorded")
+
+  expect_identical(apply_criteria(dat, crit, id = "event_id")[["id"]], "event_id")
+  expect_identical(
+    apply_criteria(dat, crit, id = c("participant_id", "period"))[["id"]],
+    c("participant_id", "period")
+  )
+  auto <- suppressMessages(apply_criteria(dat, crit))
+  expect_null(auto[["id"]])
+  dat$.cf_row_id <- seq_len(nrow(dat))
+  expect_null(apply_criteria(dat, crit)[["id"]])
+  expect_null(apply_criteria(dat, crit, id = ".cf_row_id")[["id"]])
+})
+
+test_that("continue_criteria() carries the recorded id forward", {
+  dat <- mock_parallel_rct(n_participants = 50, seed = 1)
+  f1  <- apply_criteria(dat, cf_criteria() |> include(~ eligible_screen, label = "Screen"),
+                        id = "participant_id")
+  f2  <- continue_criteria(f1, cf_criteria() |> exclude(~ withdrew, label = "Withdrew"))
+  expect_identical(f2[["id"]], "participant_id")
+})
+
+test_that("flows without a recorded id (older objects) still work", {
+  f   <- make_flow_parallel_rct()
+  old <- new_cf_flow(f$data, f$criteria, f$steps, f$hierarchy)
+  old <- structure(unclass(old)[c("data", "criteria", "steps", "hierarchy")], class = "cf_flow")
+  expect_null(old[["id"]])
+  expect_identical(cohort(old), cohort(f))
+  expect_identical(excluded(old), excluded(f))
+})

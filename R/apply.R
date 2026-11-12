@@ -98,8 +98,11 @@ apply_criteria <- function(data, criteria, id = NULL, expected = NULL, by = NULL
   # -- Apply steps -----------------------------------------------------------
   result <- .run_criteria_steps(data, criteria$steps, hierarchy = hierarchy)
 
+  # `.cf_row_id` itself is not a user id column (R/table.R passes it
+  # internally), so it is recorded as "no id".
+  if (identical(id, ".cf_row_id")) id <- NULL
   new_cf_flow(data = original, criteria = criteria, steps = result$step_records,
-              hierarchy = hierarchy)
+              hierarchy = hierarchy, id = id)
 }
 
 # ---------------------------------------------------------------------------

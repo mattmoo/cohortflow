@@ -4,7 +4,7 @@ test_that("apply_criteria() returns a cf_flow object", {
     include(~ eligible_screen, label = "Screening")
   flow <- apply_criteria(dat, crit)
   expect_s3_class(flow, "cf_flow")
-  expect_named(flow, c("data", "criteria", "steps", "hierarchy"))
+  expect_named(flow, c("data", "criteria", "steps", "hierarchy", "id"))
 })
 
 

@@ -4,7 +4,7 @@
 \alias{new_cf_flow}
 \title{The cohort flow result object}
 \usage{
-new_cf_flow(data, criteria, steps, hierarchy = NULL)
+new_cf_flow(data, criteria, steps, hierarchy = NULL, id = NULL)
 }
 \description{
 A \code{cf_flow} object is returned by \code{\link[=apply_criteria]{apply_criteria()}}. It stores the
@@ -13,5 +13,10 @@ that produced it, a per-step record of attrition, and (optionally) the
 \code{cf_hierarchy} used for per-level counting. Use \code{\link[=cohort]{cohort()}} to extract the
 surviving rows and \code{\link[=excluded]{excluded()}} to extract all removed rows with step
 metadata attached.
+}
+\details{
+\code{id} records the column name(s) passed as \code{id} to \code{\link[=apply_criteria]{apply_criteria()}}, or
+\code{NULL} when \code{.cf_row_id} was pre-existing or auto-generated. Flows built
+before this field existed lack it, so read it with \code{flow[["id"]]}.
 }
 \keyword{internal}

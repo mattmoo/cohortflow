@@ -62,7 +62,8 @@ continue_criteria <- function(flow, criteria, join = NULL, by = NULL) {
     data      = updated_data,
     criteria  = c(flow$criteria, criteria),
     steps     = c(flow$steps, result$step_records),
-    hierarchy = flow$hierarchy
+    hierarchy = flow$hierarchy,
+    id        = flow[["id"]]
   )
 }
 

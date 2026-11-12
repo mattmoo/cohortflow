@@ -7,14 +7,19 @@
 #' surviving rows and [excluded()] to extract all removed rows with step
 #' metadata attached.
 #'
+#' `id` records the column name(s) passed as `id` to [apply_criteria()], or
+#' `NULL` when `.cf_row_id` was pre-existing or auto-generated. Flows built
+#' before this field existed lack it, so read it with `flow[["id"]]`.
+#'
 #' @keywords internal
-new_cf_flow <- function(data, criteria, steps, hierarchy = NULL) {
+new_cf_flow <- function(data, criteria, steps, hierarchy = NULL, id = NULL) {
   structure(
     list(
       data      = data,
       criteria  = criteria,
       steps     = steps,
-      hierarchy = hierarchy
+      hierarchy = hierarchy,
+      id        = id
     ),
     class = "cf_flow"
   )
