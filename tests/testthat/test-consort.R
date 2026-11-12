@@ -275,6 +275,15 @@ test_that("stage_by requires branch_by", {
   )
 })
 
+test_that("count_by requires branch_by", {
+  flow <- make_flow_crossover()
+  expect_error(
+    as_consort_diagram(flow, count_by = "participant_id"),
+    "requires.*branch_by",
+    class = "rlang_error"
+  )
+})
+
 test_that("stage_label_by requires stage_by", {
   flow <- make_flow_crossover()
   expect_error(
@@ -318,6 +327,99 @@ test_that("count_by uses distinct counts", {
       cohort_data$participant_id[cohort_data$sequence == seq_val]
     )
     expect_equal(counts[i], expected_n)
+  }
+})
+
+test_that("main boxes never overlap in a long (14-step) pipeline", {
+  d    <- tibble::tibble(id = 1:200, x = 1:200)
+  crit <- cf_criteria()
+  for (k in 1:14) {
+    crit <- include(crit, rlang::new_formula(NULL, rlang::expr(x > !!(k * 5))),
+                    label = paste("Step", k))
+  }
+  flow <- apply_criteria(d, crit, id = "id")
+  main <- consort_layout(as_consort_diagram(flow))$main_boxes
+
+  expect_gte(nrow(main), 14L)
+  gaps <- (main$y[-nrow(main)] - main$h[-nrow(main)] / 2) - (main$y[-1L] + main$h[-1L] / 2)
+  expect_true(all(gaps > 0))
+})
+
+test_that("a tall exclusion box fits between the main boxes above and below it", {
+  d    <- tibble::tibble(id = 1:100, x = 1:100)
+  crit <- cf_criteria() |> include(~ x > 1, label = "Pre", category = "First")
+  for (k in 1:6) {
+    crit <- include(crit, rlang::new_formula(NULL, rlang::expr(x > !!(k * 5))),
+                    label = paste("Reason", k), category = "Six reasons")
+  }
+  flow <- apply_criteria(d, crit, id = "id")
+  lay  <- consort_layout(as_consort_diagram(flow))
+  main <- lay$main_boxes
+  excl <- lay$excl_boxes
+
+  # The six-reason category is the third main box (header, First, Six reasons)
+  ex <- excl[excl$id == "main_excl_box_3", ]
+  expect_equal(nrow(ex), 1L)
+  above_bottom <- main$y[2] - main$h[2] / 2
+  below_top    <- main$y[3] + main$h[3] / 2
+  expect_lt(ex$y + ex$h / 2, above_bottom)
+  expect_gt(ex$y - ex$h / 2, below_top)
+
+  # Exclusion boxes never overlap each other either
+  excl <- excl[order(-excl$y), ]
+  if (nrow(excl) > 1L) {
+    egaps <- (excl$y[-nrow(excl)] - excl$h[-nrow(excl)] / 2) - (excl$y[-1L] + excl$h[-1L] / 2)
+    expect_true(all(egaps > 0))
+  }
+})
+
+test_that("NA branch values get their own branch box", {
+  d  <- tibble::tibble(x = 1:6, arm = c("A", "B", NA, "A", "B", NA))
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  dg <- as_consort_diagram(fl, branch_by = "arm")
+
+  branch_boxes <- consort_layout(dg)$branch_boxes
+  expect_equal(nrow(branch_boxes), 3L)
+  expect_equal(branch_boxes$branch, c("A", "B", "Missing"))
+  counts <- as.integer(gsub(".*\\(n=([0-9,]+)\\).*", "\\1", branch_boxes$label))
+  expect_equal(counts, c(2L, 2L, 2L))
+  expect_equal(sum(counts), nrow(cohort(fl)))
+})
+
+test_that("branch_na_label renames the NA branch box", {
+  d  <- tibble::tibble(x = 1:6, arm = c("A", "B", NA, "A", "B", NA))
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  dg <- as_consort_diagram(fl, branch_by = "arm", branch_na_label = "Unknown arm")
+
+  branch_boxes <- consort_layout(dg)$branch_boxes
+  expect_true("Unknown arm" %in% branch_boxes$branch)
+  expect_false("Missing" %in% branch_boxes$branch)
+})
+
+test_that("no Missing branch box when branch_by has no NA", {
+  flow <- make_flow_parallel_rct()
+  dg   <- as_consort_diagram(flow, branch_by = "arm")
+  expect_false("Missing" %in% consort_layout(dg)$branch_boxes$branch)
+})
+
+test_that("NA stage values get their own stage box and stage counts sum to branch counts", {
+  d <- tibble::tibble(
+    x      = 1:8,
+    arm    = c("A", "A", "A", "A", "B", "B", "B", "B"),
+    period = c(1, 2, NA, 1, 1, 2, 2, NA)
+  )
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  dg <- as_consort_diagram(fl, branch_by = "arm", stage_by = "period")
+
+  lay    <- consort_layout(dg)
+  stages <- lay$stage_boxes
+  get_n  <- function(lbl) as.integer(gsub(".*\\(n=([0-9,]+)\\).*", "\\1", lbl))
+
+  expect_equal(stages$stage[stages$branch == "A"], c("1", "2", "Missing"))
+  expect_equal(stages$stage[stages$branch == "B"], c("1", "2", "Missing"))
+  for (b in c("A", "B")) {
+    branch_n <- get_n(lay$branch_boxes$label[lay$branch_boxes$branch == b])
+    expect_equal(sum(get_n(stages$label[stages$branch == b])), branch_n)
   }
 })
 
@@ -487,4 +589,33 @@ test_that("every main-flow group with exclusions has an exclusion box", {
 
   excl_boxes <- consort_layout(d)$excl_boxes
   expect_equal(nrow(excl_boxes), groups_with_excl)
+})
+
+test_that("NA arm values get their own arm cascade after a randomise() step", {
+  d <- tibble::tibble(
+    id  = 1:12,
+    x   = 1:12,
+    grp = rep(c("g1", "g2", "g3", "g4"), each = 3),
+    arm = rep(c("A", "B", NA, "A"), each = 3)
+  )
+  crit <- cf_criteria() |>
+    include(~ x > 0, label = "pos") |>
+    randomise(by = "grp", arms = "arm") |>
+    exclude(~ x == 12, label = "Lost")
+  flow <- apply_criteria(d, crit, id = "id")
+  lay  <- consort_layout(as_consort_diagram(flow, branch_na_label = "Unallocated"))
+
+  arms <- unique(lay$branch_boxes$branch)
+  expect_equal(arms, c("A", "B", "Unallocated"))
+  labels <- lay$branch_boxes$label[grepl("_label$", lay$branch_boxes$id)]
+  counts <- as.integer(gsub(".*[(]n=([0-9,]+)[)].*", "\\1", labels))
+  expect_equal(counts, c(6L, 3L, 3L))
+
+  # Per-arm cascade boxes never overlap vertically within an arm column
+  for (a in arms) {
+    col <- lay$branch_boxes[lay$branch_boxes$branch == a, ]
+    col <- col[order(-col$y), ]
+    gaps <- (col$y[-nrow(col)] - col$h[-nrow(col)] / 2) - (col$y[-1L] + col$h[-1L] / 2)
+    expect_true(all(gaps > 0))
+  }
 })

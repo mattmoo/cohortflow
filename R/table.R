@@ -29,6 +29,11 @@
 #' Uncategorised steps appear at indent level 1 without sub-rows. When
 #' `show_categories = FALSE`, one row per step is produced at indent level 1.
 #'
+#' Steps are collapsed under a category only when they are *consecutive* in
+#' the pipeline (reordering steps would change the cumulative counts). A
+#' category whose steps are separated by other steps therefore produces more
+#' than one category row, and a warning suggests reordering the pipeline.
+#'
 #' @section Percentage columns:
 #' * `pct_removed`: percentage of entering N removed at this row's step (or
 #'   category). For the final cohort row this is the percentage *retained*
@@ -77,7 +82,8 @@
 #'   one additional column per branch value (named after the branch value,
 #'   e.g. `Control`, `Intervention`), each populated only on the final row.
 #'   Use `final_label = "Randomised"` when appropriate. Cannot be combined
-#'   with `group_x`/`group_y`.
+#'   with `group_x`/`group_y`. Rows whose branch value is `NA` form their own
+#'   branch, labelled `branch_na_label`.
 #' @param count_by Optional column name (string) for distinct counts. When
 #'   supplied, counts are computed as `n_distinct(count_by)` rather than
 #'   `nrow()`. Essential for crossover data where one participant has several
@@ -92,6 +98,10 @@
 #'   `NA` values in `group_x`/`group_y` (see the Grouping section). Default
 #'   `"Missing"`. Ignored when the corresponding grouping column has no `NA`
 #'   values.
+#' @param branch_na_label Character string used to label the branch formed by
+#'   `NA` values in `branch_by` (and, in [as_consort_diagram()], the stage
+#'   formed by `NA` values in `stage_by`). Default `"Missing"`. Ignored when
+#'   the column has no `NA` values.
 #' @param levels Optional; requires `flow` to have been built with
 #'   `apply_criteria(hierarchy = ...)`. When the default `character(0)`, this
 #'   argument is ignored and the row-count behaviour above is unchanged. When
@@ -113,7 +123,6 @@
 #'   \item{`n_removed`}{Number removed at this step (`NA` for header/final)}
 #'   \item{`pct_removed`}{Percentage removed relative to entering N (`NA` for
 #'     header; for final row: percentage retained of original N)}
-#'   \item{`branch`}{Always `NA`; retained for backward compatibility}
 #' }
 #' When `branch_by` is supplied, one additional column per unique branch
 #' value is appended (named after the branch value), populated only on the
@@ -129,7 +138,7 @@
 #' @export
 #'
 #' @examples
-#' dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+#' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 #' crit <- cf_criteria() |>
 #'   include(~ !is.na(age),        label = "Age recorded",       category = "Valid age") |>
 #'   include(~ age >= 18,          label = "Adults only",         category = "Valid age") |>
@@ -149,11 +158,14 @@ as_attrition_tibble <- function(
   group_x         = NULL,
   group_y         = NULL,
   group_na_label  = "Missing",
-  levels          = character(0)
+  levels          = character(0),
+  branch_na_label = "Missing"
 ) {
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
   }
+
+  if (show_categories) .warn_split_categories(flow$steps)
 
   # -- Hierarchy-level path ---------------------------------------------------
   if (!identical(levels, character(0))) {
@@ -196,7 +208,7 @@ as_attrition_tibble <- function(
 
   .attrition_tibble_core(
     flow, show_categories, assessed_label, final_label, digits,
-    branch_by, count_by
+    branch_by, count_by, branch_na_label
   )
 }
 
@@ -206,7 +218,8 @@ as_attrition_tibble <- function(
 # `branch_by = NULL, count_by = NULL`, bypassing randomise-step
 # auto-detection -- branching is not supported alongside `group_x`/`group_y`).
 .attrition_tibble_core <- function(flow, show_categories, assessed_label,
-                                   final_label, digits, branch_by, count_by) {
+                                   final_label, digits, branch_by, count_by,
+                                   branch_na_label = "Missing") {
   randomise_step <- .find_randomise_step(flow$steps)
 
   digits  <- as.integer(digits)
@@ -225,7 +238,6 @@ as_attrition_tibble <- function(
     n            = n_start,
     n_removed    = NA_integer_,
     pct_removed  = NA_real_,
-    branch       = NA_character_,
     post_randomisation = if (is.na(randomise_step_num)) NA else FALSE
   )))
 
@@ -243,8 +255,7 @@ as_attrition_tibble <- function(
     indent_level = 0L,
     n            = n_end,
     n_removed    = NA_integer_,
-    pct_removed  = round(100 * n_end / n_start, digits),
-    branch       = NA_character_,
+    pct_removed  = if (n_start > 0L) round(100 * n_end / n_start, digits) else NA_real_,
     post_randomisation = if (is.na(randomise_step_num)) NA else TRUE
   )))
 
@@ -259,12 +270,41 @@ as_attrition_tibble <- function(
 
   # -- Branch columns ---------------------------------------------------------
   if (!is.null(branch_by)) {
-    out <- .attrition_add_branch_columns(out, flow, branch_by, count_by)
+    out <- .attrition_add_branch_columns(out, flow, branch_by, count_by, branch_na_label)
   }
 
   out
 }
 
+
+# Categories are collapsed only across *consecutive* steps (reordering steps
+# would change the cumulative counts), so a category that reappears after a
+# different one yields a second category row. Warn once per call so the user
+# can reorder the pipeline if that was not intended.
+.warn_split_categories <- function(steps) {
+  cats <- vapply(steps, function(s) {
+    if (is.null(s$category)) NA_character_ else s$category
+  }, character(1L))
+  # rle() breaks runs at NA (uncategorised steps), matching the collapsing
+  # rule in .attrition_rows_categorised().
+  runs <- rle(cats)$values
+  runs <- runs[!is.na(runs)]
+  split_cats <- unique(runs[duplicated(runs)])
+  if (length(split_cats) > 0L) {
+    rlang::warn(
+      c(
+        sprintf("Categor%s %s appear%s in non-consecutive steps.",
+                if (length(split_cats) == 1L) "y" else "ies",
+                paste0("\"", split_cats, "\"", collapse = ", "),
+                if (length(split_cats) == 1L) "s" else ""),
+        "i" = "Steps are collapsed into one category row only when they are consecutive.",
+        "i" = "Reorder the criteria pipeline so each category's steps are adjacent."
+      ),
+      class = "cohortflow_split_category"
+    )
+  }
+  invisible(split_cats)
+}
 
 # Build rows with category grouping
 .attrition_rows_categorised <- function(steps, digits, randomise_step_num = NA_integer_) {
@@ -309,7 +349,6 @@ as_attrition_tibble <- function(
         n            = n_in_cat,
         n_removed    = if (is_singleton) NA_integer_ else n_fail_cat,
         pct_removed  = if (is_singleton) NA_real_    else pct_removed,
-        branch       = NA_character_,
         post_randomisation = if (is.na(randomise_step_num)) {
           NA
         } else {
@@ -344,8 +383,11 @@ as_attrition_tibble <- function(
 # only on the final row with that branch's surviving count. Column names are
 # the branch values themselves (e.g. "Control", "Intervention"), so the N
 # column is effectively split into per-branch columns on the final row
-# rather than adding extra rows below it.
-.attrition_add_branch_columns <- function(tbl, flow, branch_by, count_by) {
+# rather than adding extra rows below it. Rows with an `NA` branch value form
+# their own column, named `branch_na_label`, so the branch columns always sum
+# to the final row's total.
+.attrition_add_branch_columns <- function(tbl, flow, branch_by, count_by,
+                                          branch_na_label = "Missing") {
   cohort_data <- cohort(flow)
 
   # Count function: distinct count_by or nrow
@@ -358,15 +400,34 @@ as_attrition_tibble <- function(
     nrow
   }
 
-  # Split cohort by branch_by
-  branch_values <- sort(unique(cohort_data[[branch_by]]))
+  # Split cohort by branch_by (an NA branch, if any, comes last)
+  branch_values <- .cf_group_values(cohort_data[[branch_by]])
   final_idx     <- which(tbl$row_type == "final")
 
-  for (branch_val in branch_values) {
-    branch_data <- cohort_data[cohort_data[[branch_by]] == branch_val, ]
+  # Branch labels become column names, so they must not clobber the
+  # tibble's own columns.
+  branch_labels <- vapply(branch_values, .cf_group_label, character(1L),
+                          na_label = branch_na_label, USE.NAMES = FALSE)
+  reserved <- c("row_type", "label", "indent_level", "n", "n_removed",
+                "pct_removed", "post_randomisation", "group_x", "group_y")
+  clash <- intersect(branch_labels, reserved)
+  if (length(clash) > 0L) {
+    rlang::abort(c(
+      sprintf("`branch_by` value%s %s clash%s with standard attrition column names.",
+              if (length(clash) == 1L) "" else "s",
+              paste0("\"", clash, "\"", collapse = ", "),
+              if (length(clash) == 1L) "es" else ""),
+      "i" = sprintf("Recode `%s` (or set `branch_na_label`) so no value is one of: %s.",
+                    branch_by, paste(reserved, collapse = ", "))
+    ))
+  }
+
+  for (b in seq_along(branch_values)) {
+    branch_data <- cohort_data[.cf_group_match(cohort_data[[branch_by]], branch_values[b]), ,
+                               drop = FALSE]
     branch_n    <- count_fn(branch_data)
 
-    col_name <- as.character(branch_val)
+    col_name <- branch_labels[b]
     tbl[[col_name]] <- NA_integer_
     tbl[[col_name]][final_idx] <- branch_n
   }
@@ -390,7 +451,6 @@ as_attrition_tibble <- function(
     n            = s$n_in,
     n_removed    = s$n_fail,
     pct_removed  = pct,
-    branch       = NA_character_,
     post_randomisation = if (is.na(randomise_step_num)) NA else s$step >= randomise_step_num
   )
 }
@@ -433,18 +493,18 @@ as_attrition_tibble <- function(
   # own explicit group instead of either being silently dropped or (the
   # original bug) leaking into every other group via `== ` producing NA
   # matches under base R's `[` subsetting.
-  x_vals <- if (!is.null(group_x)) .attrition_group_values(data[[group_x]]) else NA
-  y_vals <- if (!is.null(group_y)) .attrition_group_values(data[[group_y]]) else NA
+  x_vals <- if (!is.null(group_x)) .cf_group_values(data[[group_x]]) else NA
+  y_vals <- if (!is.null(group_y)) .cf_group_values(data[[group_y]]) else NA
 
   blocks <- list()
   for (y in y_vals) {
     for (x in x_vals) {
       sub_data <- data
       if (!is.null(group_x)) {
-        sub_data <- sub_data[.attrition_group_match(sub_data[[group_x]], x), , drop = FALSE]
+        sub_data <- sub_data[.cf_group_match(sub_data[[group_x]], x), , drop = FALSE]
       }
       if (!is.null(group_y)) {
-        sub_data <- sub_data[.attrition_group_match(sub_data[[group_y]], y), , drop = FALSE]
+        sub_data <- sub_data[.cf_group_match(sub_data[[group_y]], y), , drop = FALSE]
       }
 
       sub_flow <- apply_criteria(sub_data, flow$criteria, id = ".cf_row_id")
@@ -457,8 +517,8 @@ as_attrition_tibble <- function(
         sub_flow, show_categories, assessed_label, final_label, digits,
         branch_by = NULL, count_by = NULL
       )
-      block$group_x <- if (!is.null(group_x)) .attrition_group_label(x, group_na_label) else NA_character_
-      block$group_y <- if (!is.null(group_y)) .attrition_group_label(y, group_na_label) else NA_character_
+      block$group_x <- if (!is.null(group_x)) .cf_group_label(x, group_na_label) else NA_character_
+      block$group_y <- if (!is.null(group_y)) .cf_group_label(y, group_na_label) else NA_character_
 
       blocks <- c(blocks, list(block))
     }
@@ -471,7 +531,7 @@ as_attrition_tibble <- function(
 # sentinel appended at the end if `x` contains any missing values. This
 # sentinel becomes its own explicit "Missing" group rather than being
 # dropped or (incorrectly) folded into every other group.
-.attrition_group_values <- function(x) {
+.cf_group_values <- function(x) {
   vals <- sort(unique(x), na.last = NA)
   if (anyNA(x)) vals <- c(vals, NA)
   vals
@@ -481,12 +541,12 @@ as_attrition_tibble <- function(
 # against `x` using `%in%` (never returns NA), and matches a `NA` sentinel
 # `value` against `is.na(x)`. This ensures every row -- including those
 # with a missing grouping value -- belongs to exactly one group.
-.attrition_group_match <- function(x, value) {
+.cf_group_match <- function(x, value) {
   if (is.na(value)) is.na(x) else x %in% value
 }
 
 # Converts a group value (possibly the NA sentinel) to its display label.
-.attrition_group_label <- function(value, na_label) {
+.cf_group_label <- function(value, na_label) {
   if (is.na(value)) na_label else as.character(value)
 }
 
@@ -565,8 +625,7 @@ as_attrition_tibble <- function(
     n               = n_start,
     n_removed       = NA_integer_,
     n_consequential = NA_integer_,
-    pct_removed     = NA_real_,
-    branch          = NA_character_
+    pct_removed     = NA_real_
   ))
 
   if (show_categories) {
@@ -582,8 +641,7 @@ as_attrition_tibble <- function(
     n               = n_end,
     n_removed       = NA_integer_,
     n_consequential = NA_integer_,
-    pct_removed     = if (n_start > 0L) round(100 * n_end / n_start, digits) else NA_real_,
-    branch          = NA_character_
+    pct_removed     = if (n_start > 0L) round(100 * n_end / n_start, digits) else NA_real_
   )))
 
   out <- do.call(rbind, rows)
@@ -604,8 +662,7 @@ as_attrition_tibble <- function(
     n               = s$n_in,
     n_removed       = s$n_fail,
     n_consequential = s$n_consequential,
-    pct_removed     = pct,
-    branch          = NA_character_
+    pct_removed     = pct
   )
 }
 
@@ -646,8 +703,7 @@ as_attrition_tibble <- function(
         n               = n_in_cat,
         n_removed       = if (is_singleton) NA_integer_ else n_fail_cat,
         n_consequential = if (is_singleton) NA_integer_ else n_conseq_cat,
-        pct_removed     = if (is_singleton) NA_real_    else pct_removed,
-        branch          = NA_character_
+        pct_removed     = if (is_singleton) NA_real_    else pct_removed
       )))
 
       for (cs in cat_steps) {
@@ -787,8 +843,8 @@ as_attrition_tibble <- function(
 #' @export
 #'
 #' @examples
-#' \dontrun{
-#' dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+#' \donttest{
+#' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 #' crit <- cf_criteria() |>
 #'   include(~ !is.na(age),     label = "Age recorded",    category = "Valid age") |>
 #'   include(~ age >= 18,       label = "Adults only",      category = "Valid age") |>
@@ -797,24 +853,33 @@ as_attrition_tibble <- function(
 #'   exclude(~ withdrew,        label = "Withdrew consent", category = "Consent")
 #' flow <- apply_criteria(dat, crit)
 #'
-#' as_attrition_table(flow)                       # flextable (Word-ready)
-#' as_attrition_table(flow, backend = "gt")       # gt (LaTeX/HTML-ready)
-#' as_attrition_table(flow, backend = "huxtable") # huxtable
+#' if (requireNamespace("flextable", quietly = TRUE) &&
+#'     requireNamespace("officer", quietly = TRUE)) {
+#'   as_attrition_table(flow)                         # flextable (Word-ready)
+#'   as_attrition_table(flow, shade = "pct_removed")  # shade by % removed
+#' }
+#' if (requireNamespace("gt", quietly = TRUE)) {
+#'   as_attrition_table(flow, backend = "gt")         # gt (LaTeX/HTML-ready)
+#' }
+#' if (requireNamespace("huxtable", quietly = TRUE)) {
+#'   as_attrition_table(flow, backend = "huxtable")   # huxtable
+#' }
 #'
-#' # Shade cells by percentage removed
-#' as_attrition_table(flow, shade = "pct_removed")
+#' if (requireNamespace("flextable", quietly = TRUE) &&
+#'     requireNamespace("officer", quietly = TRUE)) {
+#'   # Grid: sites as columns, periods as rows (stepped-wedge design)
+#'   sw      <- mock_stepped_wedge(n_participants = 400, n_periods = 4, seed = 1)
+#'   flow_sw <- apply_criteria(sw, crit, id = "event_id")
+#'   as_attrition_table(flow_sw, group_x = "site_id", group_y = "period")
 #'
-#' # Grid: sites as columns, periods as rows (stepped-wedge design)
-#' sw   <- mock_stepped_wedge(n_participants = 400, n_periods = 4, seed = 1)
-#' flow_sw <- apply_criteria(sw, crit, id = "event_id")
-#' as_attrition_table(flow_sw, group_x = "site_id", group_y = "period")
-#'
-#' # Hierarchy levels: cluster CONSORT reporting
-#' cl <- mock_cluster_rct(n_clusters = 20, seed = 1)
-#' h  <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
-#' flow_cl <- apply_criteria(cl, crit, hierarchy = h)
-#' as_attrition_table(flow_cl, levels = c("participant", "cluster"))
-#'
+#'   # Hierarchy levels: cluster CONSORT reporting
+#'   cl <- mock_cluster_rct(n_clusters = 20, seed = 1)
+#'   h  <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+#'   flow_cl <- apply_criteria(cl, crit, id = "participant_id", hierarchy = h)
+#'   as_attrition_table(flow_cl, levels = c("participant", "cluster"))
+#' }
+#' }
+#' \dontrun{
 #' # Save to Word
 #' ft <- as_attrition_table(flow)
 #' flextable::save_as_docx(ft, path = "attrition.docx")
@@ -833,10 +898,12 @@ as_attrition_table <- function(
   consequential_col_label = "Consequential",
   branch_by               = NULL,
   count_by                = NULL,
+  branch_na_label         = "Missing",
   group_x                 = NULL,
   group_y                 = NULL,
   group_x_label           = NULL,
   group_y_label           = NULL,
+  group_na_label          = "Missing",
   levels                  = character(0),
   level_labels            = NULL,
   show_consequential      = NULL,
@@ -905,7 +972,8 @@ as_attrition_table <- function(
       final_label     = final_label,
       digits          = digits,
       group_x         = group_x,
-      group_y         = group_y
+      group_y         = group_y,
+      group_na_label  = group_na_label
     )
 
     shade_colours <- .attrition_shade_colours(tbl, shade, shade_fn, shade_palette)
@@ -935,7 +1003,8 @@ as_attrition_table <- function(
     final_label     = final_label,
     digits          = digits,
     branch_by       = branch_by,
-    count_by        = count_by
+    count_by        = count_by,
+    branch_na_label = branch_na_label
   )
 
   shade_colours <- .attrition_shade_colours(tbl, shade, shade_fn, shade_palette)
@@ -1010,7 +1079,7 @@ as_attrition_table <- function(
 # Converts the raw attrition tibble to a display data frame and returns
 # recommended column widths for flextable (inches). Any column beyond the
 # standard set (row_type, label, indent_level, n, n_removed, pct_removed,
-# branch) is treated as a per-branch N column -- these are added to the
+# post_randomisation) is treated as a per-branch N column -- these are added to the
 # display data frame as-is (character, blank/NA except on the final row).
 .attrition_display <- function(tbl, criterion_col_label,
                                n_col_label, removed_col_label,
@@ -1022,6 +1091,8 @@ as_attrition_table <- function(
   # above it.
   pct_str <- dplyr::case_when(
     tbl$row_type == "header"               ~ NA_character_,
+    # An NA final percentage (zero-row flow) must not render as "NA% included"
+    tbl$row_type == "final" & is.na(tbl$pct_removed) ~ NA_character_,
     tbl$row_type == "final"                ~ paste0(tbl$pct_removed, "% included"),
     is.na(tbl$pct_removed) | tbl$pct_removed == 0 ~ "\u2014",
     TRUE                                   ~ paste0(tbl$pct_removed, "%")
@@ -1044,7 +1115,7 @@ as_attrition_table <- function(
   # Branch columns -- any column beyond the standard set is a per-branch N
   # column, populated only on the final row (NA elsewhere).
   standard_cols <- c("row_type", "label", "indent_level", "n",
-                     "n_removed", "pct_removed", "branch")
+                     "n_removed", "pct_removed", "post_randomisation")
   branch_cols <- setdiff(names(tbl), standard_cols)
 
   for (col in branch_cols) {
@@ -1465,19 +1536,19 @@ as_attrition_table <- function(
     pct_col <- df_full[[paste0(pfx, "pct_removed")]]
 
     display[[paste0(pfx, "n")]] <- ifelse(is.na(n_col), "", as.character(n_col))
-    display[[paste0(pfx, "n_removed")]] <- dplyr::case_when(
-      is.na(nr_col) ~ "",
-      nr_col == 0L  ~ "\u2014",
-      TRUE          ~ as.character(nr_col)
-    )
+    nr_str <- as.character(nr_col)
+    nr_str[!is.na(nr_col) & nr_col == 0L] <- "\u2014"
+    nr_str[is.na(nr_col)] <- ""
+    display[[paste0(pfx, "n_removed")]] <- nr_str
+
     # The final row's percentage is the percentage *retained*/*included*, not
     # removed, so it is labelled explicitly (e.g. "83.5% included") to avoid
     # reading as if it shared the "% removed" semantics of the column header.
-    display[[paste0(pfx, "pct_removed")]] <- dplyr::case_when(
-      is.na(pct_col)                    ~ "",
-      df_full$row_type == "final"       ~ paste0(pct_col, "% included"),
-      TRUE                               ~ paste0(pct_col, "%")
-    )
+    pct_str <- ifelse(df_full$row_type == "final",
+                      paste0(pct_col, "% included"),
+                      paste0(pct_col, "%"))
+    pct_str[is.na(pct_col)] <- ""
+    display[[paste0(pfx, "pct_removed")]] <- pct_str
   }
 
   x_headings <- if (grid$has_x) {
@@ -1872,7 +1943,7 @@ as_attrition_table <- function(
     # per-branch columns by `.attrition_display()`.
     disp <- .attrition_display(
       sub[c("row_type", "label", "indent_level", "n", "n_removed",
-            "pct_removed", "branch")],
+            "pct_removed")],
       "", "", "", ""
     )
 

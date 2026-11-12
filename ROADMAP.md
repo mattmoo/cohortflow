@@ -115,6 +115,12 @@ cohortflow/
 - [ ] **5.4** Final `R CMD check` with zero warnings/notes
 - [ ] **5.5** CRAN submission
 
+**Audit 2026-11-12** (plan: `dev/audit-remediation-plan.md`, branch `fix/audit-remediation`). Completed:
+- Phase 1: 1.1 regenerate stale docs, 1.2 build-ignore stray files
+- Phase 2: 2.1 NA `branch_by`/`stage_by` values form their own branch, 2.2 abort on duplicate/NA row ids, 2.3 validate group-predicate summaries, 2.4 NA group keys removed consistently by all grouped step types
+- Phase 3: 3.1 `group_na_label` in `as_attrition_table()`, 3.2 function predicates print their body, 3.3 YAML round-trips function defaults, 3.4 warn on non-consecutive categories, 3.5 content-driven CONSORT vertical layout, 3.6 no `NaN%` for zero-row flows, 3.7 abort on branch values that clash with column names
+- Phase 4: 4.1–4.8, 4.10, 4.11 (examples, deprecation frequency, argument checks, `branch` column removed, YAML security note, `object_usage_linter` re-enabled). 4.9 (mark `cf_hierarchy()` internal) dropped: Milestone 6 wired it into the pipeline.
+
 ### Milestone 6: Staged & Hierarchical Pipeline Extensions
 
 Proposed after applying `cohortflow` to a two-stage, trial-nested-within-participant

@@ -25,7 +25,7 @@ test_that("as_attrition_tibble() returns a tibble with required columns", {
 
   expect_s3_class(out, "tbl_df")
   expect_named(out, c("row_type", "label", "indent_level", "n",
-                      "n_removed", "pct_removed", "branch"))
+                      "n_removed", "pct_removed"))
 })
 
 test_that("first row is the header, last row is the final cohort", {
@@ -382,6 +382,85 @@ test_that("branch columns are NA except on the final row", {
   }
 })
 
+test_that("zero-row flows give an NA final percentage and no NaN in the display", {
+  d    <- tibble::tibble(id = integer(0), x = numeric(0))
+  crit <- cf_criteria() |> include(~ x > 0, label = "pos")
+  flow <- apply_criteria(d, crit, id = "id")
+  out  <- as_attrition_tibble(flow)
+
+  expect_true(is.na(out$pct_removed[out$row_type == "final"]))
+  expect_false(any(is.nan(out$pct_removed)))
+
+  disp <- cohortflow:::.attrition_display(out, "Criterion", "N", "Removed", "% removed")$df
+  expect_false(any(grepl("NaN|NA%", disp$pct_removed)))
+  expect_true(is.na(disp$pct_removed[out$row_type == "final"]))
+})
+
+test_that("non-consecutive categories warn and still produce separate rows", {
+  d    <- tibble::tibble(id = 1:10, x = 1:10)
+  crit <- cf_criteria() |>
+    include(~ x > 1, label = "s1", category = "A") |>
+    include(~ x > 2, label = "s2", category = "B") |>
+    include(~ x > 3, label = "s3", category = "A")
+  flow <- apply_criteria(d, crit, id = "id")
+
+  expect_warning(out <- as_attrition_tibble(flow), "non-consecutive", class = "cohortflow_split_category")
+  expect_equal(sum(out$row_type == "category" & out$label == "A"), 2L)
+  expect_no_warning(as_attrition_tibble(flow, show_categories = FALSE))
+})
+
+test_that("categories separated by an uncategorised step warn", {
+  d    <- tibble::tibble(id = 1:10, x = 1:10)
+  crit <- cf_criteria() |>
+    include(~ x > 1, label = "s1", category = "A") |>
+    include(~ x > 2, label = "s2") |>
+    include(~ x > 3, label = "s3", category = "A")
+  flow <- apply_criteria(d, crit, id = "id")
+  expect_warning(as_attrition_tibble(flow), class = "cohortflow_split_category")
+})
+
+test_that("consecutive categories do not warn", {
+  expect_no_warning(as_attrition_tibble(make_flow_categorised()))
+})
+
+test_that("NA branch values form their own column and are not double-counted", {
+  d  <- tibble::tibble(x = 1:6, arm = c("A", "B", NA, "A", "B", NA))
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  out <- as_attrition_tibble(fl, branch_by = "arm")
+  final_row <- out[out$row_type == "final", ]
+
+  expect_equal(final_row$A, 2L)
+  expect_equal(final_row$B, 2L)
+  expect_equal(final_row$Missing, 2L)
+  expect_equal(final_row$A + final_row$B + final_row$Missing, final_row$n)
+})
+
+test_that("branch_na_label renames the NA branch column", {
+  d  <- tibble::tibble(x = 1:6, arm = c("A", "B", NA, "A", "B", NA))
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  out <- as_attrition_tibble(fl, branch_by = "arm", branch_na_label = "Unknown arm")
+
+  expect_true("Unknown arm" %in% names(out))
+  expect_false("Missing" %in% names(out))
+  expect_equal(out[out$row_type == "final", ][["Unknown arm"]], 2L)
+})
+
+test_that("branch values that clash with standard column names abort", {
+  d  <- tibble::tibble(x = 1:4, arm = c("n", "A", "n", "A"))
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  expect_error(as_attrition_tibble(fl, branch_by = "arm"), "clash", class = "rlang_error")
+  expect_error(
+    as_attrition_tibble(fl, branch_by = "x", branch_na_label = "label"),
+    NA
+  )
+})
+
+test_that("no Missing branch column when branch_by has no NA", {
+  flow <- make_flow_parallel_rct()
+  out  <- as_attrition_tibble(flow, branch_by = "arm")
+  expect_false("Missing" %in% names(out))
+})
+
 test_that("branch_by errors when column not found", {
   flow <- make_flow_categorised()
   expect_error(
@@ -431,7 +510,7 @@ test_that("linear table has no branch columns when branch_by is NULL", {
   out  <- as_attrition_tibble(flow)
 
   standard_cols <- c("row_type", "label", "indent_level", "n",
-                     "n_removed", "pct_removed", "branch")
+                     "n_removed", "pct_removed")
   expect_equal(setdiff(names(out), standard_cols), character(0L))
 })
 
@@ -647,6 +726,18 @@ test_that("NA values in group_x form their own 'Missing' group, not folded into 
   # no silent dropping.
   total_assessed <- sum(out$n[out$row_type == "header"])
   expect_equal(total_assessed, nrow(flow$data))
+})
+
+test_that("as_attrition_table() passes group_na_label through to the header", {
+  skip_if_not_installed("flextable")
+  skip_if_not_installed("officer")
+  flow <- make_flow_stepped_wedge()
+  flow$data$site_id[seq_len(20)] <- NA
+
+  ft <- as_attrition_table(flow, group_x = "site_id", group_na_label = "Unknown")
+  header_text <- unlist(ft$header$dataset, use.names = FALSE)
+  expect_true("Unknown" %in% header_text)
+  expect_false("Missing" %in% header_text)
 })
 
 test_that("NA values in group_y form their own 'Missing' group, not folded into every other group", {
@@ -882,7 +973,7 @@ test_that("as_attrition_tibble() default (levels = character(0)) is unaffected b
   out  <- as_attrition_tibble(flow)
 
   expect_named(out, c("row_type", "label", "indent_level", "n",
-                      "n_removed", "pct_removed", "branch"))
+                      "n_removed", "pct_removed"))
   expect_equal(out$n[[1]], nrow(flow$data))
 })
 
@@ -943,3 +1034,16 @@ test_that("as_attrition_tibble(levels=) group_include step shows n_consequential
   expect_true(is.na(conseq) || conseq >= 0L)
 })
 
+test_that("NA arm values form their own branch column with a randomise() step", {
+  d <- tibble::tibble(
+    id  = 1:9, x = 1:9,
+    grp = rep(c("g1", "g2", "g3"), each = 3),
+    arm = rep(c("A", "B", NA), each = 3)
+  )
+  crit <- cf_criteria() |>
+    include(~ x > 0, label = "pos") |>
+    randomise(by = "grp", arms = "arm")
+  out <- as_attrition_tibble(apply_criteria(d, crit, id = "id"))
+  final_row <- out[out$row_type == "final", ]
+  expect_equal(c(final_row$A, final_row$B, final_row$Missing), c(3L, 3L, 3L))
+})

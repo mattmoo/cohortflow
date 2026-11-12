@@ -22,8 +22,10 @@
 #'   `select_within`): one or more character strings naming the grouping
 #'   column(s); supply more than one for composite (multi-column) grouping.
 #'   For `randomise`: one or more character strings naming the
-#'   randomisation unit column(s) (e.g. `"cluster_id"`). Ignored for
-#'   row-wise types.
+#'   randomisation unit column(s) (e.g. `"cluster_id"`). Must be `NULL` for
+#'   the row-wise types (`include`, `exclude`). Rows with an `NA` in any `by`
+#'   column cannot be assigned to a group and are always removed by grouped
+#'   step types.
 #' @param category An optional character string grouping this criterion with
 #'   others for display purposes (e.g. `"Valid age"` to group age-related steps
 #'   into one box in a CONSORT diagram). `NULL` (default) leaves the step
@@ -118,6 +120,11 @@ cf_criterion <- function(predicate,
         )
       )
     }
+  } else if (!is.null(by)) {
+    cli_abort(c(
+      sprintf("`by` must be NULL for row-wise type \"%s\".", type),
+      "i" = "Use group_include(), group_exclude() or select_within() for grouped steps."
+    ))
   }
 
   if (type == "randomise") {
@@ -167,15 +174,12 @@ predicate_label <- function(predicate) {
   if (is_formula(predicate)) {
     paste(deparse(predicate[[2L]], width.cutoff = 60L), collapse = " ")
   } else {
-    fn_name <- tryCatch(
-      deparse(substitute(predicate)),
-      error = function(e) NULL
-    )
-    if (!is.null(fn_name) && nzchar(fn_name) && fn_name != "predicate") {
-      fn_name
-    } else {
-      paste(deparse(body(predicate), width.cutoff = 60L), collapse = " ")
-    }
+    # Show the function body (collapsed onto one line, truncated). Deparsing
+    # the call site via substitute() would only ever show the caller's
+    # expression (e.g. `x$predicate`), not the function itself.
+    body_str <- paste(trimws(deparse(body(predicate), width.cutoff = 60L)), collapse = " ")
+    if (nchar(body_str) > 60L) body_str <- paste0(substr(body_str, 1L, 57L), "...")
+    body_str
   }
 }
 
@@ -278,9 +282,36 @@ eval_group_criterion <- function(criterion, data) {
     }
   }
 
-  # Broadcast scalar group result back to rows, keyed on the (possibly composite) `by` column(s)
-  pass_map <- stats::setNames(summary$.pass, as.character(.composite_key(summary, by_col)))
-  pass_map[as.character(.composite_key(data, by_col))]
+  by_str <- paste(by_col, collapse = ", ")
+  if (!is.logical(summary$.pass)) {
+    cli_abort(c(
+      "Group criterion must produce a logical `.pass` value per group.",
+      "x" = sprintf("`.pass` is of class <%s>.", paste(class(summary$.pass), collapse = "/")),
+      "i" = sprintf("Criterion: \"%s\"", criterion$label)
+    ))
+  }
+  if (!all(by_col %in% names(summary))) {
+    cli_abort(c(
+      sprintf("Group criterion result must contain the grouping column(s) `%s`.", by_str),
+      "i" = sprintf("Criterion: \"%s\"", criterion$label)
+    ))
+  }
+  summary_key <- as.character(.composite_key(summary, by_col))
+  if (anyDuplicated(summary_key)) {
+    cli_abort(c(
+      "Group criterion must return exactly one row per group.",
+      "x" = sprintf("Duplicate values found in `%s` of the returned summary.", by_str),
+      "i" = sprintf("Criterion: \"%s\"", criterion$label)
+    ))
+  }
+
+  # Broadcast scalar group result back to rows, keyed on the (possibly
+  # composite) `by` column(s). Rows with an NA in any `by` column get NA (and
+  # so are removed): they cannot be assigned to a group.
+  pass_map <- stats::setNames(summary$.pass, summary_key)
+  out <- unname(pass_map[as.character(.composite_key(data, by_col))])
+  out[!stats::complete.cases(data[by_col])] <- NA
+  out
 }
 
 #' Evaluate a select_within criterion -- returns a logical vector (nrow(data))
@@ -302,7 +333,13 @@ eval_select_criterion <- function(criterion, data) {
   row_idx <- seq_len(nrow(data))
   keep    <- logical(nrow(data))
 
-  groups <- split(row_idx, .composite_key(data, by_col))
+  # Rows with an NA in any `by` column are never visited, so their `keep`
+  # entry stays FALSE: by design, rows that cannot be assigned to a group are
+  # always removed by grouped step types. (A pasted composite key is never NA,
+  # so this is checked explicitly rather than relying on split() dropping NA.)
+  complete <- stats::complete.cases(data[by_col])
+  groups   <- split(row_idx[complete], .composite_key(data[complete, , drop = FALSE], by_col),
+                    drop = TRUE)
 
   for (grp_rows in groups) {
     grp_data <- data[grp_rows, , drop = FALSE]

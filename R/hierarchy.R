@@ -33,15 +33,18 @@
 cf_hierarchy <- function(...) {
   args <- list(...)
 
-  if (is.null(names(args)) || any(!nzchar(names(args)))) {
-    rlang::abort("All arguments to `cf_hierarchy()` must be named.")
-  }
-
+  # Checked first so cf_hierarchy() reports the real problem rather than
+  # "must be named".
   if (length(args) == 0L) {
     rlang::abort("`cf_hierarchy()` requires at least one level.")
   }
 
-  if (!all(vapply(args, is.character, logical(1L)))) {
+  if (is.null(names(args)) || any(!nzchar(names(args)))) {
+    rlang::abort("All arguments to `cf_hierarchy()` must be named.")
+  }
+
+  # Checked per argument (each may be a multi-column character vector)
+  if (!all(vapply(args, function(a) is.character(a) && length(a) >= 1L, logical(1L)))) {
     rlang::abort("All values in `cf_hierarchy()` must be character strings (column names).")
   }
 

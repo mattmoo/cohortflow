@@ -25,7 +25,8 @@ as_consort_diagram(
   branch_by = NULL,
   stage_by = NULL,
   stage_label_by = NULL,
-  count_by = NULL
+  count_by = NULL,
+  branch_na_label = "Missing"
 )
 }
 \arguments{
@@ -110,6 +111,11 @@ supplied, counts are computed as \code{n_distinct(count_by)} rather than
 \code{nrow()}. Essential for crossover data where one participant has
 several event rows. Not currently supported together with a
 \code{randomise()}-driven split (per-arm cascades always use row counts).}
+
+\item{branch_na_label}{Character string used to label the branch formed by
+\code{NA} values in \code{branch_by} (and, in \code{\link[=as_consort_diagram]{as_consort_diagram()}}, the stage
+formed by \code{NA} values in \code{stage_by}). Default \code{"Missing"}. Ignored when
+the column has no \code{NA} values.}
 }
 \value{
 A \code{consort_diagram} object (a \code{ggplot2} \code{ggplot}), drawable via
@@ -137,7 +143,7 @@ with \code{+} and further \code{ggplot2} layers/themes, or exported with
 \code{\link[grDevices:png]{grDevices::png()}}) before drawing.
 }
 \examples{
-dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
   include(~ !is.na(age),          label = "Age recorded",    category = "Valid age") |>
   include(~ age >= 18,            label = "Adults only",     category = "Valid age") |>

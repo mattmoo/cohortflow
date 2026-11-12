@@ -21,3 +21,12 @@ A \code{cf_criteria} object.
 Reads a YAML file (or string) written by \code{\link[=export_criteria]{export_criteria()}} and
 reconstructs a \code{cf_criteria} object.
 }
+\section{Security}{
+
+Criteria files contain R code: every formula and function predicate is
+parsed and evaluated when the file is imported (and again when the
+criteria are applied), and \code{fn_ref} entries are looked up and called.
+Treat a criteria file like an R script: do not import files from
+untrusted sources.
+}
+

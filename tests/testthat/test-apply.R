@@ -33,6 +33,62 @@ test_that("apply_criteria() uses supplied id column", {
   expect_equal(flow$data$.cf_row_id, dat$participant_id)
 })
 
+test_that("apply_criteria() aborts on duplicate id values", {
+  d    <- tibble::tibble(pid = c("P1", "P1", "P2", "P3"), x = c(1, -1, 1, 1))
+  crit <- cf_criteria() |> include(~ x > 0, label = "pos")
+  expect_error(apply_criteria(d, crit, id = "pid"), "duplicate", class = "rlang_error")
+})
+
+test_that("apply_criteria() aborts on NA id values", {
+  d    <- tibble::tibble(pid = c("P1", NA, "P3"), x = c(1, -1, 1))
+  crit <- cf_criteria() |> include(~ x > 0, label = "pos")
+  expect_error(apply_criteria(d, crit, id = "pid"), "missing", class = "rlang_error")
+})
+
+test_that("apply_criteria() aborts when id is not a character vector of names", {
+  d    <- tibble::tibble(a = 1:3, b = 1:3)
+  crit <- cf_criteria() |> include(~ a > 0, label = "pos")
+  expect_error(apply_criteria(d, crit, id = 1), class = "rlang_error")
+  expect_error(apply_criteria(d, crit, id = c("a", NA)), class = "rlang_error")
+  expect_error(apply_criteria(d, crit, id = ""), class = "rlang_error")
+})
+
+test_that("apply_criteria() aborts on a non-unique existing .cf_row_id", {
+  d    <- tibble::tibble(x = 1:3, .cf_row_id = c(1L, 1L, 2L))
+  crit <- cf_criteria() |> include(~ x > 0, label = "pos")
+  expect_error(apply_criteria(d, crit), "duplicate", class = "rlang_error")
+  d$.cf_row_id <- c(1L, NA, 2L)
+  expect_error(apply_criteria(d, crit), "missing", class = "rlang_error")
+})
+
+test_that("group_include removes rows with an NA group key", {
+  d    <- tibble::tibble(id = 1:5, grp = c("a", "a", NA, "b", "b"))
+  crit <- cf_criteria() |> group_include(by = "grp", ~ n() >= 1, label = "Any size")
+  flow <- apply_criteria(d, crit, id = "id")
+  ex   <- excluded(flow)
+  expect_equal(ex$id, 3L)
+  expect_equal(ex$cf_step, 1L)
+})
+
+test_that("group_exclude removes rows with an NA group key", {
+  d    <- tibble::tibble(id = 1:5, grp = c("a", "a", NA, "b", "b"))
+  crit <- cf_criteria() |> group_exclude(by = "grp", ~ n() > 10, label = "Huge groups")
+  flow <- apply_criteria(d, crit, id = "id")
+  ex   <- excluded(flow)
+  expect_equal(ex$id, 3L)
+  expect_equal(ex$cf_step, 1L)
+  expect_equal(nrow(cohort(flow)), 4L)
+})
+
+test_that("select_within removes rows with an NA group key", {
+  d    <- tibble::tibble(id = 1:5, grp = c("a", "a", NA, "b", "b"))
+  crit <- cf_criteria() |> select_within(by = "grp", ~ rep(TRUE, length(id)), label = "Keep all")
+  flow <- apply_criteria(d, crit, id = "id")
+  ex   <- excluded(flow)
+  expect_equal(ex$id, 3L)
+  expect_equal(ex$cf_step, 1L)
+})
+
 test_that("apply_criteria() supports a composite (multi-column) id", {
   dat  <- suppressWarnings(mock_cohortflow(50, seed = 1))
   crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
@@ -43,13 +99,33 @@ test_that("apply_criteria() supports a composite (multi-column) id", {
   )
 })
 
-test_that("apply_criteria() warns on a duplicated composite id", {
+test_that("apply_criteria() aborts on a duplicated composite id", {
   dat  <- suppressWarnings(mock_cohortflow(50, seed = 1))
   crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
-  expect_warning(
+  expect_error(
     apply_criteria(dat, crit, id = c("cluster_id", "site_id")),
-    "duplicate"
+    "duplicate",
+    class = "rlang_error"
   )
+})
+
+test_that("apply_criteria() aborts when any composite id column is NA", {
+  d    <- tibble::tibble(a = c(1, 1, 2), b = c("x", NA, "x"), v = 1:3)
+  crit <- cf_criteria() |> include(~ v > 0, label = "pos")
+  expect_error(apply_criteria(d, crit, id = c("a", "b")), "missing", class = "rlang_error")
+})
+
+test_that("grouped steps remove rows with an NA in any composite by column", {
+  d <- tibble::tibble(id = 1:6, g1 = c("a", "a", "a", "b", "b", "b"),
+                      g2 = c(1, 1, NA, 2, 2, 2))
+  for (crit in list(
+    cf_criteria() |> group_include(by = c("g1", "g2"), ~ n() >= 1, label = "gi"),
+    cf_criteria() |> group_exclude(by = c("g1", "g2"), ~ n() > 10, label = "ge"),
+    cf_criteria() |> select_within(by = c("g1", "g2"), ~ rep(TRUE, length(id)), label = "sw")
+  )) {
+    flow <- apply_criteria(d, crit, id = "id")
+    expect_equal(excluded(flow)$id, 3L)
+  }
 })
 
 test_that("apply_criteria() errors naming a missing composite id column", {

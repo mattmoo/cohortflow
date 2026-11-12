@@ -6,3 +6,6 @@
 ^\.lintr$
 ^\.github$
 ^ROADMAP\.md$
+^\.vscode$
+^\.Rprofile$
+^Rplots\.pdf$

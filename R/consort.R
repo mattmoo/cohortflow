@@ -247,10 +247,13 @@
       excl_dims <- excl_info[[i]]
       excl_x    <- excl_x_left + excl_dims$w / 2
 
+      # Branch off the midpoint of the connector into this box (the gap
+      # above it was sized by .consort_stack_y() to fit this exclusion box).
+      box_top  <- main_df$y[i] + main_df$h[i] / 2
       branch_y <- if (i > 1L) {
-        mean(c(main_df$y[i - 1L], main_df$y[i]))
+        mean(c(main_df$y[i - 1L] - main_df$h[i - 1L] / 2, box_top))
       } else if (!is.null(prev_bottom_y)) {
-        mean(c(prev_bottom_y, main_df$y[i]))
+        mean(c(prev_bottom_y, box_top))
       } else {
         main_df$y[i]
       }
@@ -284,6 +287,45 @@
 
   list(main_df = main_df, main_arrow_df = main_arrow_df,
        excl_df = excl_df, excl_arrow_df = excl_arrow_df)
+}
+
+# Main-box and exclusion-box heights for a list of groups (exclusion height
+# is 0 when the group has no exclusion box). Position-independent, so it can
+# be computed before any box is placed and used to drive the vertical layout.
+.consort_group_heights <- function(groups, wrap_width, big_mark, digits) {
+  h <- vapply(groups, function(g) {
+    r <- g$row
+    n_survive <- r$n - .consort_group_removal(g)$n_removed
+    label <- sprintf("%s\n(n=%s)", r$label, .format_n(n_survive, big_mark))
+    .consort_box_dims(label, wrap_width = wrap_width)$h
+  }, numeric(1L))
+  excl_h <- vapply(groups, function(g) {
+    if (!.consort_has_exclusions(g)) return(0)
+    excl_label <- paste(.consort_excl_lines(g, digits, big_mark), collapse = "\n")
+    .consort_box_dims(excl_label, wrap_width = wrap_width)$h
+  }, numeric(1L))
+  list(h = h, excl_h = excl_h)
+}
+
+# Stacks boxes of heights `h` top-down from `top_edge` and returns their
+# centre y positions. The gap above box i is at least `gap_y`, widened to fit
+# an exclusion box of height `excl_h[i]` (centred on the connector into box
+# i) with `gap_pad` clearance, so neither main boxes nor exclusion boxes can
+# overlap however long the pipeline is. `first_gap` is the gap above the
+# first box (0 when stacking from the top of the diagram). The plot's
+# y-limits are derived from the box extents afterwards.
+.consort_stack_y <- function(h, excl_h, top_edge, gap_y = 0.06, gap_pad = 0.02,
+                             first_gap = 0) {
+  n <- length(h)
+  y <- numeric(n)
+  edge <- top_edge
+  for (i in seq_len(n)) {
+    gap <- if (i == 1L) first_gap else gap_y
+    if (excl_h[i] > 0) gap <- max(gap, excl_h[i] + 2 * gap_pad)
+    y[i] <- edge - gap - h[i] / 2
+    edge <- y[i] - h[i] / 2
+  }
+  y
 }
 
 # Row ids from `flow$data` that are still "in" immediately after step
@@ -383,7 +425,7 @@
 #' @export
 #'
 #' @examples
-#' dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+#' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 #' crit <- cf_criteria() |>
 #'   include(~ !is.na(age),          label = "Age recorded",    category = "Valid age") |>
 #'   include(~ age >= 18,            label = "Adults only",     category = "Valid age") |>
@@ -412,7 +454,8 @@ as_consort_diagram <- function(
   branch_by        = NULL,
   stage_by         = NULL,
   stage_label_by   = NULL,
-  count_by         = NULL
+  count_by         = NULL,
+  branch_na_label  = "Missing"
 ) {
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
@@ -429,6 +472,9 @@ as_consort_diagram <- function(
     if (!branch_by %in% names(cohort_data)) {
       rlang::abort(sprintf("Column `%s` not found in surviving cohort.", branch_by))
     }
+  }
+  if (!is.null(count_by) && is.null(branch_by)) {
+    rlang::abort("`count_by` requires `branch_by` to be specified.")
   }
   if (!is.null(stage_by) && is.null(branch_by)) {
     rlang::abort("`stage_by` requires `branch_by` to be specified.")
@@ -468,19 +514,17 @@ as_consort_diagram <- function(
     )
   }
 
-  top      <- 0.94
-  bottom   <- 0.06
-  # `row_height` is the vertical spacing a single linear cascade of `n_main`
-  # boxes would use; re-deriving it (rather than a fresh `seq(top, bottom, ...)`
-  # over just the shared-trunk boxes) means the trunk keeps the *same* row
-  # spacing whether or not it gets split, and any per-arm cascade rows below
-  # it continue seamlessly at the positions the unsplit layout would have
-  # used for those same rows.
-  row_height <- if (n_main > 1L) (top - bottom) / (n_main - 1L) else 0.15
-  full_y     <- if (n_main > 1L) top - (seq_len(n_main) - 1L) * row_height else 0.5
+  top        <- 0.94
+  gap_y      <- 0.06   # minimum vertical gap between consecutive boxes
+  gap_pad    <- 0.02   # clearance above/below an exclusion box within its gap
   n_pre      <- if (use_split_cascade) split_idx else n_main
   pre_groups <- groups[seq_len(n_pre)]
-  main_y     <- full_y[seq_len(n_pre)]
+  # Vertical positions are derived from box content (see .consort_stack_y()):
+  # the shared trunk stacks down from `top`, and any per-arm cascades below a
+  # randomise() split stack down from the bottom of the split box.
+  pre_heights <- .consort_group_heights(pre_groups, wrap_width, big_mark, digits)
+  main_y      <- .consort_stack_y(pre_heights$h, pre_heights$excl_h, top_edge = top,
+                                  gap_y = gap_y, gap_pad = gap_pad)
   main_x     <- 0.24
   gap_x      <- 0.08
   text_pad   <- 0.015
@@ -550,7 +594,10 @@ as_consort_diagram <- function(
       entered_ids  <- .consort_entered_at_step(flow, randomise_step$step)
       entered_data <- flow$data[flow$data$.cf_row_id %in% entered_ids, , drop = FALSE]
 
-      branch_values <- sort(unique(entered_data[[branch_by]]))
+      # NA arm values form their own trailing arm (labelled branch_na_label)
+      branch_values <- .cf_group_values(entered_data[[branch_by]])
+      branch_labels <- vapply(branch_values, .cf_group_label, character(1L),
+                              na_label = branch_na_label, USE.NAMES = FALSE)
       n_branches    <- length(branch_values)
 
       n_criteria    <- length(flow$criteria)
@@ -564,7 +611,6 @@ as_consort_diagram <- function(
       split_box  <- main_df[n_pre, ]
       trunk_y0   <- split_box$y - split_box$h / 2
       n_post     <- n_main - n_pre
-      post_y     <- full_y[n_pre + seq_len(n_post)]
 
       # -- Pass 1: re-apply the remaining criteria per arm and measure box
       # dims (position-independent), so the horizontal spacing between
@@ -578,8 +624,8 @@ as_consort_diagram <- function(
       arm_entered_n   <- integer(n_branches)
 
       for (b in seq_len(n_branches)) {
-        branch_val <- branch_values[b]
-        arm_data   <- entered_data[entered_data[[branch_by]] == branch_val, , drop = FALSE]
+        arm_data   <- entered_data[.cf_group_match(entered_data[[branch_by]], branch_values[b]), ,
+                                   drop = FALSE]
         arm_entered_n[b] <- nrow(arm_data)
         arm_flow   <- apply_criteria(arm_data, remaining_criteria, id = ".cf_row_id")
         arm_tbl    <- .attrition_tibble_core(
@@ -595,7 +641,7 @@ as_consort_diagram <- function(
 
         arm_groups_list[[b]] <- arm_groups
         arm_label_dims[[b]]  <- .consort_box_dims(
-          sprintf("%s\n(n=%s)", branch_val, .format_n(arm_entered_n[b], big_mark)),
+          sprintf("%s\n(n=%s)", branch_labels[b], .format_n(arm_entered_n[b], big_mark)),
           wrap_width = wrap_width
         )
       }
@@ -631,10 +677,17 @@ as_consort_diagram <- function(
       # allocation box a standard CONSORT diagram always draws right after
       # randomisation, and is the only place the arm identity is shown
       # (the step cascades below it are otherwise unlabelled by arm).
-      extended_y <- c(post_y, post_y[n_post] - row_height)
-      label_y    <- extended_y[1L]
-      step_y     <- extended_y[2:(n_post + 1L)]
-      crossbar_y <- mean(c(full_y[n_pre], label_y))
+      # Positions are shared by every arm column, so each row's gap is sized
+      # for the tallest box/exclusion box at that row across all arms.
+      label_h    <- max(vapply(arm_label_dims, `[[`, numeric(1L), "h"))
+      label_y    <- trunk_y0 - gap_y - label_h / 2
+      arm_heights <- lapply(arm_groups_list, .consort_group_heights,
+                            wrap_width = wrap_width, big_mark = big_mark, digits = digits)
+      post_h      <- do.call(pmax, lapply(arm_heights, `[[`, "h"))
+      post_excl_h <- do.call(pmax, lapply(arm_heights, `[[`, "excl_h"))
+      step_y     <- .consort_stack_y(post_h, post_excl_h, top_edge = label_y - label_h / 2,
+                                     gap_y = gap_y, gap_pad = gap_pad, first_gap = gap_y)
+      crossbar_y <- mean(c(trunk_y0, label_y + label_h / 2))
 
       branch_main_list       <- vector("list", n_branches)
       branch_arrow_list      <- vector("list", n_branches)
@@ -643,12 +696,11 @@ as_consort_diagram <- function(
       branch_anchor_list     <- vector("list", n_branches)
 
       for (b in seq_len(n_branches)) {
-        branch_val  <- branch_values[b]
         label_dims  <- arm_label_dims[[b]]
         label_box <- data.frame(
           id = paste0("branch_", b, "_label"), x = branch_xs[b], y = label_y,
           w = label_dims$w, h = label_dims$h, label = label_dims$label,
-          branch = as.character(branch_val), stringsAsFactors = FALSE
+          branch = branch_labels[b], stringsAsFactors = FALSE
         )
 
         arm_cascade <- .consort_build_cascade(
@@ -659,7 +711,7 @@ as_consort_diagram <- function(
         )
 
         arm_main <- arm_cascade$main_df
-        arm_main$branch <- as.character(branch_val)
+        arm_main$branch <- branch_labels[b]
         branch_main_list[[b]] <- rbind(label_box, arm_main)
 
         entry_arrow <- data.frame(
@@ -677,14 +729,14 @@ as_consort_diagram <- function(
 
         if (nrow(arm_cascade$excl_df) > 0L) {
           arm_excl <- arm_cascade$excl_df
-          arm_excl$branch <- as.character(branch_val)
+          arm_excl$branch <- branch_labels[b]
           branch_excl_list[[b]] <- arm_excl
           branch_excl_arrow_list[[b]] <- arm_cascade$excl_arrow_df
         }
 
         branch_anchor_list[[b]] <- data.frame(
           x = branch_xs[b], y = arm_main$y[nrow(arm_main)],
-          h = arm_main$h[nrow(arm_main)], branch = as.character(branch_val),
+          h = arm_main$h[nrow(arm_main)], branch = branch_labels[b],
           stringsAsFactors = FALSE
         )
       }
@@ -713,8 +765,11 @@ as_consort_diagram <- function(
       }
     } else {
       # ---- Legacy end-of-cascade branching (no active randomise() split) --
-      # Split cohort by branch_by
-      branch_values <- sort(unique(cohort_data[[branch_by]]))
+      # Split cohort by branch_by -- NA values form their own trailing branch
+      # (labelled `branch_na_label`) rather than leaking into every branch.
+      branch_values <- .cf_group_values(cohort_data[[branch_by]])
+      branch_labels <- vapply(branch_values, .cf_group_label, character(1L),
+                              na_label = branch_na_label, USE.NAMES = FALSE)
       n_branches <- length(branch_values)
 
       final_box <- main_df[nrow(main_df), ]
@@ -730,10 +785,10 @@ as_consort_diagram <- function(
       # First compute each branch box's label/dims (position comes next)
       branch_dims_list <- vector("list", n_branches)
       for (b in seq_len(n_branches)) {
-        branch_val  <- branch_values[b]
-        branch_data <- cohort_data[cohort_data[[branch_by]] == branch_val, ]
+        branch_data <- cohort_data[.cf_group_match(cohort_data[[branch_by]], branch_values[b]), ,
+                                   drop = FALSE]
         branch_n    <- count_fn(branch_data)
-        label <- sprintf("%s\n(n=%s)", branch_val, .format_n(branch_n, big_mark))
+        label <- sprintf("%s\n(n=%s)", branch_labels[b], .format_n(branch_n, big_mark))
         branch_dims_list[[b]] <- .consort_box_dims(label, wrap_width = wrap_width)
       }
 
@@ -753,7 +808,6 @@ as_consort_diagram <- function(
       branch_arrow_rows <- list()
 
       for (b in seq_len(n_branches)) {
-        branch_val <- branch_values[b]
         dims <- branch_dims_list[[b]]
 
         branch_rows[[b]] <- data.frame(
@@ -763,7 +817,7 @@ as_consort_diagram <- function(
           w = dims$w,
           h = dims$h,
           label = dims$label,
-          branch = as.character(branch_val),
+          branch = branch_labels[b],
           stringsAsFactors = FALSE
         )
 
@@ -814,11 +868,11 @@ as_consort_diagram <- function(
       row_idx <- 1L
 
       for (b in seq_len(n_branches)) {
-        branch_val <- branch_values[b]
-        branch_data <- cohort_data[cohort_data[[branch_by]] == branch_val, ]
+        branch_data <- cohort_data[.cf_group_match(cohort_data[[branch_by]], branch_values[b]), ,
+                                   drop = FALSE]
 
-        # Get unique stages in order
-        stages <- sort(unique(branch_data[[stage_by]]))
+        # Get unique stages in order (an NA stage, if any, comes last)
+        stages <- .cf_group_values(branch_data[[stage_by]])
         n_stages <- length(stages)
 
         anchor_y <- branch_anchor_df$y[b]
@@ -827,8 +881,10 @@ as_consort_diagram <- function(
         stage_spacing <- 0.08
 
         for (s in seq_len(n_stages)) {
-          stage_val <- stages[s]
-          stage_data <- branch_data[branch_data[[stage_by]] == stage_val, ]
+          stage_val   <- stages[s]
+          stage_name  <- .cf_group_label(stage_val, branch_na_label)
+          stage_data  <- branch_data[.cf_group_match(branch_data[[stage_by]], stage_val), ,
+                                     drop = FALSE]
 
           # Label: use stage_label_by if provided, otherwise stage value
           if (!is.null(stage_label_by)) {
@@ -836,7 +892,7 @@ as_consort_diagram <- function(
             labels <- stage_data[[stage_label_by]]
             stage_label <- names(sort(table(labels), decreasing = TRUE))[1]
           } else {
-            stage_label <- as.character(stage_val)
+            stage_label <- stage_name
           }
 
           stage_n <- count_fn(stage_data)
@@ -852,8 +908,8 @@ as_consort_diagram <- function(
             w = dims$w,
             h = dims$h,
             label = dims$label,
-            branch = as.character(branch_val),
-            stage = as.character(stage_val),
+            branch = branch_labels[b],
+            stage = stage_name,
             stringsAsFactors = FALSE
           )
 

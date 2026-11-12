@@ -11,6 +11,13 @@
 #' and `id` is `NULL`, a sequential integer identifier is added automatically
 #' (with a message). Supply `id` to use an existing column as the identifier.
 #'
+#' The identifier (whether supplied via `id` or a pre-existing `.cf_row_id`
+#' column) must uniquely identify every row: it may contain neither
+#' duplicates nor `NA` values, and `apply_criteria()` aborts if it does. For
+#' designs with several rows per participant (e.g. crossover or stepped-wedge
+#' data), use a row-level identifier such as `event_id`, not the participant
+#' identifier.
+#'
 #' @section Step types:
 #' | Type | Predicate | Effect |
 #' |---|---|---|
@@ -20,6 +27,10 @@
 #' | `group_exclude` | Per-group scalar (summarise context) | Drop rows in groups where result is `TRUE` |
 #' | `select_within` | Per-group logical vector | Keep `TRUE` rows within each group |
 #' | `randomise` | None (`predicate = NULL`) | Records the randomisation unit and arm column for downstream reporting |
+#'
+#' Rows whose `by` value is `NA` cannot be assigned to a group and are always
+#' removed by grouped step types (`group_include`, `group_exclude`,
+#' `select_within`).
 #'
 #' @param data A data frame.
 #' @param criteria A `cf_criteria` object.
@@ -46,7 +57,7 @@
 #' @export
 #'
 #' @examples
-#' dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+#' dat  <- mock_cluster_rct(n_participants = 200, seed = 1)
 #' crit <- cf_criteria() |>
 #'   include(~ eligible_screen, label = "Passed screening") |>
 #'   include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
@@ -124,7 +135,9 @@ apply_criteria <- function(data, criteria, id = NULL, expected = NULL, by = NULL
       },
       group_exclude = {
         result <- eval_group_criterion(s, current)
-        !(result & !is.na(result))
+        # Rows with an NA group key are removed, matching group_include and
+        # select_within (otherwise `!(NA & FALSE)` would keep them).
+        !(result & !is.na(result)) & stats::complete.cases(current[s$by])
       },
       select_within = {
         result <- eval_select_criterion(s, current)
@@ -165,6 +178,9 @@ apply_criteria <- function(data, criteria, id = NULL, expected = NULL, by = NULL
 .ensure_row_id <- function(data, id) {
   if (!is.null(id)) {
     # User supplied one or more column names (composite key when length > 1)
+    if (!is.character(id) || length(id) < 1L || anyNA(id) || !all(nzchar(id))) {
+      rlang::abort("`id` must be a character vector of column names in `data`.")
+    }
     missing_id <- setdiff(id, names(data))
     if (length(missing_id) > 0L) {
       rlang::abort(sprintf(
@@ -172,19 +188,14 @@ apply_criteria <- function(data, criteria, id = NULL, expected = NULL, by = NULL
         paste(missing_id, collapse = ", ")
       ))
     }
-    key <- .composite_key(data, id)
-    if (any(duplicated(key))) {
-      rlang::warn(sprintf(
-        "Column(s) `%s` contain duplicate values; they may not uniquely identify rows.",
-        paste(id, collapse = ", ")
-      ))
-    }
-    data$.cf_row_id <- key
+    .check_unique_id(data[id], paste(id, collapse = ", "))
+    data$.cf_row_id <- .composite_key(data, id)
     return(data)
   }
 
   if (".cf_row_id" %in% names(data)) {
-    # Already has an ID column -- use it
+    # Already has an ID column -- use it, but only if it is a valid identifier
+    .check_unique_id(data$.cf_row_id, ".cf_row_id")
     return(data)
   }
 
@@ -193,6 +204,28 @@ apply_criteria <- function(data, criteria, id = NULL, expected = NULL, by = NULL
           "Adding a sequential `.cf_row_id`.")
   data$.cf_row_id <- seq_len(nrow(data))
   data
+}
+
+# Row identity is used to select rows in cohort()/excluded(), so a
+# non-unique or missing identifier would silently remove (or keep) every row
+# sharing a value. Abort rather than warn. `x` is a vector, or a data frame
+# of the column(s) forming a composite key (checked row-wise).
+.check_unique_id <- function(x, col) {
+  if (anyNA(x)) {
+    rlang::abort(c(
+      sprintf("Column(s) `%s` used as the row identifier contain missing values.", col),
+      "i" = "The identifier must uniquely identify every row."
+    ))
+  }
+  if (anyDuplicated(x)) {
+    rlang::abort(c(
+      sprintf("Column(s) `%s` used as the row identifier contain duplicate values.", col),
+      "i" = "The identifier must uniquely identify every row.",
+      "i" = paste0("For designs with several rows per participant, use a row-level ",
+                   "identifier (e.g. `id = \"event_id\"`) rather than a participant id.")
+    ))
+  }
+  invisible(x)
 }
 
 # Build a single grouping/identifier key from one or more columns. A single
@@ -209,7 +242,7 @@ apply_criteria <- function(data, criteria, id = NULL, expected = NULL, by = NULL
 
 # Right-joins `data` onto `expected` by `by`, so every row of `expected` is
 # retained (with `NA` for any `data`-only columns when there is no match).
-# Unlike `.ensure_row_id()`'s duplicate check (warn-only), a duplicated key in
+# As with `.ensure_row_id()`'s uniqueness check, a duplicated key in
 # `expected` is destructive (silently fans out matching `data` rows) and so
 # is a hard error.
 .join_expected <- function(data, expected, by) {
@@ -257,7 +290,7 @@ apply_criteria <- function(data, criteria, id = NULL, expected = NULL, by = NULL
 # Aborts (rather than warns) if `by` does not uniquely identify rows of `df`,
 # naming the offending duplicate value(s). Used wherever a join would
 # silently fan out rows if the key were not unique (expected-unit joins,
-# continue_criteria() joins) -- deliberately stricter than `.ensure_row_id()`.
+# continue_criteria() joins).
 .assert_no_join_fanout <- function(df, by) {
   key <- .composite_key(df, by)
   dup <- unique(key[duplicated(key)])

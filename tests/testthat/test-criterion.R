@@ -27,6 +27,17 @@ test_that("cf_criterion() requires a non-empty label", {
   expect_error(cf_criterion(~ age >= 18, label = NA_character_), class = "rlang_error")
 })
 
+test_that("cf_criterion() rejects `by` for row-wise types", {
+  expect_error(
+    cf_criterion(~ x > 0, label = "pos", type = "include", by = "grp"),
+    class = "rlang_error"
+  )
+  expect_error(
+    cf_criterion(~ x > 0, label = "pos", type = "exclude", by = "grp"),
+    class = "rlang_error"
+  )
+})
+
 test_that("cf_criterion() defaults type to 'include'", {
   crit <- cf_criterion(~ age >= 18, label = "Adults")
   expect_equal(crit$type, "include")
@@ -38,7 +49,7 @@ test_that("print.cf_criterion() runs without error", {
 })
 
 # ---------------------------------------------------------------------------
-# type = "randomise"
+# randomise step type
 
 test_that("cf_criterion() accepts type = 'randomise' with NULL predicate", {
   crit <- cf_criterion(predicate = NULL, label = "Randomised", type = "randomise",
@@ -67,7 +78,7 @@ test_that("cf_criterion() requires `arms` for type = 'randomise'", {
 test_that("cf_criterion() requires a NULL predicate for type = 'randomise'", {
   expect_error(
     cf_criterion(~ TRUE, label = "Randomised", type = "randomise",
-                by = "cluster_id", arms = "arm"),
+                 by = "cluster_id", arms = "arm"),
     class = "rlang_error"
   )
 })
@@ -165,6 +176,19 @@ test_that("format.cf_criterion() works for function predicate", {
   s    <- format(crit)
   expect_type(s, "character")
   expect_true(grepl("Age present", s))
+  expect_true(grepl("is.na", s, fixed = TRUE))
+  expect_false(grepl("$predicate", s, fixed = TRUE))
+  expect_output(print(crit), "is.na", fixed = TRUE)
+})
+
+test_that("format.cf_criterion() truncates long function bodies", {
+  fn   <- function(d) {
+    !is.na(d$a_really_long_column_name) & !is.na(d$another_really_long_column_name)
+  }
+  crit <- cf_criterion(fn, label = "Long", type = "include")
+  pred <- cohortflow:::predicate_label(crit$predicate)
+  expect_lte(nchar(pred), 60L)
+  expect_true(endsWith(pred, "..."))
 })
 
 test_that("format.cf_criterion() works for select_within", {
@@ -223,6 +247,30 @@ test_that("eval_group_criterion() errors when fn does not return .pass column", 
   crit <- cf_criterion(fn, label = "Bad fn", type = "group_include", by = "grp")
   d    <- data.frame(grp = c("a", "a"), x = 1:2)
   expect_error(cohortflow:::eval_group_criterion(crit, d), class = "rlang_error")
+})
+
+test_that("eval_group_criterion() errors when .pass is not logical", {
+  d <- data.frame(grp = c("a", "a", "b"), x = 1:3)
+  crit <- cf_criterion(~ n(), label = "Numeric pass", type = "group_include", by = "grp")
+  expect_error(cohortflow:::eval_group_criterion(crit, d), "logical", class = "rlang_error")
+
+  fn <- function(g) dplyr::summarise(g, .pass = dplyr::n(), .groups = "drop")
+  crit_fn <- cf_criterion(fn, label = "Numeric pass fn", type = "group_include", by = "grp")
+  expect_error(cohortflow:::eval_group_criterion(crit_fn, d), "logical", class = "rlang_error")
+})
+
+test_that("eval_group_criterion() errors when summary lacks the by column", {
+  fn <- function(g) data.frame(.pass = c(TRUE, FALSE))
+  crit <- cf_criterion(fn, label = "No by col", type = "group_include", by = "grp")
+  d <- data.frame(grp = c("a", "a", "b"), x = 1:3)
+  expect_error(cohortflow:::eval_group_criterion(crit, d), "grouping column", class = "rlang_error")
+})
+
+test_that("eval_group_criterion() errors when summary has duplicate group rows", {
+  fn <- function(g) data.frame(grp = c("a", "a", "b"), .pass = c(TRUE, FALSE, TRUE))
+  crit <- cf_criterion(fn, label = "Dup groups", type = "group_include", by = "grp")
+  d <- data.frame(grp = c("a", "a", "b"), x = 1:3)
+  expect_error(cohortflow:::eval_group_criterion(crit, d), "one row per group", class = "rlang_error")
 })
 
 # ---------------------------------------------------------------------------

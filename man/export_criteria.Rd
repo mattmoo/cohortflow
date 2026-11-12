@@ -17,7 +17,9 @@ returned as a character string.}
 \code{"pkg::name"} reference strings.}
 }
 \value{
-Invisibly, the \code{criteria} object (or the YAML string if \code{path = NULL}).
+When \code{path = NULL}, the YAML text as a character string (returned
+visibly, so it prints at the console). Otherwise, invisibly, the
+\code{criteria} object.
 }
 \description{
 Serialises a \code{cf_criteria} object to a human-readable YAML file (or string).
@@ -35,11 +37,16 @@ The schema is self-describing and can be re-imported with \code{\link[=import_cr
       by:     null
       expr:   "age >= 18"
       fn_ref: null
+      category: null
 }\if{html}{\out{</div>}}
 
-Formula-based criteria round-trip cleanly. Anonymous function bodies are
-deparsed as a fallback; complex closures may not round-trip and a warning
-is issued. Named exported functions can be stored as \code{"pkg::name"} references
-via \code{fn_refs}.
+Formula-based criteria round-trip cleanly. For function predicates
+(\verb{kind: function}), \code{expr} holds the full deparsed function source,
+including its argument list and any default values (e.g.
+\code{"function(d, thr = 18) d$age >= thr"}); complex closures may not
+round-trip and a warning is issued. Named exported functions can be stored
+as \code{"pkg::name"} references via \code{fn_refs}. Files written by earlier
+versions, which stored the function body in \code{expr} and the argument names
+in a separate \code{fn_args} field, can still be imported.
 }
 

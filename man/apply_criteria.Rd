@@ -55,6 +55,13 @@ object from which the surviving cohort (\code{\link[=cohort]{cohort()}}) and exc
 default it looks for a \code{.cf_row_id} column in \code{data}. If one is not found
 and \code{id} is \code{NULL}, a sequential integer identifier is added automatically
 (with a message). Supply \code{id} to use an existing column as the identifier.
+
+The identifier (whether supplied via \code{id} or a pre-existing \code{.cf_row_id}
+column) must uniquely identify every row: it may contain neither
+duplicates nor \code{NA} values, and \code{apply_criteria()} aborts if it does. For
+designs with several rows per participant (e.g. crossover or stepped-wedge
+data), use a row-level identifier such as \code{event_id}, not the participant
+identifier.
 }
 
 \section{Step types}{
@@ -65,12 +72,17 @@ and \code{id} is \code{NULL}, a sequential integer identifier is added automatic
    \code{group_include} \tab Per-group scalar (summarise context) \tab Keep rows in groups where result is \code{TRUE} \cr
    \code{group_exclude} \tab Per-group scalar (summarise context) \tab Drop rows in groups where result is \code{TRUE} \cr
    \code{select_within} \tab Per-group logical vector \tab Keep \code{TRUE} rows within each group \cr
-   \code{randomise} \tab None (\code{predicate = NULL}) \tab Passes every row through unchanged; records the randomisation unit (\code{by}) and arm column (\code{arms}) for use by \code{\link[=as_consort_diagram]{as_consort_diagram()}}/\code{\link[=as_attrition_tibble]{as_attrition_tibble()}} \cr
+   \code{randomise} \tab None (\code{predicate = NULL}) \tab Records the randomisation unit and arm column for downstream reporting \cr
 }
+
+
+Rows whose \code{by} value is \code{NA} cannot be assigned to a group and are always
+removed by grouped step types (\code{group_include}, \code{group_exclude},
+\code{select_within}).
 }
 
 \examples{
-dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+dat  <- mock_cluster_rct(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
   include(~ eligible_screen, label = "Passed screening") |>
   include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>

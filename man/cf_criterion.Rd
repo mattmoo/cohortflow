@@ -36,8 +36,10 @@ identifying which rows within the group to keep.
 \code{select_within}): one or more character strings naming the grouping
 column(s); supply more than one for composite (multi-column) grouping.
 For \code{randomise}: one or more character strings naming the
-randomisation unit column(s) (e.g. \code{"cluster_id"}). Ignored for
-row-wise types.}
+randomisation unit column(s) (e.g. \code{"cluster_id"}). Must be \code{NULL} for
+the row-wise types (\code{include}, \code{exclude}). Rows with an \code{NA} in any \code{by}
+column cannot be assigned to a group and are always removed by grouped
+step types.}
 
 \item{category}{An optional character string grouping this criterion with
 others for display purposes (e.g. \code{"Valid age"} to group age-related steps

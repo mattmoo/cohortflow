@@ -18,10 +18,12 @@ as_attrition_table(
   consequential_col_label = "Consequential",
   branch_by = NULL,
   count_by = NULL,
+  branch_na_label = "Missing",
   group_x = NULL,
   group_y = NULL,
   group_x_label = NULL,
   group_y_label = NULL,
+  group_na_label = "Missing",
   levels = character(0),
   level_labels = NULL,
   show_consequential = NULL,
@@ -72,12 +74,18 @@ is split by this column and the final row's total is broken out into
 one additional column per branch value (named after the branch value,
 e.g. \code{Control}, \code{Intervention}), each populated only on the final row.
 Use \code{final_label = "Randomised"} when appropriate. Cannot be combined
-with \code{group_x}/\code{group_y}.}
+with \code{group_x}/\code{group_y}. Rows whose branch value is \code{NA} form their own
+branch, labelled \code{branch_na_label}.}
 
 \item{count_by}{Optional column name (string) for distinct counts. When
 supplied, counts are computed as \code{n_distinct(count_by)} rather than
 \code{nrow()}. Essential for crossover data where one participant has several
 event rows.}
+
+\item{branch_na_label}{Character string used to label the branch formed by
+\code{NA} values in \code{branch_by} (and, in \code{\link[=as_consort_diagram]{as_consort_diagram()}}, the stage
+formed by \code{NA} values in \code{stage_by}). Default \code{"Missing"}. Ignored when
+the column has no \code{NA} values.}
 
 \item{group_x}{Optional column name (string), present in \code{flow$data}, used
 to repeat the attrition table across the "column" direction (e.g. trial
@@ -94,6 +102,11 @@ value alone).}
 \item{group_y_label}{Optional prefix label for \code{group_y} row headings
 (e.g. \code{"Period"} to show \code{"Period: 1"}). Default \code{NULL} (show the group
 value alone).}
+
+\item{group_na_label}{Character string used to label the group formed by
+\code{NA} values in \code{group_x}/\code{group_y} (see the Grouping section). Default
+\code{"Missing"}. Ignored when the corresponding grouping column has no \code{NA}
+values.}
 
 \item{levels}{Optional; requires \code{flow} to have been built with
 \code{apply_criteria(hierarchy = ...)}. When the default \code{character(0)}, this
@@ -221,8 +234,8 @@ with \code{group_x}/\code{group_y}/\code{branch_by}/\code{count_by}.
 }
 
 \examples{
-\dontrun{
-dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+\donttest{
+dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
   include(~ !is.na(age),     label = "Age recorded",    category = "Valid age") |>
   include(~ age >= 18,       label = "Adults only",      category = "Valid age") |>
@@ -231,24 +244,33 @@ crit <- cf_criteria() |>
   exclude(~ withdrew,        label = "Withdrew consent", category = "Consent")
 flow <- apply_criteria(dat, crit)
 
-as_attrition_table(flow)                       # flextable (Word-ready)
-as_attrition_table(flow, backend = "gt")       # gt (LaTeX/HTML-ready)
-as_attrition_table(flow, backend = "huxtable") # huxtable
+if (requireNamespace("flextable", quietly = TRUE) &&
+    requireNamespace("officer", quietly = TRUE)) {
+  as_attrition_table(flow)                         # flextable (Word-ready)
+  as_attrition_table(flow, shade = "pct_removed")  # shade by \% removed
+}
+if (requireNamespace("gt", quietly = TRUE)) {
+  as_attrition_table(flow, backend = "gt")         # gt (LaTeX/HTML-ready)
+}
+if (requireNamespace("huxtable", quietly = TRUE)) {
+  as_attrition_table(flow, backend = "huxtable")   # huxtable
+}
 
-# Shade cells by percentage removed
-as_attrition_table(flow, shade = "pct_removed")
+if (requireNamespace("flextable", quietly = TRUE) &&
+    requireNamespace("officer", quietly = TRUE)) {
+  # Grid: sites as columns, periods as rows (stepped-wedge design)
+  sw      <- mock_stepped_wedge(n_participants = 400, n_periods = 4, seed = 1)
+  flow_sw <- apply_criteria(sw, crit, id = "event_id")
+  as_attrition_table(flow_sw, group_x = "site_id", group_y = "period")
 
-# Grid: sites as columns, periods as rows (stepped-wedge design)
-sw   <- mock_stepped_wedge(n_participants = 400, n_periods = 4, seed = 1)
-flow_sw <- apply_criteria(sw, crit, id = "event_id")
-as_attrition_table(flow_sw, group_x = "site_id", group_y = "period")
-
-# Hierarchy levels: cluster CONSORT reporting
-cl <- mock_cluster_rct(n_clusters = 20, seed = 1)
-h  <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
-flow_cl <- apply_criteria(cl, crit, hierarchy = h)
-as_attrition_table(flow_cl, levels = c("participant", "cluster"))
-
+  # Hierarchy levels: cluster CONSORT reporting
+  cl <- mock_cluster_rct(n_clusters = 20, seed = 1)
+  h  <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+  flow_cl <- apply_criteria(cl, crit, id = "participant_id", hierarchy = h)
+  as_attrition_table(flow_cl, levels = c("participant", "cluster"))
+}
+}
+\dontrun{
 # Save to Word
 ft <- as_attrition_table(flow)
 flextable::save_as_docx(ft, path = "attrition.docx")

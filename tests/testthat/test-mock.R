@@ -1,5 +1,14 @@
 test_that("mock_cohortflow() is deprecated", {
+  rlang::reset_warning_verbosity("cohortflow_mock_cohortflow_deprecated")
   expect_warning(mock_cohortflow(seed = 1), "deprecated")
+})
+
+test_that("mock_cohortflow() deprecation warning fires only once per session", {
+  # testthat forces verbose warnings; restore the default frequency handling.
+  rlang::local_options(rlib_warning_verbosity = "default")
+  rlang::reset_warning_verbosity("cohortflow_mock_cohortflow_deprecated")
+  expect_warning(mock_cohortflow(seed = 1), "deprecated")
+  expect_no_warning(mock_cohortflow(seed = 1))
 })
 
 

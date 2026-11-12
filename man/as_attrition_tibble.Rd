@@ -15,7 +15,8 @@ as_attrition_tibble(
   group_x = NULL,
   group_y = NULL,
   group_na_label = "Missing",
-  levels = character(0)
+  levels = character(0),
+  branch_na_label = "Missing"
 )
 }
 \arguments{
@@ -42,7 +43,8 @@ is split by this column and the final row's total is broken out into
 one additional column per branch value (named after the branch value,
 e.g. \code{Control}, \code{Intervention}), each populated only on the final row.
 Use \code{final_label = "Randomised"} when appropriate. Cannot be combined
-with \code{group_x}/\code{group_y}.}
+with \code{group_x}/\code{group_y}. Rows whose branch value is \code{NA} form their own
+branch, labelled \code{branch_na_label}.}
 
 \item{count_by}{Optional column name (string) for distinct counts. When
 supplied, counts are computed as \code{n_distinct(count_by)} rather than
@@ -71,6 +73,11 @@ column (see \code{\link[=apply_criteria]{apply_criteria()}}'s \code{hierarchy} a
 rule). When a character vector of level name(s), only those levels are
 returned, in the order given. Cannot be combined with \code{group_x}/\code{group_y},
 \code{branch_by}, or \code{count_by}.}
+
+\item{branch_na_label}{Character string used to label the branch formed by
+\code{NA} values in \code{branch_by} (and, in \code{\link[=as_consort_diagram]{as_consort_diagram()}}, the stage
+formed by \code{NA} values in \code{stage_by}). Default \code{"Missing"}. Ignored when
+the column has no \code{NA} values.}
 }
 \value{
 A \code{\link[tibble:tibble]{tibble::tibble()}} with columns:
@@ -84,7 +91,6 @@ category/step rows; N surviving for the final row)}
 \item{\code{n_removed}}{Number removed at this step (\code{NA} for header/final)}
 \item{\code{pct_removed}}{Percentage removed relative to entering N (\code{NA} for
 header; for final row: percentage retained of original N)}
-\item{\code{branch}}{Always \code{NA}; retained for backward compatibility}
 }
 When \code{branch_by} is supplied, one additional column per unique branch
 value is appended (named after the branch value), populated only on the
@@ -110,6 +116,11 @@ that share a \code{category} are collapsed into a parent row (indent level 1)
 with individual step sub-rows (indent level 2) nested beneath it.
 Uncategorised steps appear at indent level 1 without sub-rows. When
 \code{show_categories = FALSE}, one row per step is produced at indent level 1.
+
+Steps are collapsed under a category only when they are \emph{consecutive} in
+the pipeline (reordering steps would change the cumulative counts). A
+category whose steps are separated by other steps therefore produces more
+than one category row, and a warning suggests reordering the pipeline.
 }
 
 \section{Percentage columns}{
@@ -149,7 +160,7 @@ to the full dataset.
 }
 
 \examples{
-dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
   include(~ !is.na(age),        label = "Age recorded",       category = "Valid age") |>
   include(~ age >= 18,          label = "Adults only",         category = "Valid age") |>

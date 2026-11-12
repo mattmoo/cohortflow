@@ -111,6 +111,35 @@ test_that("export/import round-trips a function predicate via body deparse", {
   expect_equal(res, c(TRUE, FALSE))
 })
 
+test_that("export/import round-trips a function with a default argument", {
+  fn   <- function(d, thr = 18) d$age >= thr
+  crit <- cf_criteria() |> include(fn, label = "Adults")
+
+  yml   <- suppressWarnings(export_criteria(crit))
+  expect_false(grepl("fn_args", yml, fixed = TRUE))
+  crit2 <- import_criteria(text = yml)
+
+  res <- cohortflow:::eval_criterion(crit2$steps[[1]], data.frame(age = c(10, 20)))
+  expect_equal(res, c(FALSE, TRUE))
+})
+
+test_that("import_criteria() still reads the legacy fn_args format", {
+  yml <- paste(
+    "cohortflow_criteria:",
+    "  version: 1",
+    "  steps:",
+    "  - label: Has age",
+    "    type: include",
+    "    kind: function",
+    "    expr: '!is.na(d$age)'",
+    "    fn_args: d",
+    sep = "\n"
+  )
+  crit <- import_criteria(text = yml)
+  res  <- cohortflow:::eval_criterion(crit$steps[[1]], data.frame(age = c(1, NA)))
+  expect_equal(res, c(TRUE, FALSE))
+})
+
 test_that("export_criteria() warns when function captures non-empty closure", {
   threshold <- 18
   fn_closure <- function(d) d$age >= threshold  # captures 'threshold'
@@ -157,6 +186,11 @@ test_that("import_criteria() round-trips select_within with by and category", {
   expect_equal(crit2$steps[[1]]$by,       "participant_id")
   expect_equal(crit2$steps[[1]]$category, "Selection")
   expect_equal(crit2$steps[[1]]$type,     "select_within")
+})
+
+test_that("export_criteria() returns the YAML string visibly when path is NULL", {
+  crit <- cf_criteria() |> include(~ age >= 18, label = "Adults")
+  expect_visible(export_criteria(crit))
 })
 
 test_that("export_criteria() stores randomise steps with kind 'none' and no expr", {

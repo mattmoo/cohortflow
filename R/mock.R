@@ -85,7 +85,9 @@ utils::globalVariables(c(
       "`mock_cohortflow()` is deprecated. Use a design-specific generator",
       "instead: mock_parallel_rct(), mock_crossover(), mock_cluster_rct(),",
       "or mock_stepped_wedge()."
-    )
+    ),
+    .frequency    = "once",
+    .frequency_id = "cohortflow_mock_cohortflow_deprecated"
   )
 }
 

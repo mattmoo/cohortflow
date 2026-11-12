@@ -27,7 +27,7 @@
 #' @export
 #'
 #' @examples
-#' dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+#' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 #' crit <- cf_criteria() |>
 #'   include(~ eligible_screen, label = "Passed screening")
 #' flow <- apply_criteria(dat, crit)
