@@ -275,6 +275,15 @@ test_that("stage_by requires branch_by", {
   )
 })
 
+test_that("count_by requires branch_by", {
+  flow <- make_flow_crossover()
+  expect_error(
+    as_consort_diagram(flow, count_by = "participant_id"),
+    "requires.*branch_by",
+    class = "rlang_error"
+  )
+})
+
 test_that("stage_label_by requires stage_by", {
   flow <- make_flow_crossover()
   expect_error(

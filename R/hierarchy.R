@@ -23,18 +23,22 @@
 #' # Three-level: participants within clusters within sites
 #' cf_hierarchy(participant = "pid", cluster = "cluster_id", site = "site_id")
 cf_hierarchy <- function(...) {
-  args <- c(...)  # named character vector after c() coercion
+  dots <- list(...)
 
-  if (is.null(names(args)) || any(!nzchar(names(args)))) {
-    rlang::abort("All arguments to `cf_hierarchy()` must be named.")
+  if (length(dots) == 0L) {
+    rlang::abort("`cf_hierarchy()` requires at least one level.")
   }
 
-  if (any(!is.character(args))) {
+  # Check each argument before c() silently coerces mixed types to character
+  is_string <- vapply(dots, function(a) is.character(a) && length(a) == 1L, logical(1L))
+  if (!all(is_string)) {
     rlang::abort("All values in `cf_hierarchy()` must be character strings (column names).")
   }
 
-  if (length(args) == 0L) {
-    rlang::abort("`cf_hierarchy()` requires at least one level.")
+  args <- unlist(dots)  # named character vector
+
+  if (is.null(names(args)) || any(!nzchar(names(args)))) {
+    rlang::abort("All arguments to `cf_hierarchy()` must be named.")
   }
 
   if (anyDuplicated(names(args))) {

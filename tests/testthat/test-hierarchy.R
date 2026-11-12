@@ -55,3 +55,12 @@ test_that("format.cf_hierarchy() returns a character string", {
 test_that("cf_hierarchy() rejects non-character values", {
   expect_error(cf_hierarchy(participant = 1L), class = "rlang_error")
 })
+
+test_that("cf_hierarchy() with no arguments reports the missing level", {
+  expect_error(cf_hierarchy(), "at least one level", class = "rlang_error")
+})
+
+test_that("cf_hierarchy() rejects a non-character value mixed with strings", {
+  # c() would otherwise silently coerce 1L to "1"
+  expect_error(cf_hierarchy(participant = "pid", cluster = 1L), "character", class = "rlang_error")
+})

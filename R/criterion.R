@@ -19,7 +19,7 @@
 #'   `"group_exclude"`, or `"select_within"`.
 #' @param by For grouped step types (`group_include`, `group_exclude`,
 #'   `select_within`): a single character string naming the grouping column.
-#'   Ignored for row-wise types. Rows whose `by` value is `NA` cannot be
+#'   Must be `NULL` for the row-wise types (`include`, `exclude`). Rows whose `by` value is `NA` cannot be
 #'   assigned to a group and are always removed by grouped step types.
 #' @param category An optional character string grouping this criterion with
 #'   others for display purposes (e.g. `"Valid age"` to group age-related steps
@@ -93,6 +93,11 @@ cf_criterion <- function(predicate,
         )
       )
     }
+  } else if (!is.null(by)) {
+    cli_abort(c(
+      sprintf("`by` must be NULL for row-wise type \"%s\".", type),
+      "i" = "Use group_include(), group_exclude() or select_within() for grouped steps."
+    ))
   }
 
   if (!is.null(category)) {

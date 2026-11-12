@@ -27,6 +27,17 @@ test_that("cf_criterion() requires a non-empty label", {
   expect_error(cf_criterion(~ age >= 18, label = NA_character_), class = "rlang_error")
 })
 
+test_that("cf_criterion() rejects `by` for row-wise types", {
+  expect_error(
+    cf_criterion(~ x > 0, label = "pos", type = "include", by = "grp"),
+    class = "rlang_error"
+  )
+  expect_error(
+    cf_criterion(~ x > 0, label = "pos", type = "exclude", by = "grp"),
+    class = "rlang_error"
+  )
+})
+
 test_that("cf_criterion() defaults type to 'include'", {
   crit <- cf_criterion(~ age >= 18, label = "Adults")
   expect_equal(crit$type, "include")

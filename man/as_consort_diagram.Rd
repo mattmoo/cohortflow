@@ -136,7 +136,7 @@ with \code{+} and further \code{ggplot2} layers/themes, or exported with
 \code{\link[grDevices:png]{grDevices::png()}}) before drawing.
 }
 \examples{
-dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
   include(~ !is.na(age),          label = "Age recorded",    category = "Valid age") |>
   include(~ age >= 18,            label = "Adults only",     category = "Valid age") |>

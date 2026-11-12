@@ -56,7 +56,7 @@ removed by grouped step types (\code{group_include}, \code{group_exclude},
 }
 
 \examples{
-dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+dat  <- mock_cluster_rct(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
   include(~ eligible_screen, label = "Passed screening") |>
   include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>

@@ -144,7 +144,7 @@ to the full dataset.
 }
 
 \examples{
-dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
   include(~ !is.na(age),        label = "Age recorded",       category = "Valid age") |>
   include(~ age >= 18,          label = "Adults only",         category = "Valid age") |>

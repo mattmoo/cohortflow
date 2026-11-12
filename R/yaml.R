@@ -31,7 +31,9 @@
 #' @param fn_refs An optional named list mapping function objects to
 #'   `"pkg::name"` reference strings.
 #'
-#' @return Invisibly, the `criteria` object (or the YAML string if `path = NULL`).
+#' @return When `path = NULL`, the YAML text as a character string (returned
+#'   visibly, so it prints at the console). Otherwise, invisibly, the
+#'   `criteria` object.
 #' @export
 export_criteria <- function(criteria, path = NULL, fn_refs = list()) {
   if (!inherits(criteria, "cf_criteria")) {
@@ -50,7 +52,7 @@ export_criteria <- function(criteria, path = NULL, fn_refs = list()) {
   yml <- yaml::as.yaml(doc)
 
   if (is.null(path)) {
-    return(invisible(yml))
+    return(yml)
   }
 
   writeLines(yml, con = path)
@@ -61,6 +63,13 @@ export_criteria <- function(criteria, path = NULL, fn_refs = list()) {
 #'
 #' Reads a YAML file (or string) written by [export_criteria()] and
 #' reconstructs a `cf_criteria` object.
+#'
+#' @section Security:
+#' Criteria files contain R code: every formula and function predicate is
+#' parsed and evaluated when the file is imported (and again when the
+#' criteria are applied), and `fn_ref` entries are looked up and called.
+#' Treat a criteria file like an R script: do not import files from
+#' untrusted sources.
 #'
 #' @param path A file path to read from. Exactly one of `path` or `text` must
 #'   be supplied.

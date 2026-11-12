@@ -17,7 +17,9 @@ returned as a character string.}
 \code{"pkg::name"} reference strings.}
 }
 \value{
-Invisibly, the \code{criteria} object (or the YAML string if \code{path = NULL}).
+When \code{path = NULL}, the YAML text as a character string (returned
+visibly, so it prints at the console). Otherwise, invisibly, the
+\code{criteria} object.
 }
 \description{
 Serialises a \code{cf_criteria} object to a human-readable YAML file (or string).

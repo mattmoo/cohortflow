@@ -259,7 +259,7 @@
 #' @export
 #'
 #' @examples
-#' dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+#' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 #' crit <- cf_criteria() |>
 #'   include(~ !is.na(age),          label = "Age recorded",    category = "Valid age") |>
 #'   include(~ age >= 18,            label = "Adults only",     category = "Valid age") |>
@@ -301,6 +301,9 @@ as_consort_diagram <- function(
     if (!branch_by %in% names(cohort_data)) {
       rlang::abort(sprintf("Column `%s` not found in surviving cohort.", branch_by))
     }
+  }
+  if (!is.null(count_by) && is.null(branch_by)) {
+    rlang::abort("`count_by` requires `branch_by` to be specified.")
   }
   if (!is.null(stage_by) && is.null(branch_by)) {
     rlang::abort("`stage_by` requires `branch_by` to be specified.")

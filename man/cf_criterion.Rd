@@ -31,7 +31,7 @@ identifying which rows within the group to keep.
 
 \item{by}{For grouped step types (\code{group_include}, \code{group_exclude},
 \code{select_within}): a single character string naming the grouping column.
-Ignored for row-wise types. Rows whose \code{by} value is \code{NA} cannot be
+Must be \code{NULL} for the row-wise types (\code{include}, \code{exclude}). Rows whose \code{by} value is \code{NA} cannot be
 assigned to a group and are always removed by grouped step types.}
 
 \item{category}{An optional character string grouping this criterion with

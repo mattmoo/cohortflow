@@ -124,7 +124,7 @@
 #' @export
 #'
 #' @examples
-#' dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+#' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 #' crit <- cf_criteria() |>
 #'   include(~ !is.na(age),        label = "Age recorded",       category = "Valid age") |>
 #'   include(~ age >= 18,          label = "Adults only",         category = "Valid age") |>
@@ -560,8 +560,8 @@ as_attrition_tibble <- function(
 #' @export
 #'
 #' @examples
-#' \dontrun{
-#' dat  <- mock_cohortflow(n_participants = 200, seed = 1)
+#' \donttest{
+#' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 #' crit <- cf_criteria() |>
 #'   include(~ !is.na(age),     label = "Age recorded",    category = "Valid age") |>
 #'   include(~ age >= 18,       label = "Adults only",      category = "Valid age") |>
@@ -570,18 +570,27 @@ as_attrition_tibble <- function(
 #'   exclude(~ withdrew,        label = "Withdrew consent", category = "Consent")
 #' flow <- apply_criteria(dat, crit)
 #'
-#' as_attrition_table(flow)                       # flextable (Word-ready)
-#' as_attrition_table(flow, backend = "gt")       # gt (LaTeX/HTML-ready)
-#' as_attrition_table(flow, backend = "huxtable") # huxtable
-#'
-#' # Shade cells by percentage removed
-#' as_attrition_table(flow, shade = "pct_removed")
+#' if (requireNamespace("flextable", quietly = TRUE) &&
+#'     requireNamespace("officer", quietly = TRUE)) {
+#'   as_attrition_table(flow)                         # flextable (Word-ready)
+#'   as_attrition_table(flow, shade = "pct_removed")  # shade by % removed
+#' }
+#' if (requireNamespace("gt", quietly = TRUE)) {
+#'   as_attrition_table(flow, backend = "gt")         # gt (LaTeX/HTML-ready)
+#' }
+#' if (requireNamespace("huxtable", quietly = TRUE)) {
+#'   as_attrition_table(flow, backend = "huxtable")   # huxtable
+#' }
 #'
 #' # Grid: sites as columns, periods as rows (stepped-wedge design)
-#' sw   <- mock_stepped_wedge(n_participants = 400, n_periods = 4, seed = 1)
+#' sw      <- mock_stepped_wedge(n_participants = 400, n_periods = 4, seed = 1)
 #' flow_sw <- apply_criteria(sw, crit, id = "event_id")
-#' as_attrition_table(flow_sw, group_x = "site_id", group_y = "period")
-#'
+#' if (requireNamespace("flextable", quietly = TRUE) &&
+#'     requireNamespace("officer", quietly = TRUE)) {
+#'   as_attrition_table(flow_sw, group_x = "site_id", group_y = "period")
+#' }
+#' }
+#' \dontrun{
 #' # Save to Word
 #' ft <- as_attrition_table(flow)
 #' flextable::save_as_docx(ft, path = "attrition.docx")

@@ -187,3 +187,8 @@ test_that("import_criteria() round-trips select_within with by and category", {
   expect_equal(crit2$steps[[1]]$category, "Selection")
   expect_equal(crit2$steps[[1]]$type,     "select_within")
 })
+
+test_that("export_criteria() returns the YAML string visibly when path is NULL", {
+  crit <- cf_criteria() |> include(~ age >= 18, label = "Adults")
+  expect_visible(export_criteria(crit))
+})
