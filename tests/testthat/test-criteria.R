@@ -90,6 +90,14 @@ test_that("format.cf_criteria() returns a character string", {
   expect_true(nzchar(s))
 })
 
+test_that("print.cf_criteria() shows function predicate bodies, not s$predicate", {
+  crit <- cf_criteria() |>
+    include(function(d) !is.na(d$age), label = "Age present")
+  s <- paste(utils::capture.output(print(crit)), collapse = "\n")
+  expect_true(grepl("is.na", s, fixed = TRUE))
+  expect_false(grepl("$predicate", s, fixed = TRUE))
+})
+
 test_that("group_exclude() adds a group_exclude step", {
   crit <- cf_criteria() |>
     group_exclude(by = "cluster_id", ~ n() < 5, label = "Small clusters")

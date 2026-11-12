@@ -129,15 +129,12 @@ predicate_label <- function(predicate) {
   if (is_formula(predicate)) {
     paste(deparse(predicate[[2L]], width.cutoff = 60L), collapse = " ")
   } else {
-    fn_name <- tryCatch(
-      deparse(substitute(predicate)),
-      error = function(e) NULL
-    )
-    if (!is.null(fn_name) && nzchar(fn_name) && fn_name != "predicate") {
-      fn_name
-    } else {
-      paste(deparse(body(predicate), width.cutoff = 60L), collapse = " ")
-    }
+    # Show the function body (collapsed onto one line, truncated). Deparsing
+    # the call site via substitute() would only ever show the caller's
+    # expression (e.g. `x$predicate`), not the function itself.
+    body_str <- paste(trimws(deparse(body(predicate), width.cutoff = 60L)), collapse = " ")
+    if (nchar(body_str) > 60L) body_str <- paste0(substr(body_str, 1L, 57L), "...")
+    body_str
   }
 }
 

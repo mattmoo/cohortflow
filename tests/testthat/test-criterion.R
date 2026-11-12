@@ -108,6 +108,19 @@ test_that("format.cf_criterion() works for function predicate", {
   s    <- format(crit)
   expect_type(s, "character")
   expect_true(grepl("Age present", s))
+  expect_true(grepl("is.na", s, fixed = TRUE))
+  expect_false(grepl("$predicate", s, fixed = TRUE))
+  expect_output(print(crit), "is.na", fixed = TRUE)
+})
+
+test_that("format.cf_criterion() truncates long function bodies", {
+  fn   <- function(d) {
+    !is.na(d$a_really_long_column_name) & !is.na(d$another_really_long_column_name)
+  }
+  crit <- cf_criterion(fn, label = "Long", type = "include")
+  pred <- cohortflow:::predicate_label(crit$predicate)
+  expect_lte(nchar(pred), 60L)
+  expect_true(endsWith(pred, "..."))
 })
 
 test_that("format.cf_criterion() works for select_within", {
