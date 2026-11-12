@@ -22,6 +22,7 @@ as_attrition_table(
   group_y = NULL,
   group_x_label = NULL,
   group_y_label = NULL,
+  group_na_label = "Missing",
   shade = NULL,
   shade_fn = NULL,
   shade_palette = c("#FFFFFF", "#F8696B")
@@ -91,6 +92,11 @@ value alone).}
 \item{group_y_label}{Optional prefix label for \code{group_y} row headings
 (e.g. \code{"Period"} to show \code{"Period: 1"}). Default \code{NULL} (show the group
 value alone).}
+
+\item{group_na_label}{Character string used to label the group formed by
+\code{NA} values in \code{group_x}/\code{group_y} (see the Grouping section). Default
+\code{"Missing"}. Ignored when the corresponding grouping column has no \code{NA}
+values.}
 
 \item{shade}{Optional character string: \code{"pct_removed"} or \code{"n_removed"}.
 When supplied, shades the N/Removed/\% cells of step and category rows

@@ -620,6 +620,18 @@ test_that("NA values in group_x form their own 'Missing' group, not folded into 
   expect_equal(total_assessed, nrow(flow$data))
 })
 
+test_that("as_attrition_table() passes group_na_label through to the header", {
+  skip_if_not_installed("flextable")
+  skip_if_not_installed("officer")
+  flow <- make_flow_stepped_wedge()
+  flow$data$site_id[seq_len(20)] <- NA
+
+  ft <- as_attrition_table(flow, group_x = "site_id", group_na_label = "Unknown")
+  header_text <- unlist(ft$header$dataset, use.names = FALSE)
+  expect_true("Unknown" %in% header_text)
+  expect_false("Missing" %in% header_text)
+})
+
 test_that("NA values in group_y form their own 'Missing' group, not folded into every other group", {
   flow <- make_flow_stepped_wedge()
 

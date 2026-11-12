@@ -546,6 +546,7 @@ as_attrition_table <- function(
   group_y             = NULL,
   group_x_label       = NULL,
   group_y_label       = NULL,
+  group_na_label      = "Missing",
   shade               = NULL,
   shade_fn            = NULL,
   shade_palette       = c("#FFFFFF", "#F8696B")
@@ -565,7 +566,8 @@ as_attrition_table <- function(
       final_label     = final_label,
       digits          = digits,
       group_x         = group_x,
-      group_y         = group_y
+      group_y         = group_y,
+      group_na_label  = group_na_label
     )
 
     shade_colours <- .attrition_shade_colours(tbl, shade, shade_fn, shade_palette)
