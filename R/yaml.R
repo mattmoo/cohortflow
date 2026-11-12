@@ -13,12 +13,17 @@
 #'       by:     null
 #'       expr:   "age >= 18"
 #'       fn_ref: null
+#'       category: null
 #' ```
 #'
-#' Formula-based criteria round-trip cleanly. Anonymous function bodies are
-#' deparsed as a fallback; complex closures may not round-trip and a warning
-#' is issued. Named exported functions can be stored as `"pkg::name"` references
-#' via `fn_refs`.
+#' Formula-based criteria round-trip cleanly. For function predicates
+#' (`kind: function`), `expr` holds the full deparsed function source,
+#' including its argument list and any default values (e.g.
+#' `"function(d, thr = 18) d$age >= thr"`); complex closures may not
+#' round-trip and a warning is issued. Named exported functions can be stored
+#' as `"pkg::name"` references via `fn_refs`. Files written by earlier
+#' versions, which stored the function body in `expr` and the argument names
+#' in a separate `fn_args` field, can still be imported.
 #'
 #' @param criteria A `cf_criteria` object.
 #' @param path A file path to write to. If `NULL` (default), the YAML text is
@@ -123,16 +128,17 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     }
   }
 
-  body_str    <- paste(deparse(body(crit$predicate), width.cutoff = 500L), collapse = "\n")
-  formals_str <- paste(names(formals(crit$predicate)), collapse = ", ")
+  # Serialise the whole function (signature + body), so default argument
+  # values survive the round-trip. deparse() never includes the
+  # <environment>/<bytecode> lines that print() adds.
+  fn_src <- paste(deparse(crit$predicate, width.cutoff = 500L), collapse = "\n")
 
   list(
     label    = crit$label,
     type     = crit$type,
     kind     = "function",
     by       = crit$by,
-    expr     = body_str,
-    fn_args  = formals_str,
+    expr     = fn_src,
     fn_ref   = fn_ref_str,
     category = crit$category
   )
@@ -153,10 +159,15 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
       } else {
         get(s$fn_ref, envir = envir)
       }
-    } else {
-      args_str <- if (!is.null(s$fn_args) && nzchar(s$fn_args)) s$fn_args else "d"
+    } else if (!is.null(s$fn_args)) {
+      # Legacy format: `expr` holds only the body and `fn_args` the
+      # argument names, so the function is rebuilt from the two parts.
+      args_str <- if (nzchar(s$fn_args)) s$fn_args else "d"
       fn_text  <- sprintf("function(%s) %s", args_str, s$expr)
       pred     <- eval(parse(text = fn_text, keep.source = FALSE), envir = envir)
+    } else {
+      # Current format: `expr` holds the full function source.
+      pred <- eval(parse(text = s$expr, keep.source = FALSE)[[1L]], envir = envir)
     }
   }
 
