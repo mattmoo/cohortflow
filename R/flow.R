@@ -119,25 +119,7 @@ cohort <- function(flow, flag = FALSE, at = NULL, step_number = NULL, label = NU
   k <- .resolve_step(flow, at, step_number, label, category)
 
   if (flag) {
-    lookup_chunks <- lapply(flow$steps[seq_len(k)], function(s) {
-      if (length(s$excluded_ids) == 0L) return(NULL)
-      tibble::tibble(
-        .cf_row_id           = s$excluded_ids,
-        cf_excluded_step     = s$step,
-        cf_excluded_label    = s$label,
-        cf_excluded_category = if (is.null(s$category)) NA_character_ else s$category
-      )
-    })
-    lookup_chunks <- Filter(Negate(is.null), lookup_chunks)
-
-    flagged <- if (length(lookup_chunks) > 0L) {
-      dplyr::left_join(flow$data, do.call(rbind, lookup_chunks), by = ".cf_row_id")
-    } else {
-      flow$data$cf_excluded_step     <- NA_integer_
-      flow$data$cf_excluded_label    <- NA_character_
-      flow$data$cf_excluded_category <- NA_character_
-      flow$data
-    }
+    flagged <- dplyr::left_join(flow$data, .exclusion_lookup(flow, k), by = ".cf_row_id")
     flagged$cf_included <- is.na(flagged$cf_excluded_step)
     flagged$.cf_row_id  <- NULL
     return(tibble::as_tibble(flagged))
@@ -146,6 +128,30 @@ cohort <- function(flow, flag = FALSE, at = NULL, step_number = NULL, label = NU
   surviving <- flow$data[flow$data$.cf_row_id %in% .surviving_ids(flow, k), , drop = FALSE]
   surviving$.cf_row_id <- NULL
   tibble::as_tibble(surviving)
+}
+
+# One row per id excluded by steps 1..step_num, naming the step that removed
+# it. Each id appears at most once because the cascade removes a row at most
+# once. Always has the four columns, typed, even when nothing was excluded.
+.exclusion_lookup <- function(flow, step_num = length(flow$steps)) {
+  chunks <- lapply(flow$steps[seq_len(step_num)], function(s) {
+    if (length(s$excluded_ids) == 0L) return(NULL)
+    tibble::tibble(
+      .cf_row_id           = s$excluded_ids,
+      cf_excluded_step     = as.integer(s$step),
+      cf_excluded_label    = s$label,
+      cf_excluded_category = if (is.null(s$category)) NA_character_ else s$category
+    )
+  })
+  chunks <- Filter(Negate(is.null), chunks)
+  if (length(chunks) > 0L) return(do.call(rbind, chunks))
+
+  tibble::tibble(
+    .cf_row_id           = flow$data$.cf_row_id[0L],
+    cf_excluded_step     = integer(0L),
+    cf_excluded_label    = character(0L),
+    cf_excluded_category = character(0L)
+  )
 }
 
 # Row ids from `flow$data` not excluded by steps 1..step_num (0 = all rows).
