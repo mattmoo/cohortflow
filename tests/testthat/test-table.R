@@ -25,7 +25,7 @@ test_that("as_attrition_tibble() returns a tibble with required columns", {
 
   expect_s3_class(out, "tbl_df")
   expect_named(out, c("row_type", "label", "indent_level", "n",
-                      "n_removed", "pct_removed", "branch"))
+                      "n_removed", "pct_removed"))
 })
 
 test_that("first row is the header, last row is the final cohort", {
@@ -510,7 +510,7 @@ test_that("linear table has no branch columns when branch_by is NULL", {
   out  <- as_attrition_tibble(flow)
 
   standard_cols <- c("row_type", "label", "indent_level", "n",
-                     "n_removed", "pct_removed", "branch")
+                     "n_removed", "pct_removed")
   expect_equal(setdiff(names(out), standard_cols), character(0L))
 })
 

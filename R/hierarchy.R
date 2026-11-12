@@ -8,12 +8,19 @@
 #' **coarsest** (outermost) level. The first role is conventionally the
 #' individual participant.
 #'
+#' @section Lifecycle:
+#' Experimental and not yet wired into [apply_criteria()]: a `cf_hierarchy`
+#' is currently only constructed and printed, and no part of the pipeline
+#' uses it. It is kept as groundwork for hierarchical designs (see
+#' `ROADMAP.md`).
+#'
 #' @param ... Named character scalars mapping role labels to column names,
 #'   e.g. `participant = "participant_id", cluster = "cluster_id"`. At least
 #'   one entry is required.
 #'
 #' @return A `cf_hierarchy` object (a named character vector with additional
 #'   class attribute).
+#' @keywords internal
 #' @export
 #'
 #' @examples

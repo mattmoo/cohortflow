@@ -25,6 +25,14 @@ The order of \code{...} is from the \strong{finest} (innermost) level to the
 \strong{coarsest} (outermost) level. The first role is conventionally the
 individual participant.
 }
+\section{Lifecycle}{
+
+Experimental and not yet wired into \code{\link[=apply_criteria]{apply_criteria()}}: a \code{cf_hierarchy}
+is currently only constructed and printed, and no part of the pipeline
+uses it. It is kept as groundwork for hierarchical designs (see
+\code{ROADMAP.md}).
+}
+
 \examples{
 # Two-level: participants within clusters
 cf_hierarchy(participant = "pid", cluster = "cid")
@@ -32,3 +40,4 @@ cf_hierarchy(participant = "pid", cluster = "cid")
 # Three-level: participants within clusters within sites
 cf_hierarchy(participant = "pid", cluster = "cluster_id", site = "site_id")
 }
+\keyword{internal}

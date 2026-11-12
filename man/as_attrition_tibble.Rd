@@ -78,7 +78,6 @@ category/step rows; N surviving for the final row)}
 \item{\code{n_removed}}{Number removed at this step (\code{NA} for header/final)}
 \item{\code{pct_removed}}{Percentage removed relative to entering N (\code{NA} for
 header; for final row: percentage retained of original N)}
-\item{\code{branch}}{Always \code{NA}; retained for backward compatibility}
 }
 When \code{branch_by} is supplied, one additional column per unique branch
 value is appended (named after the branch value), populated only on the

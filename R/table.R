@@ -112,7 +112,6 @@
 #'   \item{`n_removed`}{Number removed at this step (`NA` for header/final)}
 #'   \item{`pct_removed`}{Percentage removed relative to entering N (`NA` for
 #'     header; for final row: percentage retained of original N)}
-#'   \item{`branch`}{Always `NA`; retained for backward compatibility}
 #' }
 #' When `branch_by` is supplied, one additional column per unique branch
 #' value is appended (named after the branch value), populated only on the
@@ -188,8 +187,7 @@ as_attrition_tibble <- function(
     indent_level = 0L,
     n            = n_start,
     n_removed    = NA_integer_,
-    pct_removed  = NA_real_,
-    branch       = NA_character_
+    pct_removed  = NA_real_
   )))
 
   # -- Step / category rows -------------------------------------------------
@@ -206,8 +204,7 @@ as_attrition_tibble <- function(
     indent_level = 0L,
     n            = n_end,
     n_removed    = NA_integer_,
-    pct_removed  = if (n_start > 0L) round(100 * n_end / n_start, digits) else NA_real_,
-    branch       = NA_character_
+    pct_removed  = if (n_start > 0L) round(100 * n_end / n_start, digits) else NA_real_
   )))
 
   out <- do.call(rbind, rows)
@@ -289,8 +286,7 @@ as_attrition_tibble <- function(
         indent_level = 1L,
         n            = n_in_cat,
         n_removed    = if (is_singleton) NA_integer_ else n_fail_cat,
-        pct_removed  = if (is_singleton) NA_real_    else pct_removed,
-        branch       = NA_character_
+        pct_removed  = if (is_singleton) NA_real_    else pct_removed
       )))
 
       # Sub-rows for each step in category -- percentages are relative to
@@ -344,7 +340,7 @@ as_attrition_tibble <- function(
   branch_labels <- vapply(branch_values, .cf_group_label, character(1L),
                           na_label = branch_na_label, USE.NAMES = FALSE)
   reserved <- c("row_type", "label", "indent_level", "n", "n_removed",
-                "pct_removed", "branch", "group_x", "group_y")
+                "pct_removed", "group_x", "group_y")
   clash <- intersect(branch_labels, reserved)
   if (length(clash) > 0L) {
     rlang::abort(c(
@@ -382,8 +378,7 @@ as_attrition_tibble <- function(
     indent_level = indent_level,
     n            = s$n_in,
     n_removed    = s$n_fail,
-    pct_removed  = pct,
-    branch       = NA_character_
+    pct_removed  = pct
   )
 }
 
@@ -739,8 +734,8 @@ as_attrition_table <- function(
 
 # Converts the raw attrition tibble to a display data frame and returns
 # recommended column widths for flextable (inches). Any column beyond the
-# standard set (row_type, label, indent_level, n, n_removed, pct_removed,
-# branch) is treated as a per-branch N column -- these are added to the
+# standard set (row_type, label, indent_level, n, n_removed, pct_removed)
+# is treated as a per-branch N column -- these are added to the
 # display data frame as-is (character, blank/NA except on the final row).
 .attrition_display <- function(tbl, criterion_col_label,
                                n_col_label, removed_col_label,
@@ -776,7 +771,7 @@ as_attrition_table <- function(
   # Branch columns -- any column beyond the standard set is a per-branch N
   # column, populated only on the final row (NA elsewhere).
   standard_cols <- c("row_type", "label", "indent_level", "n",
-                     "n_removed", "pct_removed", "branch")
+                     "n_removed", "pct_removed")
   branch_cols <- setdiff(names(tbl), standard_cols)
 
   for (col in branch_cols) {
@@ -1197,19 +1192,19 @@ as_attrition_table <- function(
     pct_col <- df_full[[paste0(pfx, "pct_removed")]]
 
     display[[paste0(pfx, "n")]] <- ifelse(is.na(n_col), "", as.character(n_col))
-    display[[paste0(pfx, "n_removed")]] <- dplyr::case_when(
-      is.na(nr_col) ~ "",
-      nr_col == 0L  ~ "\u2014",
-      TRUE          ~ as.character(nr_col)
-    )
+    nr_str <- as.character(nr_col)
+    nr_str[!is.na(nr_col) & nr_col == 0L] <- "\u2014"
+    nr_str[is.na(nr_col)] <- ""
+    display[[paste0(pfx, "n_removed")]] <- nr_str
+
     # The final row's percentage is the percentage *retained*/*included*, not
     # removed, so it is labelled explicitly (e.g. "83.5% included") to avoid
     # reading as if it shared the "% removed" semantics of the column header.
-    display[[paste0(pfx, "pct_removed")]] <- dplyr::case_when(
-      is.na(pct_col)                    ~ "",
-      df_full$row_type == "final"       ~ paste0(pct_col, "% included"),
-      TRUE                               ~ paste0(pct_col, "%")
-    )
+    pct_str <- ifelse(df_full$row_type == "final",
+                      paste0(pct_col, "% included"),
+                      paste0(pct_col, "%"))
+    pct_str[is.na(pct_col)] <- ""
+    display[[paste0(pfx, "pct_removed")]] <- pct_str
   }
 
   x_headings <- if (grid$has_x) {
