@@ -13,7 +13,8 @@ as_attrition_tibble(
   branch_by = NULL,
   count_by = NULL,
   group_x = NULL,
-  group_y = NULL
+  group_y = NULL,
+  group_na_label = "Missing"
 )
 }
 \arguments{
@@ -52,6 +53,11 @@ site). See the Grouping section.}
 \item{group_y}{Optional column name (string), present in \code{flow$data}, used
 to repeat the attrition table across the "row" direction (e.g. time
 period). See the Grouping section.}
+
+\item{group_na_label}{Character string used to label the group formed by
+\code{NA} values in \code{group_x}/\code{group_y} (see the Grouping section). Default
+\code{"Missing"}. Ignored when the corresponding grouping column has no \code{NA}
+values.}
 }
 \value{
 A \code{\link[tibble:tibble]{tibble::tibble()}} with columns:
@@ -117,6 +123,12 @@ row belongs to (\code{NA} for the ungrouped dimension). This long format is
 the input to the grid layout produced by \code{as_attrition_table()}; use it
 directly if you want to build your own custom cross-tabulated output.
 \code{branch_by}/\code{count_by} cannot currently be combined with grouping.
+
+Rows where the grouping column itself is \code{NA} (e.g. missing ethnicity)
+are \strong{not} silently dropped, and are never folded into every other
+group's counts. Instead they form their own explicit group, labelled by
+\code{group_na_label} (default \code{"Missing"}), so the grouped totals still sum
+to the full dataset.
 }
 
 \examples{

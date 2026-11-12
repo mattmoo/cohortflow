@@ -17,7 +17,6 @@ Encoding: UTF-8
 Depends:
     R (>= 4.1.0)
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 8.0.0
 Suggests:
     flextable,
     gt,
@@ -33,3 +32,4 @@ Imports:
     rlang,
     tibble,
     yaml
+Config/roxygen2/version: 8.1.1
