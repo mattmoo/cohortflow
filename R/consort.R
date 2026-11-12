@@ -333,9 +333,7 @@
 # determine which rows/arms entered a `randomise()` step, since a randomise
 # step itself never excludes anything (`n_pass == n_in`).
 .consort_entered_at_step <- function(flow, step_num) {
-  if (step_num <= 0L) return(flow$data$.cf_row_id)
-  excluded_ids <- unlist(lapply(flow$steps[seq_len(step_num)], `[[`, "excluded_ids"))
-  flow$data$.cf_row_id[!flow$data$.cf_row_id %in% excluded_ids]
+  .surviving_ids(flow, step_num)
 }
 
 

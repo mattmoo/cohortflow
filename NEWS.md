@@ -34,6 +34,13 @@
 
 ## New features
 
+* `cohort()` and `excluded()` can stop at an intermediate step, returning the
+  rows surviving (or removed) up to and including it. Select the step with
+  `step_number` (`0` = starting data), `label`, or `category` (last step in
+  that category); or use `at`, which auto-selects (number, else label, else
+  category). At most one selector may be given. With `cohort(flag = TRUE)`,
+  attribution only covers steps up to the chosen step.
+
 * `as_attrition_table()` gained a `levels` argument, mirroring
   `as_attrition_tibble(levels = )`: it renders one row per criterion with a
   column block (N / Removed / % removed) per hierarchy level, so a single

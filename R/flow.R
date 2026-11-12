@@ -63,8 +63,21 @@ print.cf_flow <- function(x, ...) {
 
 #' Extract the surviving cohort from a flow object
 #'
-#' Returns the rows that passed all criteria, with the internal `.cf_row_id`
-#' column removed.
+#' Returns the rows that passed all criteria (or, with a step selector, all
+#' criteria up to a chosen step), with the internal `.cf_row_id` column
+#' removed.
+#'
+#' @section Intermediate steps:
+#' A selector picks a step and means "up to and including that step". With
+#' none given, the last step is used. At most one may be given:
+#'
+#' * `step_number`: a whole number `k` from `0` to the number of steps; `0` is
+#'   the starting data.
+#' * `label`: an exact step label. Errors if no step, or several steps, have it.
+#' * `category`: a category name; selects the last step in that category.
+#' * `at`: picks automatically. A number is a `step_number`; a string is a
+#'   `label` if one matches, else a `category`. A string that is both a label
+#'   and a category is an error: use `label` or `category` explicitly.
 #'
 #' @param flow A `cf_flow` object produced by [apply_criteria()].
 #' @param flag Logical. When `FALSE` (default), returns only the surviving
@@ -74,14 +87,34 @@ print.cf_flow <- function(x, ...) {
 #'   included), `cf_excluded_label` (character, `NA` if included), and
 #'   `cf_excluded_category` (character, `NA` if uncategorised or included).
 #'   Useful when downstream code needs every row present (e.g. plotting a
-#'   full recording) while still knowing which rows count.
+#'   full recording) while still knowing which rows count. Combined with a
+#'   step selector, attribution only considers steps up to that step; rows
+#'   removed later count as included.
+#' @param at Optional automatic step selector (number, label or category);
+#'   see the section "Intermediate steps".
+#' @param step_number Optional whole step number (`0` = starting data).
+#' @param label Optional exact step label.
+#' @param category Optional category name (last step in that category).
 #' @return A tibble.
+#' @examples
+#' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
+#' crit <- cf_criteria() |>
+#'   include(~ !is.na(age), label = "Age recorded") |>
+#'   include(~ eligible_screen, label = "Passed screening") |>
+#'   exclude(~ withdrew, label = "Withdrew consent")
+#' flow <- apply_criteria(dat, crit)
+#' cohort(flow)                            # final survivors
+#' cohort(flow, at = "Passed screening")   # screening cohort (auto-select)
+#' cohort(flow, label = "Passed screening") # same, explicit
+#' nrow(cohort(flow, step_number = 0))     # the starting data
+#' excluded(flow, at = 2)                  # removed by steps 1-2
 #' @export
-cohort <- function(flow, flag = FALSE) {
+cohort <- function(flow, flag = FALSE, at = NULL, step_number = NULL, label = NULL, category = NULL) {
   if (!inherits(flow, "cf_flow")) rlang::abort("`flow` must be a `cf_flow` object.")
+  k <- .resolve_step(flow, at, step_number, label, category)
 
   if (flag) {
-    lookup_chunks <- lapply(flow$steps, function(s) {
+    lookup_chunks <- lapply(flow$steps[seq_len(k)], function(s) {
       if (length(s$excluded_ids) == 0L) return(NULL)
       tibble::tibble(
         .cf_row_id           = s$excluded_ids,
@@ -105,35 +138,128 @@ cohort <- function(flow, flag = FALSE) {
     return(tibble::as_tibble(flagged))
   }
 
-  all_excluded_ids <- unlist(lapply(flow$steps, `[[`, "excluded_ids"))
-  surviving <- flow$data[!flow$data$.cf_row_id %in% all_excluded_ids, , drop = FALSE]
+  surviving <- flow$data[flow$data$.cf_row_id %in% .surviving_ids(flow, k), , drop = FALSE]
   surviving$.cf_row_id <- NULL
   tibble::as_tibble(surviving)
+}
+
+# Row ids from `flow$data` not excluded by steps 1..step_num (0 = all rows).
+.surviving_ids <- function(flow, step_num = length(flow$steps)) {
+  if (step_num <= 0L) return(flow$data$.cf_row_id)
+  excluded_ids <- unlist(lapply(flow$steps[seq_len(step_num)], `[[`, "excluded_ids"))
+  flow$data$.cf_row_id[!flow$data$.cf_row_id %in% excluded_ids]
 }
 
 # Like cohort(), but keeps `.cf_row_id` (needed internally by
 # continue_criteria(), which must be able to re-attach step records using the
 # same identifier).
 .surviving_with_id <- function(flow) {
-  all_excluded_ids <- unlist(lapply(flow$steps, `[[`, "excluded_ids"))
-  flow$data[!flow$data$.cf_row_id %in% all_excluded_ids, , drop = FALSE]
+  flow$data[flow$data$.cf_row_id %in% .surviving_ids(flow), , drop = FALSE]
+}
+
+# Resolve the step selectors to a step number in 0..length(flow$steps).
+# At most one of `at` (auto), `step_number`, `label`, `category` may be given.
+.resolve_step <- function(flow, at = NULL, step_number = NULL, label = NULL, category = NULL) {
+  given <- c(at = !is.null(at), step_number = !is.null(step_number),
+             label = !is.null(label), category = !is.null(category))
+  if (sum(given) > 1L) {
+    rlang::abort(sprintf(
+      "Give at most one of `at`, `step_number`, `label`, `category`; got %s.",
+      paste0("`", names(given)[given], "`", collapse = ", ")
+    ))
+  }
+  if (!any(given)) return(length(flow$steps))
+  if (given[["step_number"]]) return(.step_by_number(flow, step_number, "step_number"))
+  if (given[["label"]]) return(.step_by_label(flow, label, "label"))
+  if (given[["category"]]) return(.step_by_category(flow, category, "category"))
+
+  # `at`: numbers are step numbers; strings are a label, else a category.
+  if (length(at) != 1L || is.na(at)) {
+    rlang::abort("`at` must be a single non-missing step number, label or category name.")
+  }
+  if (is.numeric(at)) return(.step_by_number(flow, at, "at"))
+  if (!is.character(at)) {
+    rlang::abort("`at` must be a step number or a step label/category name.")
+  }
+  has_label    <- any(.step_labels(flow) == at)
+  has_category <- any(.step_categories(flow) == at, na.rm = TRUE)
+  if (has_label && has_category) {
+    rlang::abort(sprintf(
+      "`at` = \"%s\" is both a step label and a category name; use `label =` or `category =` instead.", at
+    ))
+  }
+  if (has_label) return(.step_by_label(flow, at, "at"))
+  if (has_category) return(.step_by_category(flow, at, "at"))
+  rlang::abort(sprintf("`at` = \"%s\" matches no step label or category.", at))
+}
+
+.step_labels <- function(flow) vapply(flow$steps, function(s) s$label, character(1L))
+
+.step_categories <- function(flow) {
+  vapply(flow$steps, function(s) if (is.null(s$category)) NA_character_ else s$category, character(1L))
+}
+
+.step_numbers <- function(flow) vapply(flow$steps, function(s) as.integer(s$step), integer(1L))
+
+.step_by_number <- function(flow, x, arg) {
+  n_steps <- length(flow$steps)
+  if (!is.numeric(x) || length(x) != 1L || is.na(x)) {
+    rlang::abort(sprintf("`%s` must be a single non-missing whole number.", arg))
+  }
+  if (x %% 1 != 0) {
+    rlang::abort(sprintf("`%s` must be a whole step number, not %s.", arg, format(x)))
+  }
+  if (x < 0 || x > n_steps) {
+    rlang::abort(sprintf("`%s` = %s is out of range; the flow has %d step(s) (use 0..%d).",
+                         arg, format(x), n_steps, n_steps))
+  }
+  as.integer(x)
+}
+
+.step_by_label <- function(flow, x, arg) {
+  if (!is.character(x) || length(x) != 1L || is.na(x)) {
+    rlang::abort(sprintf("`%s` must be a single non-missing string.", arg))
+  }
+  hits <- .step_numbers(flow)[.step_labels(flow) == x]
+  if (length(hits) == 0L) rlang::abort(sprintf("`%s` = \"%s\" matches no step label.", arg, x))
+  if (length(hits) > 1L) {
+    rlang::abort(sprintf(
+      "`%s` = \"%s\" matches %d steps by label (%s); use `step_number` instead.",
+      arg, x, length(hits), paste(hits, collapse = ", ")
+    ))
+  }
+  hits
+}
+
+.step_by_category <- function(flow, x, arg) {
+  if (!is.character(x) || length(x) != 1L || is.na(x)) {
+    rlang::abort(sprintf("`%s` must be a single non-missing string.", arg))
+  }
+  cats <- .step_categories(flow)
+  hits <- .step_numbers(flow)[!is.na(cats) & cats == x]
+  if (length(hits) == 0L) rlang::abort(sprintf("`%s` = \"%s\" matches no category.", arg, x))
+  max(hits)
 }
 
 #' Extract excluded rows from a flow object
 #'
-#' Returns a flat tibble of all rows removed at any step, with additional
+#' Returns a flat tibble of all rows removed at any step (or, with `at`, up to
+#' and including a chosen step), with additional
 #' columns `cf_step` (integer), `cf_label` (character), `cf_type` (character),
 #' and `cf_category` (character, `NA` if the criterion had no category).
-#' Rows are in step order.
+#' Rows are in step order. Rows removed at a single step `k` are
+#' `excluded(flow) |> dplyr::filter(cf_step == k)`.
 #'
-#' @param flow A `cf_flow` object produced by [apply_criteria()].
+#' @inheritParams cohort
+#' @inheritSection cohort Intermediate steps
 #' @return A tibble with original columns plus `cf_step`, `cf_label`,
 #'   `cf_type`, `cf_category`.
 #' @export
-excluded <- function(flow) {
+excluded <- function(flow, at = NULL, step_number = NULL, label = NULL, category = NULL) {
   if (!inherits(flow, "cf_flow")) rlang::abort("`flow` must be a `cf_flow` object.")
+  k <- .resolve_step(flow, at, step_number, label, category)
 
-  chunks <- lapply(flow$steps, function(s) {
+  chunks <- lapply(flow$steps[seq_len(k)], function(s) {
     if (length(s$excluded_ids) == 0L) return(NULL)
     rows <- flow$data[flow$data$.cf_row_id %in% s$excluded_ids, , drop = FALSE]
     rows$cf_step     <- s$step

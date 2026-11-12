@@ -4,7 +4,14 @@
 \alias{cohort}
 \title{Extract the surviving cohort from a flow object}
 \usage{
-cohort(flow, flag = FALSE)
+cohort(
+  flow,
+  flag = FALSE,
+  at = NULL,
+  step_number = NULL,
+  label = NULL,
+  category = NULL
+)
 }
 \arguments{
 \item{flow}{A \code{cf_flow} object produced by \code{\link[=apply_criteria]{apply_criteria()}}.}
@@ -16,12 +23,52 @@ filtering: \code{cf_included} (logical), \code{cf_excluded_step} (integer, \code
 included), \code{cf_excluded_label} (character, \code{NA} if included), and
 \code{cf_excluded_category} (character, \code{NA} if uncategorised or included).
 Useful when downstream code needs every row present (e.g. plotting a
-full recording) while still knowing which rows count.}
+full recording) while still knowing which rows count. Combined with a
+step selector, attribution only considers steps up to that step; rows
+removed later count as included.}
+
+\item{at}{Optional automatic step selector (number, label or category);
+see the section "Intermediate steps".}
+
+\item{step_number}{Optional whole step number (\code{0} = starting data).}
+
+\item{label}{Optional exact step label.}
+
+\item{category}{Optional category name (last step in that category).}
 }
 \value{
 A tibble.
 }
 \description{
-Returns the rows that passed all criteria, with the internal \code{.cf_row_id}
-column removed.
+Returns the rows that passed all criteria (or, with a step selector, all
+criteria up to a chosen step), with the internal \code{.cf_row_id} column
+removed.
+}
+\section{Intermediate steps}{
+
+A selector picks a step and means "up to and including that step". With
+none given, the last step is used. At most one may be given:
+\itemize{
+\item \code{step_number}: a whole number \code{k} from \code{0} to the number of steps; \code{0} is
+the starting data.
+\item \code{label}: an exact step label. Errors if no step, or several steps, have it.
+\item \code{category}: a category name; selects the last step in that category.
+\item \code{at}: picks automatically. A number is a \code{step_number}; a string is a
+\code{label} if one matches, else a \code{category}. A string that is both a label
+and a category is an error: use \code{label} or \code{category} explicitly.
+}
+}
+
+\examples{
+dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
+crit <- cf_criteria() |>
+  include(~ !is.na(age), label = "Age recorded") |>
+  include(~ eligible_screen, label = "Passed screening") |>
+  exclude(~ withdrew, label = "Withdrew consent")
+flow <- apply_criteria(dat, crit)
+cohort(flow)                            # final survivors
+cohort(flow, at = "Passed screening")   # screening cohort (auto-select)
+cohort(flow, label = "Passed screening") # same, explicit
+nrow(cohort(flow, step_number = 0))     # the starting data
+excluded(flow, at = 2)                  # removed by steps 1-2
 }
