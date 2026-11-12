@@ -37,6 +37,11 @@ criteria -- while keeping a single, continuous step numbering and
 denominators that correctly reflect the cohort at each stage (rather than
 restarting counts from the original data).
 }
+\details{
+Before any new step is evaluated, \code{\link[=check_criteria]{check_criteria()}} verifies that every
+step refers only to columns present in \code{flow}'s data plus \code{join}, so a
+forgotten join fails up front naming the step and the missing column(s).
+}
 \examples{
 dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>

@@ -8,6 +8,10 @@
 #' denominators that correctly reflect the cohort at each stage (rather than
 #' restarting counts from the original data).
 #'
+#' Before any new step is evaluated, [check_criteria()] verifies that every
+#' step refers only to columns present in `flow`'s data plus `join`, so a
+#' forgotten join fails up front naming the step and the missing column(s).
+#'
 #' @param flow A `cf_flow` object produced by [apply_criteria()] (or a
 #'   previous call to `continue_criteria()`).
 #' @param criteria A `cf_criteria` object with the additional steps to apply.
@@ -51,6 +55,12 @@ continue_criteria <- function(flow, criteria, join = NULL, by = NULL) {
   } else if (!is.null(by)) {
     rlang::abort("`by` is only used together with `join`.")
   }
+
+  .check_criteria(
+    criteria, updated_data,
+    step_offset = length(flow$steps),
+    hint = "Columns added at this stage must be supplied via `join` (with `by`)."
+  )
 
   surviving_ids <- .surviving_with_id(flow)$.cf_row_id
   current <- updated_data[updated_data$.cf_row_id %in% surviving_ids, , drop = FALSE]

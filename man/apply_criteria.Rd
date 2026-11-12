@@ -49,6 +49,10 @@ frame, recording which rows are removed at each step. Returns a \code{cf_flow}
 object from which the surviving cohort (\code{\link[=cohort]{cohort()}}) and excluded rows
 (\code{\link[=excluded]{excluded()}}) can be extracted.
 }
+\details{
+Before any step is evaluated, \code{\link[=check_criteria]{check_criteria()}} verifies that every step
+refers only to columns present in \code{data} (after any \code{expected} join).
+}
 \section{Row identity}{
 
 \code{apply_criteria()} needs a stable row identifier to track exclusions. By

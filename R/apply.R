@@ -5,6 +5,9 @@
 #' object from which the surviving cohort ([cohort()]) and excluded rows
 #' ([excluded()]) can be extracted.
 #'
+#' Before any step is evaluated, [check_criteria()] verifies that every step
+#' refers only to columns present in `data` (after any `expected` join).
+#'
 #' @section Row identity:
 #' `apply_criteria()` needs a stable row identifier to track exclusions. By
 #' default it looks for a `.cf_row_id` column in `data`. If one is not found
@@ -91,6 +94,10 @@ apply_criteria <- function(data, criteria, id = NULL, expected = NULL, by = NULL
 
   # -- Row identity ----------------------------------------------------------
   data <- .ensure_row_id(data, id)
+
+  # Pre-flight: every step must refer only to columns that exist (after the
+  # `expected` join), so a missing column fails here naming the step.
+  .check_criteria(criteria, data)
 
   # Store original (with .cf_row_id) for later retrieval
   original <- data
