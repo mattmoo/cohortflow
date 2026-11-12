@@ -9,8 +9,9 @@ select_within(criteria, by, predicate, label, category = NULL)
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
 
-\item{by}{A single column name (string) defining the grouping (e.g.
-\code{"participant_id"}).}
+\item{by}{One or more column names (character vector) defining the
+grouping (e.g. \code{"participant_id"}); supply more than one for composite
+(multi-column) grouping.}
 
 \item{predicate}{A one-sided formula evaluated within each group, or a
 function that receives a group's rows as a data frame and returns a

@@ -4,10 +4,19 @@
 \alias{cohort}
 \title{Extract the surviving cohort from a flow object}
 \usage{
-cohort(flow)
+cohort(flow, flag = FALSE)
 }
 \arguments{
 \item{flow}{A \code{cf_flow} object produced by \code{\link[=apply_criteria]{apply_criteria()}}.}
+
+\item{flag}{Logical. When \code{FALSE} (default), returns only the surviving
+rows (the historical behaviour). When \code{TRUE}, returns \strong{all} original
+rows, in their original order, with attribution columns added instead of
+filtering: \code{cf_included} (logical), \code{cf_excluded_step} (integer, \code{NA} if
+included), \code{cf_excluded_label} (character, \code{NA} if included), and
+\code{cf_excluded_category} (character, \code{NA} if uncategorised or included).
+Useful when downstream code needs every row present (e.g. plotting a
+full recording) while still knowing which rows count.}
 }
 \value{
 A tibble.

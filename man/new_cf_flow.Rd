@@ -4,13 +4,14 @@
 \alias{new_cf_flow}
 \title{The cohort flow result object}
 \usage{
-new_cf_flow(data, criteria, steps)
+new_cf_flow(data, criteria, steps, hierarchy = NULL)
 }
 \description{
 A \code{cf_flow} object is returned by \code{\link[=apply_criteria]{apply_criteria()}}. It stores the
 original data (with an internal \code{.cf_row_id} column), the criteria pipeline
-that produced it, and a per-step record of attrition. Use \code{\link[=cohort]{cohort()}} to
-extract the surviving rows and \code{\link[=excluded]{excluded()}} to extract all removed rows with
-step metadata attached.
+that produced it, a per-step record of attrition, and (optionally) the
+\code{cf_hierarchy} used for per-level counting. Use \code{\link[=cohort]{cohort()}} to extract the
+surviving rows and \code{\link[=excluded]{excluded()}} to extract all removed rows with step
+metadata attached.
 }
 \keyword{internal}

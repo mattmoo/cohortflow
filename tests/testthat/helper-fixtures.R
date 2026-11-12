@@ -86,3 +86,39 @@ make_flow_stepped_wedge <- function() {
     exclude(~ withdrew,             label = "Withdrew consent", category = "Consent")
   apply_criteria(dat, crit, id = "event_id")
 }
+
+make_flow_hierarchy <- function() {
+  dat <- mock_cluster_rct(n_clusters = 10, n_participants = 300, seed = 1)
+  h   <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+  crit <- cf_criteria() |>
+    include(~ !is.na(age),      label = "Age recorded",     category = "Valid age") |>
+    include(~ age >= 18,        label = "Adults only",      category = "Valid age") |>
+    group_include(by = "cluster_id", ~ n() >= 15, label = "Cluster size >= 15") |>
+    exclude(~ withdrew,         label = "Withdrew consent", category = "Consent")
+  apply_criteria(dat, crit, id = "participant_id", hierarchy = h)
+}
+
+make_flow_randomise <- function() {
+  dat <- mock_cluster_rct(n_clusters = 8, n_participants = 200, seed = 1)
+  crit <- cf_criteria() |>
+    include(~ !is.na(age), label = "Age recorded") |>
+    randomise(by = "cluster_id", arms = "arm") |>
+    exclude(~ withdrew,    label = "Withdrew after allocation")
+  apply_criteria(dat, crit, id = "participant_id")
+}
+
+# Two post-randomisation exclusion steps (rather than one), so each arm's
+# per-row cascade has multiple, closely-spaced exclusion boxes -- this is
+# what actually exposes the arm-column overlap bug (an exclusion box drawn
+# to the right of its own arm's column reaching into the next arm's main
+# boxes), which a single post-randomisation step is too sparse to trigger.
+make_flow_randomise_multistep <- function() {
+  dat <- mock_parallel_rct(n_participants = 240, seed = 1)
+  crit <- cf_criteria() |>
+    include(~ !is.na(age), label = "Age recorded") |>
+    include(~ age >= 18,   label = "Adults only") |>
+    randomise(by = "participant_id", arms = "arm") |>
+    exclude(~ withdrew,           label = "Withdrew after allocation") |>
+    exclude(~ !baseline_complete, label = "Missed baseline visit")
+  apply_criteria(dat, crit, id = "participant_id")
+}

@@ -9,7 +9,8 @@ group_include(criteria, by, predicate, label, category = NULL)
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
 
-\item{by}{A single column name (string) to group by.}
+\item{by}{One or more column names (character vector) to group by; supply
+more than one for composite (multi-column) grouping.}
 
 \item{predicate}{A one-sided formula using summary functions (\code{n()},
 \code{mean()}, \code{n_distinct()}, etc.) or a function that receives a grouped

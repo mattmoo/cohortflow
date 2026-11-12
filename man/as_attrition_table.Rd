@@ -15,6 +15,7 @@ as_attrition_table(
   n_col_label = "N",
   removed_col_label = "Removed",
   pct_col_label = "\% removed",
+  consequential_col_label = "Consequential",
   branch_by = NULL,
   count_by = NULL,
   branch_na_label = "Missing",
@@ -23,6 +24,9 @@ as_attrition_table(
   group_x_label = NULL,
   group_y_label = NULL,
   group_na_label = "Missing",
+  levels = character(0),
+  level_labels = NULL,
+  show_consequential = NULL,
   shade = NULL,
   shade_fn = NULL,
   shade_palette = c("#FFFFFF", "#F8696B")
@@ -58,14 +62,20 @@ Default \code{"Removed"}.}
 \item{pct_col_label}{Column header for the percentage column.
 Default \code{"\% removed"}.}
 
+\item{consequential_col_label}{Column header for the optional
+"consequential" column shown per level when \code{levels} is supplied and
+\code{show_consequential} resolves to \code{TRUE}. Default \code{"Consequential"}.}
+
 \item{branch_by}{Optional column name (string) for allocation branching.
-When \code{NULL} (default), the table has a single \code{n} column. When
-supplied, the surviving cohort is split by this column and the final
-row's total is broken out into one additional column per branch value
-(named after the branch value, e.g. \code{Control}, \code{Intervention}), each
-populated only on the final row. Use \code{final_label = "Randomised"} when
-appropriate. Cannot be combined with \code{group_x}/\code{group_y}. Rows whose
-branch value is \code{NA} form their own branch, labelled \code{branch_na_label}.}
+When \code{NULL} (default), the table has a single \code{n} column unless the
+pipeline has a \code{\link[=randomise]{randomise()}} step, in which case its \code{arms} column is
+used automatically. When supplied (or defaulted), the surviving cohort
+is split by this column and the final row's total is broken out into
+one additional column per branch value (named after the branch value,
+e.g. \code{Control}, \code{Intervention}), each populated only on the final row.
+Use \code{final_label = "Randomised"} when appropriate. Cannot be combined
+with \code{group_x}/\code{group_y}. Rows whose branch value is \code{NA} form their own
+branch, labelled \code{branch_na_label}.}
 
 \item{count_by}{Optional column name (string) for distinct counts. When
 supplied, counts are computed as \code{n_distinct(count_by)} rather than
@@ -98,6 +108,32 @@ value alone).}
 \code{"Missing"}. Ignored when the corresponding grouping column has no \code{NA}
 values.}
 
+\item{levels}{Optional; requires \code{flow} to have been built with
+\code{apply_criteria(hierarchy = ...)}. When the default \code{character(0)}, this
+argument is ignored and the row-count behaviour above is unchanged. When
+\code{NULL}, one stacked block per hierarchy level is returned (finest to
+coarsest), each with a \code{level} column and an additional \code{n_consequential}
+column (see \code{\link[=apply_criteria]{apply_criteria()}}'s \code{hierarchy} argument for the counting
+rule). When a character vector of level name(s), only those levels are
+returned, in the order given. Cannot be combined with \code{group_x}/\code{group_y},
+\code{branch_by}, or \code{count_by}.}
+
+\item{level_labels}{Optional display names for the column blocks produced
+by \code{levels}. Either a vector positionally aligned with \code{levels}, or a
+vector named by level (e.g. \code{c(trial = "Trials", participant = "Participants")}). Default \code{NULL}, which uses the level names as-is --
+level names are user-chosen and are not auto-pluralised or title-cased,
+since guessing would be as likely to surprise as to help; supply
+\code{level_labels} to get "Trials" from a level named \code{trial}. Ignored
+unless \code{levels} is supplied.}
+
+\item{show_consequential}{Logical, or \code{NULL} (default). Controls whether
+an extra "consequential" column is shown per level, reporting units
+lost only because a \code{group_include()}/\code{group_exclude()} group they
+belonged to was removed (see \code{levels} on \code{\link[=as_attrition_tibble]{as_attrition_tibble()}}). When
+\code{NULL}, the column is included only if the underlying data has any
+non-zero value for it, so pipelines without group-level criteria render
+unchanged. Ignored unless \code{levels} is supplied.}
+
 \item{shade}{Optional character string: \code{"pct_removed"} or \code{"n_removed"}.
 When supplied, shades the N/Removed/\% cells of step and category rows
 with an automatic colour gradient based on that column's value. Default
@@ -116,7 +152,9 @@ include in a document. When \code{branch_by} is supplied, one additional
 column per branch value is added after the percentage column, headed
 with the branch value itself and populated only on the final row. When
 \code{group_x}/\code{group_y} are supplied, the table is a repeated grid as
-described in the Grouping section.
+described in the Grouping section. When \code{levels} is supplied, the table
+has one N/Removed/\% column block per level, as described in the
+Hierarchy levels section.
 }
 \description{
 Produces a formatted attrition table from a \code{cf_flow} object. Three output
@@ -168,6 +206,33 @@ per row. \code{shade_fn} takes precedence over \code{shade} if both are supplied
 }
 }
 
+\section{Hierarchy levels (\code{levels})}{
+
+Supplying \code{levels} repeats the N / Removed / \% removed columns once per
+hierarchy level, so a single criterion row reports its effect at every
+level side by side -- the reporting form required by the CONSORT cluster
+extension (Campbell, Elbourne & Altman, BMJ 2004;328:702-8) and the
+within-person extension, where losses at each stage are counted at both
+the unit of analysis and the unit of recruitment. For example, with a
+cluster-randomised trial where participants nest inside clusters:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{h <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+flow <- apply_criteria(dat, crit, hierarchy = h)
+as_attrition_table(
+  flow,
+  levels       = c("participant", "cluster"),
+  level_labels = c(participant = "Participants", cluster = "Clusters")
+)
+}\if{html}{\out{</div>}}
+
+produces one row per criterion with a column block for participants and a
+column block for clusters, e.g. \emph{"Cluster too small -- 42 participants
+removed, 3 clusters removed"}. Shading (\code{shade}/\code{shade_fn}) is computed
+\emph{per level} -- each level's colour gradient is scaled across that level's
+own values, not across all levels combined. \code{levels} cannot be combined
+with \code{group_x}/\code{group_y}/\code{branch_by}/\code{count_by}.
+}
+
 \examples{
 \donttest{
 dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
@@ -191,12 +256,18 @@ if (requireNamespace("huxtable", quietly = TRUE)) {
   as_attrition_table(flow, backend = "huxtable")   # huxtable
 }
 
-# Grid: sites as columns, periods as rows (stepped-wedge design)
-sw      <- mock_stepped_wedge(n_participants = 400, n_periods = 4, seed = 1)
-flow_sw <- apply_criteria(sw, crit, id = "event_id")
 if (requireNamespace("flextable", quietly = TRUE) &&
     requireNamespace("officer", quietly = TRUE)) {
+  # Grid: sites as columns, periods as rows (stepped-wedge design)
+  sw      <- mock_stepped_wedge(n_participants = 400, n_periods = 4, seed = 1)
+  flow_sw <- apply_criteria(sw, crit, id = "event_id")
   as_attrition_table(flow_sw, group_x = "site_id", group_y = "period")
+
+  # Hierarchy levels: cluster CONSORT reporting
+  cl <- mock_cluster_rct(n_clusters = 20, seed = 1)
+  h  <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+  flow_cl <- apply_criteria(cl, crit, id = "participant_id", hierarchy = h)
+  as_attrition_table(flow_cl, levels = c("participant", "cluster"))
 }
 }
 \dontrun{
