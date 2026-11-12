@@ -445,6 +445,16 @@ test_that("branch_na_label renames the NA branch column", {
   expect_equal(out[out$row_type == "final", ][["Unknown arm"]], 2L)
 })
 
+test_that("branch values that clash with standard column names abort", {
+  d  <- tibble::tibble(x = 1:4, arm = c("n", "A", "n", "A"))
+  fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))
+  expect_error(as_attrition_tibble(fl, branch_by = "arm"), "clash", class = "rlang_error")
+  expect_error(
+    as_attrition_tibble(fl, branch_by = "x", branch_na_label = "label"),
+    NA
+  )
+})
+
 test_that("no Missing branch column when branch_by has no NA", {
   flow <- make_flow_parallel_rct()
   out  <- as_attrition_tibble(flow, branch_by = "arm")

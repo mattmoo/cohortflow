@@ -339,12 +339,30 @@ as_attrition_tibble <- function(
   branch_values <- .cf_group_values(cohort_data[[branch_by]])
   final_idx     <- which(tbl$row_type == "final")
 
+  # Branch labels become column names, so they must not clobber the
+  # tibble's own columns.
+  branch_labels <- vapply(branch_values, .cf_group_label, character(1L),
+                          na_label = branch_na_label, USE.NAMES = FALSE)
+  reserved <- c("row_type", "label", "indent_level", "n", "n_removed",
+                "pct_removed", "branch", "group_x", "group_y")
+  clash <- intersect(branch_labels, reserved)
+  if (length(clash) > 0L) {
+    rlang::abort(c(
+      sprintf("`branch_by` value%s %s clash%s with standard attrition column names.",
+              if (length(clash) == 1L) "" else "s",
+              paste0("\"", clash, "\"", collapse = ", "),
+              if (length(clash) == 1L) "es" else ""),
+      "i" = sprintf("Recode `%s` (or set `branch_na_label`) so no value is one of: %s.",
+                    branch_by, paste(reserved, collapse = ", "))
+    ))
+  }
+
   for (b in seq_along(branch_values)) {
     branch_val  <- branch_values[b]
     branch_data <- cohort_data[.cf_group_match(cohort_data[[branch_by]], branch_val), , drop = FALSE]
     branch_n    <- count_fn(branch_data)
 
-    col_name <- .cf_group_label(branch_val, branch_na_label)
+    col_name <- branch_labels[b]
     tbl[[col_name]] <- NA_integer_
     tbl[[col_name]][final_idx] <- branch_n
   }
