@@ -30,6 +30,13 @@ object from which the surviving cohort (\code{\link[=cohort]{cohort()}}) and exc
 default it looks for a \code{.cf_row_id} column in \code{data}. If one is not found
 and \code{id} is \code{NULL}, a sequential integer identifier is added automatically
 (with a message). Supply \code{id} to use an existing column as the identifier.
+
+The identifier (whether supplied via \code{id} or a pre-existing \code{.cf_row_id}
+column) must uniquely identify every row: it may contain neither
+duplicates nor \code{NA} values, and \code{apply_criteria()} aborts if it does. For
+designs with several rows per participant (e.g. crossover or stepped-wedge
+data), use a row-level identifier such as \code{event_id}, not the participant
+identifier.
 }
 
 \section{Step types}{

@@ -11,6 +11,13 @@
 #' and `id` is `NULL`, a sequential integer identifier is added automatically
 #' (with a message). Supply `id` to use an existing column as the identifier.
 #'
+#' The identifier (whether supplied via `id` or a pre-existing `.cf_row_id`
+#' column) must uniquely identify every row: it may contain neither
+#' duplicates nor `NA` values, and `apply_criteria()` aborts if it does. For
+#' designs with several rows per participant (e.g. crossover or stepped-wedge
+#' data), use a row-level identifier such as `event_id`, not the participant
+#' identifier.
+#'
 #' @section Step types:
 #' | Type | Predicate | Effect |
 #' |---|---|---|
@@ -111,20 +118,20 @@ apply_criteria <- function(data, criteria, id = NULL) {
 .ensure_row_id <- function(data, id) {
   if (!is.null(id)) {
     # User supplied a column name
+    if (!is.character(id) || length(id) != 1L || is.na(id) || !nzchar(id)) {
+      rlang::abort("`id` must be a single non-empty string naming a column in `data`.")
+    }
     if (!id %in% names(data)) {
       rlang::abort(sprintf("Column `%s` supplied as `id` not found in data.", id))
     }
-    if (any(duplicated(data[[id]]))) {
-      rlang::warn(sprintf(
-        "Column `%s` contains duplicate values; it may not uniquely identify rows.", id
-      ))
-    }
+    .check_unique_id(data[[id]], id)
     data$.cf_row_id <- data[[id]]
     return(data)
   }
 
   if (".cf_row_id" %in% names(data)) {
-    # Already has an ID column -- use it
+    # Already has an ID column -- use it, but only if it is a valid identifier
+    .check_unique_id(data$.cf_row_id, ".cf_row_id")
     return(data)
   }
 
@@ -133,4 +140,25 @@ apply_criteria <- function(data, criteria, id = NULL) {
           "Adding a sequential `.cf_row_id`.")
   data$.cf_row_id <- seq_len(nrow(data))
   data
+}
+
+# Row identity is used to select rows in cohort()/excluded(), so a
+# non-unique or missing identifier would silently remove (or keep) every row
+# sharing a value. Abort rather than warn.
+.check_unique_id <- function(x, col) {
+  if (anyNA(x)) {
+    rlang::abort(c(
+      sprintf("Column `%s` used as the row identifier contains missing values.", col),
+      "i" = "The identifier column must uniquely identify every row."
+    ))
+  }
+  if (anyDuplicated(x)) {
+    rlang::abort(c(
+      sprintf("Column `%s` used as the row identifier contains duplicate values.", col),
+      "i" = "The identifier column must uniquely identify every row.",
+      "i" = paste0("For designs with several rows per participant, use a row-level ",
+                   "identifier (e.g. `id = \"event_id\"`) rather than a participant id.")
+    ))
+  }
+  invisible(x)
 }

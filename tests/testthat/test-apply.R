@@ -33,6 +33,33 @@ test_that("apply_criteria() uses supplied id column", {
   expect_equal(flow$data$.cf_row_id, dat$participant_id)
 })
 
+test_that("apply_criteria() aborts on duplicate id values", {
+  d    <- tibble::tibble(pid = c("P1", "P1", "P2", "P3"), x = c(1, -1, 1, 1))
+  crit <- cf_criteria() |> include(~ x > 0, label = "pos")
+  expect_error(apply_criteria(d, crit, id = "pid"), "duplicate", class = "rlang_error")
+})
+
+test_that("apply_criteria() aborts on NA id values", {
+  d    <- tibble::tibble(pid = c("P1", NA, "P3"), x = c(1, -1, 1))
+  crit <- cf_criteria() |> include(~ x > 0, label = "pos")
+  expect_error(apply_criteria(d, crit, id = "pid"), "missing", class = "rlang_error")
+})
+
+test_that("apply_criteria() aborts when id is not a single string", {
+  d    <- tibble::tibble(a = 1:3, b = 1:3)
+  crit <- cf_criteria() |> include(~ a > 0, label = "pos")
+  expect_error(apply_criteria(d, crit, id = c("a", "b")), class = "rlang_error")
+  expect_error(apply_criteria(d, crit, id = 1), class = "rlang_error")
+})
+
+test_that("apply_criteria() aborts on a non-unique existing .cf_row_id", {
+  d    <- tibble::tibble(x = 1:3, .cf_row_id = c(1L, 1L, 2L))
+  crit <- cf_criteria() |> include(~ x > 0, label = "pos")
+  expect_error(apply_criteria(d, crit), "duplicate", class = "rlang_error")
+  d$.cf_row_id <- c(1L, NA, 2L)
+  expect_error(apply_criteria(d, crit), "missing", class = "rlang_error")
+})
+
 test_that("include() step keeps TRUE rows cumulatively", {
   dat  <- suppressWarnings(mock_cohortflow(200, seed = 42))
   crit <- cf_criteria() |>
