@@ -29,6 +29,11 @@
 #' Uncategorised steps appear at indent level 1 without sub-rows. When
 #' `show_categories = FALSE`, one row per step is produced at indent level 1.
 #'
+#' Steps are collapsed under a category only when they are *consecutive* in
+#' the pipeline (reordering steps would change the cumulative counts). A
+#' category whose steps are separated by other steps therefore produces more
+#' than one category row, and a warning suggests reordering the pipeline.
+#'
 #' @section Percentage columns:
 #' * `pct_removed`: percentage of entering N removed at this row's step (or
 #'   category). For the final cohort row this is the percentage *retained*
@@ -145,6 +150,8 @@ as_attrition_tibble <- function(
     rlang::abort("`flow` must be a `cf_flow` object.")
   }
 
+  if (show_categories) .warn_split_categories(flow$steps)
+
   # -- Grouped path ----------------------------------------------------------
   if (!is.null(group_x) || !is.null(group_y)) {
     if (!is.null(branch_by) || !is.null(count_by)) {
@@ -211,6 +218,35 @@ as_attrition_tibble <- function(
   }
 
   out
+}
+
+# Categories are collapsed only across *consecutive* steps (reordering steps
+# would change the cumulative counts), so a category that reappears after a
+# different one yields a second category row. Warn once per call so the user
+# can reorder the pipeline if that was not intended.
+.warn_split_categories <- function(steps) {
+  cats <- vapply(steps, function(s) {
+    if (is.null(s$category)) NA_character_ else s$category
+  }, character(1L))
+  # rle() breaks runs at NA (uncategorised steps), matching the collapsing
+  # rule in .attrition_rows_categorised().
+  runs <- rle(cats)$values
+  runs <- runs[!is.na(runs)]
+  split_cats <- unique(runs[duplicated(runs)])
+  if (length(split_cats) > 0L) {
+    rlang::warn(
+      c(
+        sprintf("Categor%s %s appear%s in non-consecutive steps.",
+                if (length(split_cats) == 1L) "y" else "ies",
+                paste0("\"", split_cats, "\"", collapse = ", "),
+                if (length(split_cats) == 1L) "s" else ""),
+        "i" = "Steps are collapsed into one category row only when they are consecutive.",
+        "i" = "Reorder the criteria pipeline so each category's steps are adjacent."
+      ),
+      class = "cohortflow_split_category"
+    )
+  }
+  invisible(split_cats)
 }
 
 # Build rows with category grouping
@@ -376,12 +412,16 @@ as_attrition_tibble <- function(
 
       sub_flow <- apply_criteria(sub_data, flow$criteria, id = ".cf_row_id")
 
-      block <- as_attrition_tibble(
-        sub_flow,
-        show_categories = show_categories,
-        assessed_label  = assessed_label,
-        final_label     = final_label,
-        digits          = digits
+      # The split-category warning was already issued once by the caller.
+      block <- withCallingHandlers(
+        as_attrition_tibble(
+          sub_flow,
+          show_categories = show_categories,
+          assessed_label  = assessed_label,
+          final_label     = final_label,
+          digits          = digits
+        ),
+        cohortflow_split_category = function(w) invokeRestart("muffleWarning")
       )
       block$group_x <- if (!is.null(group_x)) .cf_group_label(x, group_na_label) else NA_character_
       block$group_y <- if (!is.null(group_y)) .cf_group_label(y, group_na_label) else NA_character_

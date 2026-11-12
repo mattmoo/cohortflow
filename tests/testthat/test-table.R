@@ -382,6 +382,33 @@ test_that("branch columns are NA except on the final row", {
   }
 })
 
+test_that("non-consecutive categories warn and still produce separate rows", {
+  d    <- tibble::tibble(id = 1:10, x = 1:10)
+  crit <- cf_criteria() |>
+    include(~ x > 1, label = "s1", category = "A") |>
+    include(~ x > 2, label = "s2", category = "B") |>
+    include(~ x > 3, label = "s3", category = "A")
+  flow <- apply_criteria(d, crit, id = "id")
+
+  expect_warning(out <- as_attrition_tibble(flow), "non-consecutive", class = "cohortflow_split_category")
+  expect_equal(sum(out$row_type == "category" & out$label == "A"), 2L)
+  expect_no_warning(as_attrition_tibble(flow, show_categories = FALSE))
+})
+
+test_that("categories separated by an uncategorised step warn", {
+  d    <- tibble::tibble(id = 1:10, x = 1:10)
+  crit <- cf_criteria() |>
+    include(~ x > 1, label = "s1", category = "A") |>
+    include(~ x > 2, label = "s2") |>
+    include(~ x > 3, label = "s3", category = "A")
+  flow <- apply_criteria(d, crit, id = "id")
+  expect_warning(as_attrition_tibble(flow), class = "cohortflow_split_category")
+})
+
+test_that("consecutive categories do not warn", {
+  expect_no_warning(as_attrition_tibble(make_flow_categorised()))
+})
+
 test_that("NA branch values form their own column and are not double-counted", {
   d  <- tibble::tibble(x = 1:6, arm = c("A", "B", NA, "A", "B", NA))
   fl <- suppressMessages(apply_criteria(d, cf_criteria() |> include(~ x > 0, label = "pos")))

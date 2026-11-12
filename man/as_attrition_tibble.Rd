@@ -100,6 +100,11 @@ that share a \code{category} are collapsed into a parent row (indent level 1)
 with individual step sub-rows (indent level 2) nested beneath it.
 Uncategorised steps appear at indent level 1 without sub-rows. When
 \code{show_categories = FALSE}, one row per step is produced at indent level 1.
+
+Steps are collapsed under a category only when they are \emph{consecutive} in
+the pipeline (reordering steps would change the cumulative counts). A
+category whose steps are separated by other steps therefore produces more
+than one category row, and a warning suggests reordering the pipeline.
 }
 
 \section{Percentage columns}{
