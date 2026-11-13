@@ -636,3 +636,29 @@ test_that("as_consort_diagram() rejects non-scalar column-name arguments", {
   expect_error(as_consort_diagram(flow, branch_by = "arm", stage_by = "arm", stage_label_by = 1),
                "`stage_label_by` must be a single column name", fixed = TRUE)
 })
+
+# ---------------------------------------------------------------------------
+# Degenerate flows (smoke-test 5f)
+
+test_that("as_consort_diagram() renders degenerate flows without warnings", {
+  dat <- mock_parallel_rct(n_participants = 40, seed = 1)
+  crit_plain <- cf_criteria() |> include(~ age >= 18, label = "Adults")
+  crit_rand  <- cf_criteria() |>
+    include(~ age > 1000, label = "Nobody") |>
+    randomise(by = "participant_id", arms = "arm") |>
+    exclude(~ withdrew, label = "Withdrew")
+  flows <- list(
+    zero_rows      = apply_criteria(dat[0, ], crit_plain, id = "participant_id"),
+    zero_rows_rand = apply_criteria(dat[0, ], crit_rand, id = "participant_id"),
+    all_out        = apply_criteria(dat, crit_rand, id = "participant_id")
+  )
+
+  png(tempfile(fileext = ".png"))
+  on.exit(grDevices::dev.off(), add = TRUE)
+  for (nm in names(flows)) {
+    for (bb in list(NULL, "arm")) {
+      expect_no_warning(p <- as_consort_diagram(flows[[nm]], branch_by = bb))
+      expect_no_warning(print(p))
+    }
+  }
+})
