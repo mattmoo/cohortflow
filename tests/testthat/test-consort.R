@@ -619,3 +619,20 @@ test_that("NA arm values get their own arm cascade after a randomise() step", {
     expect_true(all(gaps > 0))
   }
 })
+
+# ---------------------------------------------------------------------------
+# Scalar column-name arguments (smoke-test 5e)
+
+test_that("as_consort_diagram() rejects non-scalar column-name arguments", {
+  flow <- make_flow_parallel_rct()
+  for (b in list(c("arm", "sex"), NA_character_, "", 1)) {
+    expect_error(as_consort_diagram(flow, branch_by = b), "`branch_by` must be a single column name",
+                 fixed = TRUE)
+  }
+  expect_error(as_consort_diagram(flow, branch_by = "arm", count_by = c("a", "b")),
+               "`count_by` must be a single column name", fixed = TRUE)
+  expect_error(as_consort_diagram(flow, branch_by = "arm", stage_by = ""),
+               "`stage_by` must be a single column name", fixed = TRUE)
+  expect_error(as_consort_diagram(flow, branch_by = "arm", stage_by = "arm", stage_label_by = 1),
+               "`stage_label_by` must be a single column name", fixed = TRUE)
+})

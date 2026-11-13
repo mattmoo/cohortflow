@@ -458,6 +458,10 @@ as_consort_diagram <- function(
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
   }
+  .check_scalar_col(branch_by, "branch_by")
+  .check_scalar_col(count_by, "count_by")
+  .check_scalar_col(stage_by, "stage_by")
+  .check_scalar_col(stage_label_by, "stage_label_by")
 
   # -- Validate branching parameters ----------------------------------------
   # A `randomise()` step (if present) supplies default `branch_by` (from its

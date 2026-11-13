@@ -167,6 +167,10 @@ as_attrition_tibble <- function(
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
   }
+  .check_scalar_col(branch_by, "branch_by")
+  .check_scalar_col(count_by, "count_by")
+  .check_scalar_col(group_x, "group_x")
+  .check_scalar_col(group_y, "group_y")
 
   if (show_categories) .warn_split_categories(flow$steps)
 
@@ -553,6 +557,18 @@ as_attrition_tibble <- function(
   if (is.na(value)) na_label else as.character(value)
 }
 
+# Validates a renderer argument that names one column (`branch_by`,
+# `count_by`, `stage_by`, `stage_label_by`, `group_x`, `group_y`). `NULL`
+# passes. Whether the column exists is checked later, where the data it must
+# be in is known ("Column `x` not found in surviving cohort.").
+.check_scalar_col <- function(x, arg) {
+  if (is.null(x)) return(invisible(NULL))
+  if (!is.character(x) || length(x) != 1L || is.na(x) || !nzchar(x)) {
+    rlang::abort(sprintf("`%s` must be a single column name.", arg))
+  }
+  invisible(NULL)
+}
+
 # ---------------------------------------------------------------------------
 # Hierarchy-level data layer -- levels
 # ---------------------------------------------------------------------------
@@ -917,6 +933,10 @@ as_attrition_table <- function(
   shade_palette           = c("#FFFFFF", "#F8696B")
 ) {
   backend <- match.arg(backend)
+  .check_scalar_col(branch_by, "branch_by")
+  .check_scalar_col(count_by, "count_by")
+  .check_scalar_col(group_x, "group_x")
+  .check_scalar_col(group_y, "group_y")
 
   # -- Hierarchy-level grid path ------------------------------------------
   if (!identical(levels, character(0))) {
