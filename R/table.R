@@ -110,7 +110,10 @@
 #'   column (see [apply_criteria()]'s `hierarchy` argument for the counting
 #'   rule). When a character vector of level name(s), only those levels are
 #'   returned, in the order given. Cannot be combined with `group_x`/`group_y`,
-#'   `branch_by`, or `count_by`.
+#'   `branch_by`, or `count_by`. A row with an `NA` in any of a level's
+#'   columns is not a unit at that level, but still counts at every level
+#'   whose own key is complete: an expected participant with no cluster is one
+#'   participant at risk and zero clusters.
 #'
 #' @return A [tibble::tibble()] with columns:
 #' \describe{
@@ -597,7 +600,7 @@ as_attrition_tibble <- function(
   hierarchy  <- flow$hierarchy
   level_cols <- hierarchy[[level_name]]
   steps      <- flow$steps
-  n_start    <- length(unique(.composite_key(flow$data, level_cols)))
+  n_start    <- length(.level_unit_keys(flow$data, level_cols))
 
   level_steps <- lapply(steps, function(s) {
     hc  <- s$hierarchy_counts
@@ -785,7 +788,9 @@ as_attrition_tibble <- function(
 #' removed, 3 clusters removed"*. Shading (`shade`/`shade_fn`) is computed
 #' *per level* -- each level's colour gradient is scaled across that level's
 #' own values, not across all levels combined. `levels` cannot be combined
-#' with `group_x`/`group_y`/`branch_by`/`count_by`.
+#' with `group_x`/`group_y`/`branch_by`/`count_by`. Rows with an `NA` in a
+#' level's column(s) are not counted as units at that level (they still count
+#' at any level whose own key is complete).
 #'
 #' @inheritParams as_attrition_tibble
 #' @param backend Character string: `"flextable"` (default), `"gt"`, or

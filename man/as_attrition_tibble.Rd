@@ -72,7 +72,10 @@ coarsest), each with a \code{level} column and an additional \code{n_consequenti
 column (see \code{\link[=apply_criteria]{apply_criteria()}}'s \code{hierarchy} argument for the counting
 rule). When a character vector of level name(s), only those levels are
 returned, in the order given. Cannot be combined with \code{group_x}/\code{group_y},
-\code{branch_by}, or \code{count_by}.}
+\code{branch_by}, or \code{count_by}. A row with an \code{NA} in any of a level's
+columns is not a unit at that level, but still counts at every level
+whose own key is complete: an expected participant with no cluster is one
+participant at risk and zero clusters.}
 
 \item{branch_na_label}{Character string used to label the branch formed by
 \code{NA} values in \code{branch_by} (and, in \code{\link[=as_consort_diagram]{as_consort_diagram()}}, the stage
