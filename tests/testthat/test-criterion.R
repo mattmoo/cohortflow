@@ -308,3 +308,90 @@ test_that("eval_select_criterion() errors when predicate returns wrong type", {
   d    <- data.frame(grp = c("a", "a"), x = 1:2)
   expect_error(cohortflow:::eval_select_criterion(crit, d), class = "rlang_error")
 })
+
+# ---------------------------------------------------------------------------
+# Rendered error messages (no raw cli markup)
+
+test_that("cf_criterion() validation errors render plain text", {
+  expect_error(cf_criterion(~ x > 0, label = ""), "`label` must be a single non-empty string", fixed = TRUE)
+  expect_error(cf_criterion("x", label = "a"), "`predicate` must be a formula or a function", fixed = TRUE)
+  expect_error(cf_criterion("x", label = "a"), "Supplied: <character>", fixed = TRUE)
+  expect_error(cf_criterion(NULL, label = "a"), "`predicate` must be a formula or a function", fixed = TRUE)
+  expect_error(
+    cf_criterion(~ TRUE, label = "R", type = "randomise", by = "c", arms = "arm"),
+    "`predicate` must be `NULL` for type \"randomise\"", fixed = TRUE
+  )
+  expect_error(cf_criterion(y ~ x, label = "a"), "Formulas must be one-sided (e.g. `~ age >= 18`)", fixed = TRUE)
+  expect_error(
+    cf_criterion(~ n() > 1, label = "a", type = "group_include"),
+    "`by` must be one or more non-empty strings for type \"group_include\"", fixed = TRUE
+  )
+  expect_error(
+    cf_criterion(NULL, label = "R", type = "randomise", by = "c"),
+    "`arms` must be a single non-empty string for type \"randomise\"", fixed = TRUE
+  )
+  expect_error(cf_criterion(~ x > 0, label = "a", arms = "arm"), "`arms` is only used for type \"randomise\"",
+               fixed = TRUE)
+  expect_error(cf_criterion(~ x > 0, label = "a", category = ""),
+               "`category` must be a single non-empty string or NULL", fixed = TRUE)
+})
+
+test_that("evaluation errors interpolate the real values", {
+  d <- data.frame(grp = c("a", "a", "b"), x = 1:3)
+  expect_snapshot(error = TRUE, {
+    cohortflow:::eval_criterion(cf_criterion(function(d) d$x * 2, label = "Doubled x"), d)
+  })
+  expect_snapshot(error = TRUE, {
+    cohortflow:::eval_criterion(cf_criterion(function(d) TRUE, label = "Scalar"), d)
+  })
+  expect_snapshot(error = TRUE, {
+    cohortflow:::eval_group_criterion(
+      cf_criterion(~ n() >= 2, label = "Big site", type = "group_include", by = "site"), d
+    )
+  })
+  expect_snapshot(error = TRUE, {
+    cohortflow:::eval_select_criterion(
+      cf_criterion(~ x == min(x), label = "Lowest", type = "select_within", by = c("grp", "site")), d
+    )
+  })
+})
+
+test_that("no error message carries unrendered cli markup", {
+  d <- data.frame(grp = c("a", "a", "b"), x = 1:3)
+  calls <- list(
+    quote(cf_criterion("x", label = "a")),
+    quote(cf_criterion(NULL, label = "a")),
+    quote(cf_criterion(~ TRUE, label = "R", type = "randomise", by = "c", arms = "arm")),
+    quote(cf_criterion(~ x > 0, label = "")),
+    quote(cf_criterion(y ~ x, label = "a")),
+    quote(cf_criterion(~ n() > 1, label = "a", type = "group_include")),
+    quote(cf_criterion(~ x > 0, label = "a", by = "grp")),
+    quote(cf_criterion(NULL, label = "R", type = "randomise", by = "c")),
+    quote(cf_criterion(~ x > 0, label = "a", arms = "arm")),
+    quote(cf_criterion(~ x > 0, label = "a", category = "")),
+    quote(cohortflow:::eval_criterion(cf_criterion(function(d) d$x * 2, label = "n"), d)),
+    quote(cohortflow:::eval_criterion(cf_criterion(function(d) TRUE, label = "n"), d)),
+    quote(cohortflow:::eval_group_criterion(
+      cf_criterion(~ n() >= 2, label = "g", type = "group_include", by = "site"), d
+    )),
+    quote(cohortflow:::eval_group_criterion(
+      cf_criterion(function(g) dplyr::summarise(g, k = 1), label = "g", type = "group_include", by = "grp"), d
+    )),
+    quote(cohortflow:::eval_select_criterion(
+      cf_criterion(~ x == min(x), label = "s", type = "select_within", by = "site"), d
+    )),
+    quote(cohortflow:::eval_select_criterion(
+      cf_criterion(function(g) 1L, label = "s", type = "select_within", by = "grp"), d
+    ))
+  )
+  for (cl in calls) {
+    msg <- tryCatch({
+      eval(cl)
+      NA_character_
+    }, error = function(e) conditionMessage(e))
+    expect_false(is.na(msg), info = deparse(cl))
+    expect_false(grepl("{.", msg, fixed = TRUE), info = msg)
+    expect_false(grepl("{nrow", msg, fixed = TRUE), info = msg)
+    expect_false(grepl("{length", msg, fixed = TRUE), info = msg)
+  }
+})
