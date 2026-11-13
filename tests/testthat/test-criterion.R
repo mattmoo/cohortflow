@@ -395,3 +395,11 @@ test_that("no error message carries unrendered cli markup", {
     expect_false(grepl("{length", msg, fixed = TRUE), info = msg)
   }
 })
+
+test_that("format() and print() show a primitive predicate, not NULL", {
+  crit <- cf_criterion(is.na, label = "Missing", type = "exclude")
+  expect_false(grepl("NULL", format(crit), fixed = TRUE))
+  expect_match(format(crit), ".Primitive(\"is.na\")", fixed = TRUE)
+  out <- capture.output(print(crit))
+  expect_false(any(grepl("NULL", out, fixed = TRUE)))
+})

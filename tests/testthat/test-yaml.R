@@ -231,3 +231,41 @@ test_that("re-imported randomise step round-trips through apply_criteria()", {
   expect_equal(flow$steps[[2]]$type,   "randomise")
   expect_equal(flow$steps[[2]]$n_fail, 0L)
 })
+
+# ---------------------------------------------------------------------------
+# Primitive-function predicates (smoke-test 5d)
+
+test_that("export_criteria() handles a primitive predicate", {
+  crit <- cf_criteria() |> include(is.na, "p")
+  expect_no_warning(expect_no_error(yml <- export_criteria(crit)))
+  expect_type(yml, "character")
+  expect_match(yml, ".Primitive(\"is.na\")", fixed = TRUE)
+  crit2 <- import_criteria(text = yml)
+  expect_identical(crit2$steps[[1]]$predicate, is.na)
+})
+
+test_that("a fn_ref: base::is.na step round-trips and evaluates", {
+  yml <- paste(
+    "cohortflow_criteria:",
+    "  version: 1",
+    "  steps:",
+    "  - label: Missing x",
+    "    type: exclude",
+    "    kind: function",
+    "    by: ~",
+    "    expr: ~",
+    "    fn_ref: base::is.na",
+    "    category: ~",
+    sep = "\n"
+  )
+  crit <- import_criteria(text = yml)
+  expect_identical(crit$steps[[1]]$predicate, is.na)
+
+  yml2  <- expect_no_warning(export_criteria(crit, fn_refs = list("base::is.na" = is.na)))
+  crit2 <- import_criteria(text = yml2)
+  expect_identical(crit2$steps[[1]]$predicate, is.na)
+  expect_identical(crit2$steps[[1]]$label, "Missing x")
+
+  res <- cohortflow:::eval_criterion(crit2$steps[[1]], data.frame(x = c(1, NA, 3)))
+  expect_equal(as.vector(res), c(FALSE, TRUE, FALSE))
+})

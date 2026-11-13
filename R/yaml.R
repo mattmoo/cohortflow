@@ -139,7 +139,8 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     }
   }
 
-  if (is.null(fn_ref_str)) {
+  # A primitive (e.g. `is.na`) has no environment, so it captures nothing.
+  if (is.null(fn_ref_str) && !is.primitive(crit$predicate)) {
     fn_env <- environment(crit$predicate)
     if (!identical(fn_env, globalenv()) && !identical(fn_env, baseenv()) &&
           !identical(fn_env, emptyenv()) && length(ls(fn_env)) > 0L) {
