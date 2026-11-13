@@ -458,6 +458,10 @@ as_consort_diagram <- function(
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
   }
+  .check_scalar_col(branch_by, "branch_by")
+  .check_scalar_col(count_by, "count_by")
+  .check_scalar_col(stage_by, "stage_by")
+  .check_scalar_col(stage_label_by, "stage_label_by")
 
   # -- Validate branching parameters ----------------------------------------
   # A `randomise()` step (if present) supplies default `branch_by` (from its
@@ -510,6 +514,21 @@ as_consort_diagram <- function(
     rlang::abort(
       "`count_by` is not yet supported together with a `randomise()` step (per-arm cascades use row-level counts)."
     )
+  }
+
+  # No rows reach the branch point (a zero-row flow, or every row excluded
+  # before the randomise() step), so there are no arm values to split on.
+  # Draw the plain linear cascade rather than laying out zero arms.
+  if (!is.null(branch_by)) {
+    branch_point <- if (use_split_cascade) randomise_step$step else length(flow$steps)
+    if (length(.surviving_ids(flow, branch_point)) == 0L) {
+      branch_by         <- NULL
+      stage_by          <- NULL
+      stage_label_by    <- NULL
+      count_by          <- NULL
+      split_idx         <- NA_integer_
+      use_split_cascade <- FALSE
+    }
   }
 
   top        <- 0.94

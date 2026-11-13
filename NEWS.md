@@ -1,5 +1,34 @@
 # cohortflow 0.0.0.9011
 
+## Smoke-test fixes
+
+* Error messages from `cf_criterion()` and the criterion evaluators no longer
+  show raw markup such as `{.arg label}`; they now include the actual label,
+  class, lengths and missing column names.
+* Per-level hierarchy counts (`as_attrition_tibble(levels = )`,
+  `as_attrition_table(levels = )`) no longer count an `NA` key as a unit.
+  For example, an expected participant with no cluster counts as one
+  participant and zero clusters, not as an extra "phantom" cluster.
+* The `.data` and `.env` pronouns now work in `include()`, `exclude()` and
+  `select_within()` formulas, as they already did in grouped steps and as
+  `check_criteria()` assumed.
+* `export_criteria()` no longer errors on a primitive-function predicate such
+  as `include(is.na, ...)`. Such predicates now print as `.Primitive("is.na")`
+  rather than `NULL`.
+* `as_attrition_tibble()`, `as_attrition_table()` and `as_consort_diagram()`
+  now give a clear error ("`branch_by` must be a single column name.") when
+  `branch_by`, `count_by`, `stage_by`, `stage_label_by`, `group_x` or
+  `group_y` is not a single column name. Previously this failed with an R
+  internals error.
+* `as_consort_diagram()` now draws a plain linear cascade when no rows reach
+  the branch point (a zero-row flow, or every row excluded before
+  `randomise()`). Previously it warned, or with `branch_by` failed.
+* A row-wise predicate in `group_include()` / `group_exclude()` (e.g.
+  `~ age > 18`) now gives "Group criterion "<label>" must return one value
+  per group" with a hint, not dplyr's raw size error. Other predicate
+  errors are reported under the criterion's label with the original error
+  attached.
+
 ## Audit fixes
 
 * `NA` values in `branch_by` / `stage_by` (including `randomise()` arms) now

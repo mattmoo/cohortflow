@@ -307,7 +307,7 @@ test_that("singleton category has NA n_removed and pct_removed on category row",
   crit <- cf_criteria() |>
     include(~ !is.na(age), label = "Age recorded", category = "Valid age") |>
     include(~ eligible_screen, label = "Passed screening", category = "Screening")
-  flow <- apply_criteria(dat, crit)
+  flow <- suppressMessages(apply_criteria(dat, crit))
   out  <- as_attrition_tibble(flow)
 
   # Both categories have only one step each
@@ -1046,4 +1046,28 @@ test_that("NA arm values form their own branch column with a randomise() step", 
   out <- as_attrition_tibble(apply_criteria(d, crit, id = "id"))
   final_row <- out[out$row_type == "final", ]
   expect_equal(c(final_row$A, final_row$B, final_row$Missing), c(3L, 3L, 3L))
+})
+
+# ---------------------------------------------------------------------------
+# Scalar column-name arguments (smoke-test 5e)
+
+test_that("renderers reject non-scalar column-name arguments", {
+  flow <- make_flow_parallel_rct()
+  bad  <- list(c("arm", "sex"), NA_character_, "", 1)
+  for (b in bad) {
+    expect_error(as_attrition_tibble(flow, branch_by = b), "`branch_by` must be a single column name",
+                 fixed = TRUE)
+    expect_error(as_attrition_table(flow, branch_by = b), "`branch_by` must be a single column name",
+                 fixed = TRUE)
+  }
+  expect_error(as_attrition_tibble(flow, branch_by = "arm", count_by = c("a", "b")),
+               "`count_by` must be a single column name", fixed = TRUE)
+  expect_error(as_attrition_table(flow, branch_by = "arm", count_by = ""),
+               "`count_by` must be a single column name", fixed = TRUE)
+  expect_error(as_attrition_tibble(flow, group_x = c("a", "b")), "`group_x` must be a single column name",
+               fixed = TRUE)
+  expect_error(as_attrition_table(flow, group_y = NA_character_), "`group_y` must be a single column name",
+               fixed = TRUE)
+  # A well-formed but missing column keeps the existing message.
+  expect_error(as_attrition_tibble(flow, branch_by = "nope"), "not found in surviving cohort")
 })

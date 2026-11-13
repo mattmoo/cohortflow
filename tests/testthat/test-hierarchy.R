@@ -166,7 +166,7 @@ test_that("flow$hierarchy is stored and NULL by default", {
   dat  <- suppressWarnings(mock_cohortflow(50, seed = 1))
   crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
 
-  flow_no_h <- apply_criteria(dat, crit)
+  flow_no_h <- suppressMessages(apply_criteria(dat, crit))
   expect_null(flow_no_h$hierarchy)
   expect_null(flow_no_h$steps[[1]]$hierarchy_counts)
 
@@ -182,4 +182,72 @@ test_that("continue_criteria() preserves and continues hierarchy counting", {
   expect_s3_class(flow2$hierarchy, "cf_hierarchy")
   last_step <- flow2$steps[[length(flow2$steps)]]
   expect_false(is.null(last_step$hierarchy_counts))
+})
+
+# ---------------------------------------------------------------------------
+# NA keys are not units (smoke-test 5b)
+
+level_counts <- function(flow, step, level) {
+  hc <- flow$steps[[step]]$hierarchy_counts
+  hc[hc$level == level, ]
+}
+
+test_that("expected rows with no cluster add no phantom cluster", {
+  dat <- mock_cluster_rct(n_participants = 50, seed = 1)
+  exp <- data.frame(participant_id = c(dat$participant_id, "PX1", "PX2"))
+  h   <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+  crit <- cf_criteria() |>
+    include(~ !is.na(cluster_id), label = "Has cluster") |>
+    include(~ !is.na(age),        label = "Age recorded")
+  flow <- suppressMessages(apply_criteria(dat, crit, id = "participant_id", expected = exp,
+                                          by = "participant_id", hierarchy = h))
+
+  cl1 <- level_counts(flow, 1L, "cluster")
+  expect_equal(cl1$n_risk, length(unique(dat$cluster_id)))
+  expect_equal(cl1$n_fail, 0L)
+  pt1 <- level_counts(flow, 1L, "participant")
+  expect_equal(pt1$n_risk, nrow(dat) + 2L)
+  expect_equal(pt1$n_fail, 2L)
+})
+
+test_that("NA cluster_id in plain data is not counted as a cluster", {
+  dat <- mock_cluster_rct(n_participants = 50, seed = 1)
+  dat$cluster_id[1:5] <- NA
+  h   <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+  crit <- cf_criteria() |> include(~ !is.na(age), label = "Age recorded")
+  flow <- apply_criteria(dat, crit, id = "participant_id", hierarchy = h)
+
+  expect_equal(level_counts(flow, 1L, "cluster")$n_risk,
+               length(unique(stats::na.omit(dat$cluster_id))))
+  expect_equal(level_counts(flow, 1L, "participant")$n_risk, nrow(dat))
+})
+
+test_that("composite level ignores keys with an NA component", {
+  dat <- mock_stepped_wedge(n_clusters = 4, n_participants = 40, n_periods = 3, seed = 1)
+  dat$period[1] <- NA
+  h <- cf_hierarchy(event = "event_id", cluster_period = c("cluster_id", "period"),
+                    cluster = "cluster_id")
+  crit <- cf_criteria() |> include(~ !is.na(age), label = "Age recorded")
+  flow <- apply_criteria(dat, crit, id = "event_id", hierarchy = h)
+
+  complete <- !is.na(dat$period)
+  n_cp <- nrow(unique(dat[complete, c("cluster_id", "period")]))
+  expect_equal(level_counts(flow, 1L, "cluster_period")$n_risk, n_cp)
+  expect_equal(level_counts(flow, 1L, "cluster")$n_risk, length(unique(dat$cluster_id)))
+  expect_equal(level_counts(flow, 1L, "event")$n_risk, nrow(dat))
+})
+
+test_that("as_attrition_tibble(levels =) header n matches corrected n_risk", {
+  dat <- mock_cluster_rct(n_participants = 50, seed = 1)
+  exp <- data.frame(participant_id = c(dat$participant_id, "PX1", "PX2"))
+  h   <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+  crit <- cf_criteria() |> include(~ !is.na(age), label = "Age recorded")
+  flow <- suppressMessages(apply_criteria(dat, crit, id = "participant_id", expected = exp,
+                                          by = "participant_id", hierarchy = h))
+  tbl <- as_attrition_tibble(flow, levels = NULL)
+  hdr <- tbl[tbl$row_type == "header", ]
+  for (lvl in names(h)) {
+    expect_equal(hdr$n[hdr$level == lvl], level_counts(flow, 1L, lvl)$n_risk, info = lvl)
+  }
+  expect_equal(hdr$n[hdr$level == "cluster"], length(unique(dat$cluster_id)))
 })

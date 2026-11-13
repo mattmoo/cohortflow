@@ -15,6 +15,11 @@
 #'   * For `select_within`: evaluated per group; must return a logical vector
 #'     identifying which rows within the group to keep.
 #'   * For `randomise`: must be `NULL` (a randomise step never removes rows).
+#'
+#'   Formula predicates are evaluated with a data mask, so the rlang pronouns
+#'   work in every step type: `.data$age` always refers to the column and
+#'   `.env$age` to a variable in the formula's environment, which avoids
+#'   ambiguity when a column and a local variable share a name.
 #' @param label A short human-readable description of this criterion.
 #' @param type One of `"include"`, `"exclude"`, `"group_include"`,
 #'   `"group_exclude"`, `"select_within"`, or `"randomise"`.
@@ -83,45 +88,39 @@ cf_criterion <- function(predicate,
 
   if (is.null(predicate)) {
     if (type != "randomise") {
-      cli_abort("{.arg predicate} must be a formula or a function.")
+      rlang::abort("`predicate` must be a formula or a function.")
     }
   } else if (type == "randomise") {
-    cli_abort("{.arg predicate} must be `NULL` for type \"randomise\".")
+    rlang::abort("`predicate` must be `NULL` for type \"randomise\".")
   } else if (!is_formula(predicate) && !is.function(predicate)) {
-    cli_abort(
-      c(
-        "{.arg predicate} must be a formula or a function.",
-        "i" = "Supplied: {.cls {class(predicate)}}."
-      )
-    )
+    rlang::abort(c(
+      "`predicate` must be a formula or a function.",
+      "i" = sprintf("Supplied: <%s>.", paste(class(predicate), collapse = "/"))
+    ))
   }
 
   if (!is.character(label) || length(label) != 1L || is.na(label) || !nzchar(label)) {
-    cli_abort("{.arg label} must be a single non-empty string.")
+    rlang::abort("`label` must be a single non-empty string.")
   }
 
   if (!is.null(predicate) && is_formula(predicate) && !is_one_sided(predicate)) {
-    cli_abort(
-      c(
-        "Formulas must be one-sided (e.g. {.code ~ age >= 18}).",
-        "x" = "A two-sided formula was supplied."
-      )
-    )
+    rlang::abort(c(
+      "Formulas must be one-sided (e.g. `~ age >= 18`).",
+      "x" = "A two-sided formula was supplied."
+    ))
   }
 
   grouped_types <- c("group_include", "group_exclude", "select_within", "randomise")
   if (type %in% grouped_types) {
     if (is.null(by) || !is.character(by) || length(by) == 0L ||
           anyNA(by) || any(!nzchar(by))) {
-      cli_abort(
-        c(
-          "{.arg by} must be one or more non-empty strings for type {.val {type}}.",
-          "i" = "e.g. {.code by = \"cluster_id\"} or {.code by = c(\"cluster_id\", \"period\")}"
-        )
-      )
+      rlang::abort(c(
+        sprintf("`by` must be one or more non-empty strings for type \"%s\".", type),
+        "i" = "e.g. `by = \"cluster_id\"` or `by = c(\"cluster_id\", \"period\")`."
+      ))
     }
   } else if (!is.null(by)) {
-    cli_abort(c(
+    rlang::abort(c(
       sprintf("`by` must be NULL for row-wise type \"%s\".", type),
       "i" = "Use group_include(), group_exclude() or select_within() for grouped steps."
     ))
@@ -130,16 +129,16 @@ cf_criterion <- function(predicate,
   if (type == "randomise") {
     if (is.null(arms) || !is.character(arms) || length(arms) != 1L ||
           is.na(arms) || !nzchar(arms)) {
-      cli_abort("{.arg arms} must be a single non-empty string for type \"randomise\".")
+      rlang::abort("`arms` must be a single non-empty string for type \"randomise\".")
     }
   } else if (!is.null(arms)) {
-    cli_abort("{.arg arms} is only used for type \"randomise\".")
+    rlang::abort("`arms` is only used for type \"randomise\".")
   }
 
   if (!is.null(category)) {
     if (!is.character(category) || length(category) != 1L ||
           is.na(category) || !nzchar(category)) {
-      cli_abort("{.arg category} must be a single non-empty string or NULL.")
+      rlang::abort("`category` must be a single non-empty string or NULL.")
     }
   }
 
@@ -176,8 +175,10 @@ predicate_label <- function(predicate) {
   } else {
     # Show the function body (collapsed onto one line, truncated). Deparsing
     # the call site via substitute() would only ever show the caller's
-    # expression (e.g. `x$predicate`), not the function itself.
-    body_str <- paste(trimws(deparse(body(predicate), width.cutoff = 60L)), collapse = " ")
+    # expression (e.g. `x$predicate`), not the function itself. A primitive
+    # has no body (`body()` is NULL), so show `.Primitive("name")` instead.
+    src      <- if (is.primitive(predicate)) predicate else body(predicate)
+    body_str <- paste(trimws(deparse(src, width.cutoff = 60L)), collapse = " ")
     if (nchar(body_str) > 60L) body_str <- paste0(substr(body_str, 1L, 57L), "...")
     body_str
   }
@@ -224,22 +225,27 @@ eval_criterion <- function(criterion, data) {
   stopifnot(inherits(criterion, "cf_criterion"), is.data.frame(data))
 
   result <- if (is_formula(criterion$predicate)) {
-    eval(criterion$predicate[[2L]], envir = data,
-         enclos = environment(criterion$predicate))
+    # eval_tidy() (not base eval()) so the `.data` / `.env` pronouns work, as
+    # they do in grouped steps and as check_criteria() assumes.
+    rlang::eval_tidy(
+      rlang::new_quosure(criterion$predicate[[2L]], environment(criterion$predicate)),
+      data = data
+    )
   } else {
     criterion$predicate(data)
   }
 
   if (!is.logical(result)) {
-    cli_abort(c(
+    rlang::abort(c(
       "Criterion predicate must return a logical vector.",
-      "x" = "Criterion {.val {criterion$label}} returned {.cls {class(result)}}."
+      "x" = sprintf("Criterion \"%s\" returned <%s>.", criterion$label,
+                    paste(class(result), collapse = "/"))
     ))
   }
   if (length(result) != nrow(data)) {
-    cli_abort(c(
-      "Criterion predicate must return a vector of length {nrow(data)}.",
-      "x" = "Criterion {.val {criterion$label}} returned length {length(result)}."
+    rlang::abort(c(
+      sprintf("Criterion predicate must return a vector of length %d (`nrow(data)`).", nrow(data)),
+      "x" = sprintf("Criterion \"%s\" returned length %d.", criterion$label, length(result))
     ))
   }
   result
@@ -253,9 +259,9 @@ eval_group_criterion <- function(criterion, data) {
 
   missing_by <- setdiff(by_col, names(data))
   if (length(missing_by) > 0L) {
-    cli_abort(c(
-      "Grouping column(s) {.val {missing_by}} not found in data.",
-      "i" = "Criterion: {.val {criterion$label}}"
+    rlang::abort(c(
+      sprintf("Grouping column(s) %s not found in data.", paste0("`", missing_by, "`", collapse = ", ")),
+      "i" = sprintf("Criterion: \"%s\"", criterion$label)
     ))
   }
 
@@ -269,36 +275,41 @@ eval_group_criterion <- function(criterion, data) {
     pred_env$cur_group   <- dplyr::cur_group
     pred_env$cur_group_id <- dplyr::cur_group_id
     quo <- rlang::new_quosure(criterion$predicate[[2L]], env = pred_env)
-    summary <- dplyr::summarise(grp, .pass = !!quo, .groups = "drop")
+    # dplyr's own error names `.pass` and the group but not the criterion,
+    # and says nothing about why a row-wise predicate is wrong here.
+    summary <- rlang::try_fetch(
+      dplyr::summarise(grp, .pass = !!quo, .groups = "drop"),
+      error = function(e) .abort_group_eval(e, criterion$label)
+    )
   } else {
     # Function receives the grouped data frame; must return a 1-row-per-group
     # tibble with columns: <by_col>, .pass
     summary <- criterion$predicate(dplyr::group_by(data, dplyr::across(dplyr::all_of(by_col))))
     if (!".pass" %in% names(summary)) {
-      cli_abort(c(
+      rlang::abort(c(
         "Function predicate for group criterion must return a data frame with a `.pass` column.",
-        "i" = "Criterion: {.val {criterion$label}}"
+        "i" = sprintf("Criterion: \"%s\"", criterion$label)
       ))
     }
   }
 
   by_str <- paste(by_col, collapse = ", ")
   if (!is.logical(summary$.pass)) {
-    cli_abort(c(
+    rlang::abort(c(
       "Group criterion must produce a logical `.pass` value per group.",
       "x" = sprintf("`.pass` is of class <%s>.", paste(class(summary$.pass), collapse = "/")),
       "i" = sprintf("Criterion: \"%s\"", criterion$label)
     ))
   }
   if (!all(by_col %in% names(summary))) {
-    cli_abort(c(
+    rlang::abort(c(
       sprintf("Group criterion result must contain the grouping column(s) `%s`.", by_str),
       "i" = sprintf("Criterion: \"%s\"", criterion$label)
     ))
   }
   summary_key <- as.character(.composite_key(summary, by_col))
   if (anyDuplicated(summary_key)) {
-    cli_abort(c(
+    rlang::abort(c(
       "Group criterion must return exactly one row per group.",
       "x" = sprintf("Duplicate values found in `%s` of the returned summary.", by_str),
       "i" = sprintf("Criterion: \"%s\"", criterion$label)
@@ -314,6 +325,26 @@ eval_group_criterion <- function(criterion, data) {
   out
 }
 
+# Re-throws an error from a group predicate's summarise() call, naming the
+# criterion and chaining the original. dplyr gives its "must be size 1" error
+# no class, so the size case is recognised by message; anything else (or a
+# future rewording) still gets a correct, if less specific, header.
+.abort_group_eval <- function(e, label) {
+  msgs <- character(0L)
+  cnd  <- e
+  while (!is.null(cnd)) {
+    msgs <- c(msgs, conditionMessage(cnd))
+    cnd  <- cnd$parent
+  }
+  if (any(grepl("must be size 1", msgs, fixed = TRUE))) {
+    rlang::abort(c(
+      sprintf("Group criterion \"%s\" must return one value per group.", label),
+      "i" = "Use summary functions such as n(), mean(), any(), all()."
+    ), parent = e)
+  }
+  rlang::abort(sprintf("Group criterion \"%s\" failed to evaluate.", label), parent = e)
+}
+
 #' Evaluate a select_within criterion -- returns a logical vector (nrow(data))
 #' @keywords internal
 eval_select_criterion <- function(criterion, data) {
@@ -322,9 +353,9 @@ eval_select_criterion <- function(criterion, data) {
 
   missing_by <- setdiff(by_col, names(data))
   if (length(missing_by) > 0L) {
-    cli_abort(c(
-      "Grouping column(s) {.val {missing_by}} not found in data.",
-      "i" = "Criterion: {.val {criterion$label}}"
+    rlang::abort(c(
+      sprintf("Grouping column(s) %s not found in data.", paste0("`", missing_by, "`", collapse = ", ")),
+      "i" = sprintf("Criterion: \"%s\"", criterion$label)
     ))
   }
 
@@ -345,16 +376,20 @@ eval_select_criterion <- function(criterion, data) {
     grp_data <- data[grp_rows, , drop = FALSE]
 
     result <- if (is_formula(criterion$predicate)) {
-      eval(criterion$predicate[[2L]], envir = grp_data,
-           enclos = environment(criterion$predicate))
+      rlang::eval_tidy(
+        rlang::new_quosure(criterion$predicate[[2L]], environment(criterion$predicate)),
+        data = grp_data
+      )
     } else {
       criterion$predicate(grp_data)
     }
 
     if (!is.logical(result) || length(result) != nrow(grp_data)) {
-      cli_abort(c(
+      rlang::abort(c(
         "select_within predicate must return a logical vector of length equal to the group size.",
-        "i" = "Criterion: {.val {criterion$label}}"
+        "x" = sprintf("A group of %d row(s) returned <%s> of length %d.", nrow(grp_data),
+                      paste(class(result), collapse = "/"), length(result)),
+        "i" = sprintf("Criterion: \"%s\"", criterion$label)
       ))
     }
 
@@ -362,8 +397,3 @@ eval_select_criterion <- function(criterion, data) {
   }
   keep
 }
-
-# Quiet bindings for cli helpers -------------------------------------------
-cli_abort <- function(...) rlang::abort(...)
-cli_green <- function(x) x
-cli_red   <- function(x) x

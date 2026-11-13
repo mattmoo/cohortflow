@@ -308,3 +308,124 @@ test_that("eval_select_criterion() errors when predicate returns wrong type", {
   d    <- data.frame(grp = c("a", "a"), x = 1:2)
   expect_error(cohortflow:::eval_select_criterion(crit, d), class = "rlang_error")
 })
+
+# ---------------------------------------------------------------------------
+# Rendered error messages (no raw cli markup)
+
+test_that("cf_criterion() validation errors render plain text", {
+  expect_error(cf_criterion(~ x > 0, label = ""), "`label` must be a single non-empty string", fixed = TRUE)
+  expect_error(cf_criterion("x", label = "a"), "`predicate` must be a formula or a function", fixed = TRUE)
+  expect_error(cf_criterion("x", label = "a"), "Supplied: <character>", fixed = TRUE)
+  expect_error(cf_criterion(NULL, label = "a"), "`predicate` must be a formula or a function", fixed = TRUE)
+  expect_error(
+    cf_criterion(~ TRUE, label = "R", type = "randomise", by = "c", arms = "arm"),
+    "`predicate` must be `NULL` for type \"randomise\"", fixed = TRUE
+  )
+  expect_error(cf_criterion(y ~ x, label = "a"), "Formulas must be one-sided (e.g. `~ age >= 18`)", fixed = TRUE)
+  expect_error(
+    cf_criterion(~ n() > 1, label = "a", type = "group_include"),
+    "`by` must be one or more non-empty strings for type \"group_include\"", fixed = TRUE
+  )
+  expect_error(
+    cf_criterion(NULL, label = "R", type = "randomise", by = "c"),
+    "`arms` must be a single non-empty string for type \"randomise\"", fixed = TRUE
+  )
+  expect_error(cf_criterion(~ x > 0, label = "a", arms = "arm"), "`arms` is only used for type \"randomise\"",
+               fixed = TRUE)
+  expect_error(cf_criterion(~ x > 0, label = "a", category = ""),
+               "`category` must be a single non-empty string or NULL", fixed = TRUE)
+})
+
+test_that("evaluation errors interpolate the real values", {
+  d <- data.frame(grp = c("a", "a", "b"), x = 1:3)
+  expect_snapshot(error = TRUE, {
+    cohortflow:::eval_criterion(cf_criterion(function(d) d$x * 2, label = "Doubled x"), d)
+  })
+  expect_snapshot(error = TRUE, {
+    cohortflow:::eval_criterion(cf_criterion(function(d) TRUE, label = "Scalar"), d)
+  })
+  expect_snapshot(error = TRUE, {
+    cohortflow:::eval_group_criterion(
+      cf_criterion(~ n() >= 2, label = "Big site", type = "group_include", by = "site"), d
+    )
+  })
+  expect_snapshot(error = TRUE, {
+    cohortflow:::eval_select_criterion(
+      cf_criterion(~ x == min(x), label = "Lowest", type = "select_within", by = c("grp", "site")), d
+    )
+  })
+})
+
+test_that("no error message carries unrendered cli markup", {
+  d <- data.frame(grp = c("a", "a", "b"), x = 1:3)
+  calls <- list(
+    quote(cf_criterion("x", label = "a")),
+    quote(cf_criterion(NULL, label = "a")),
+    quote(cf_criterion(~ TRUE, label = "R", type = "randomise", by = "c", arms = "arm")),
+    quote(cf_criterion(~ x > 0, label = "")),
+    quote(cf_criterion(y ~ x, label = "a")),
+    quote(cf_criterion(~ n() > 1, label = "a", type = "group_include")),
+    quote(cf_criterion(~ x > 0, label = "a", by = "grp")),
+    quote(cf_criterion(NULL, label = "R", type = "randomise", by = "c")),
+    quote(cf_criterion(~ x > 0, label = "a", arms = "arm")),
+    quote(cf_criterion(~ x > 0, label = "a", category = "")),
+    quote(cohortflow:::eval_criterion(cf_criterion(function(d) d$x * 2, label = "n"), d)),
+    quote(cohortflow:::eval_criterion(cf_criterion(function(d) TRUE, label = "n"), d)),
+    quote(cohortflow:::eval_group_criterion(
+      cf_criterion(~ n() >= 2, label = "g", type = "group_include", by = "site"), d
+    )),
+    quote(cohortflow:::eval_group_criterion(
+      cf_criterion(function(g) dplyr::summarise(g, k = 1), label = "g", type = "group_include", by = "grp"), d
+    )),
+    quote(cohortflow:::eval_select_criterion(
+      cf_criterion(~ x == min(x), label = "s", type = "select_within", by = "site"), d
+    )),
+    quote(cohortflow:::eval_select_criterion(
+      cf_criterion(function(g) 1L, label = "s", type = "select_within", by = "grp"), d
+    ))
+  )
+  for (cl in calls) {
+    msg <- tryCatch({
+      eval(cl)
+      NA_character_
+    }, error = function(e) conditionMessage(e))
+    expect_false(is.na(msg), info = deparse(cl))
+    expect_false(grepl("{.", msg, fixed = TRUE), info = msg)
+    expect_false(grepl("{nrow", msg, fixed = TRUE), info = msg)
+    expect_false(grepl("{length", msg, fixed = TRUE), info = msg)
+  }
+})
+
+test_that("format() and print() show a primitive predicate, not NULL", {
+  crit <- cf_criterion(is.na, label = "Missing", type = "exclude")
+  expect_false(grepl("NULL", format(crit), fixed = TRUE))
+  expect_match(format(crit), ".Primitive(\"is.na\")", fixed = TRUE)
+  out <- capture.output(print(crit))
+  expect_false(any(grepl("NULL", out, fixed = TRUE)))
+})
+
+# ---------------------------------------------------------------------------
+# Vector-valued group predicates (smoke-test 5g)
+
+test_that("a row-wise predicate in a group step gets a package-level message", {
+  d <- data.frame(grp = c("a", "a", "b"), age = c(10, 20, 30))
+  inc <- cf_criterion(~ age > 18, label = "Adults", type = "group_include", by = "grp")
+  exc <- cf_criterion(~ age > 18, label = "Adults out", type = "group_exclude", by = "grp")
+  expect_error(cohortflow:::eval_group_criterion(inc, d),
+               "Group criterion \"Adults\" must return one value per group", fixed = TRUE)
+  expect_error(cohortflow:::eval_group_criterion(exc, d),
+               "Group criterion \"Adults out\" must return one value per group", fixed = TRUE)
+  err <- tryCatch(cohortflow:::eval_group_criterion(inc, d), error = identity)
+  expect_match(conditionMessage(err), "n(), mean(), any(), all()", fixed = TRUE)
+  expect_false(is.null(err$parent))
+})
+
+test_that("other errors in a group predicate still surface in the chain", {
+  d <- data.frame(grp = c("a", "a", "b"), age = c(10, 20, 30))
+  crit <- cf_criterion(~ stop("boom"), label = "Boom", type = "group_include", by = "grp")
+  err <- tryCatch(cohortflow:::eval_group_criterion(crit, d), error = identity)
+  expect_match(conditionMessage(err), "Group criterion \"Boom\"", fixed = TRUE)
+  expect_no_match(conditionMessage(err), "one value per group", fixed = TRUE)
+  chain <- paste(format(err), collapse = "\n")
+  expect_match(chain, "boom", fixed = TRUE)
+})

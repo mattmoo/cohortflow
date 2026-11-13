@@ -110,7 +110,10 @@
 #'   column (see [apply_criteria()]'s `hierarchy` argument for the counting
 #'   rule). When a character vector of level name(s), only those levels are
 #'   returned, in the order given. Cannot be combined with `group_x`/`group_y`,
-#'   `branch_by`, or `count_by`.
+#'   `branch_by`, or `count_by`. A row with an `NA` in any of a level's
+#'   columns is not a unit at that level, but still counts at every level
+#'   whose own key is complete: an expected participant with no cluster is one
+#'   participant at risk and zero clusters.
 #'
 #' @return A [tibble::tibble()] with columns:
 #' \describe{
@@ -140,12 +143,13 @@
 #' @examples
 #' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 #' crit <- cf_criteria() |>
-#'   include(~ !is.na(age),        label = "Age recorded",       category = "Valid age") |>
-#'   include(~ age >= 18,          label = "Adults only",         category = "Valid age") |>
-#'   include(~ eligible_screen,    label = "Passed screening",    category = "Eligible at screening") |>
-#'   include(~ !is.na(consent_date), label = "Consent recorded",  category = "Consent") |>
-#'   exclude(~ withdrew,           label = "Withdrew consent", category = "Consent")
-#' flow <- apply_criteria(dat, crit)
+#'   include(~ !is.na(age), label = "Age recorded", category = "Valid age") |>
+#'   include(~ age >= 18, label = "Adults only", category = "Valid age") |>
+#'   include(~ eligible_screen, label = "Passed screening",
+#'           category = "Eligible at screening") |>
+#'   include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
+#'   exclude(~ withdrew, label = "Withdrew consent", category = "Consent")
+#' flow <- apply_criteria(dat, crit, id = "participant_id")
 #' as_attrition_tibble(flow)
 as_attrition_tibble <- function(
   flow,
@@ -164,6 +168,10 @@ as_attrition_tibble <- function(
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
   }
+  .check_scalar_col(branch_by, "branch_by")
+  .check_scalar_col(count_by, "count_by")
+  .check_scalar_col(group_x, "group_x")
+  .check_scalar_col(group_y, "group_y")
 
   if (show_categories) .warn_split_categories(flow$steps)
 
@@ -550,6 +558,18 @@ as_attrition_tibble <- function(
   if (is.na(value)) na_label else as.character(value)
 }
 
+# Validates a renderer argument that names one column (`branch_by`,
+# `count_by`, `stage_by`, `stage_label_by`, `group_x`, `group_y`). `NULL`
+# passes. Whether the column exists is checked later, where the data it must
+# be in is known ("Column `x` not found in surviving cohort.").
+.check_scalar_col <- function(x, arg) {
+  if (is.null(x)) return(invisible(NULL))
+  if (!is.character(x) || length(x) != 1L || is.na(x) || !nzchar(x)) {
+    rlang::abort(sprintf("`%s` must be a single column name.", arg))
+  }
+  invisible(NULL)
+}
+
 # ---------------------------------------------------------------------------
 # Hierarchy-level data layer -- levels
 # ---------------------------------------------------------------------------
@@ -597,7 +617,7 @@ as_attrition_tibble <- function(
   hierarchy  <- flow$hierarchy
   level_cols <- hierarchy[[level_name]]
   steps      <- flow$steps
-  n_start    <- length(unique(.composite_key(flow$data, level_cols)))
+  n_start    <- length(.level_unit_keys(flow$data, level_cols))
 
   level_steps <- lapply(steps, function(s) {
     hc  <- s$hierarchy_counts
@@ -785,7 +805,9 @@ as_attrition_tibble <- function(
 #' removed, 3 clusters removed"*. Shading (`shade`/`shade_fn`) is computed
 #' *per level* -- each level's colour gradient is scaled across that level's
 #' own values, not across all levels combined. `levels` cannot be combined
-#' with `group_x`/`group_y`/`branch_by`/`count_by`.
+#' with `group_x`/`group_y`/`branch_by`/`count_by`. Rows with an `NA` in a
+#' level's column(s) are not counted as units at that level (they still count
+#' at any level whose own key is complete).
 #'
 #' @inheritParams as_attrition_tibble
 #' @param backend Character string: `"flextable"` (default), `"gt"`, or
@@ -912,6 +934,10 @@ as_attrition_table <- function(
   shade_palette           = c("#FFFFFF", "#F8696B")
 ) {
   backend <- match.arg(backend)
+  .check_scalar_col(branch_by, "branch_by")
+  .check_scalar_col(count_by, "count_by")
+  .check_scalar_col(group_x, "group_x")
+  .check_scalar_col(group_y, "group_y")
 
   # -- Hierarchy-level grid path ------------------------------------------
   if (!identical(levels, character(0))) {

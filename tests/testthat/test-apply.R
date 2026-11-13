@@ -2,7 +2,7 @@ test_that("apply_criteria() returns a cf_flow object", {
   dat  <- suppressWarnings(mock_cohortflow(100, seed = 1))
   crit <- cf_criteria() |>
     include(~ eligible_screen, label = "Screening")
-  flow <- apply_criteria(dat, crit)
+  flow <- suppressMessages(apply_criteria(dat, crit))
   expect_s3_class(flow, "cf_flow")
   expect_named(flow, c("data", "criteria", "steps", "hierarchy", "id"))
 })
@@ -408,4 +408,45 @@ test_that("exclude() keeps rows whose predicate is NA", {
   flow <- apply_criteria(dat, cf_criteria() |> exclude(~ x, label = "x"), id = "id")
   expect_identical(cohort(flow)$id, c(2L, 3L))
   expect_identical(excluded(flow)$id, c(1L, 4L))
+})
+
+# ---------------------------------------------------------------------------
+# .data / .env pronouns in row-wise and select_within steps (smoke-test 5c)
+
+test_that(".data and .env work in include()/exclude()", {
+  dat <- mock_parallel_rct(n_participants = 60, seed = 1)
+  thr <- 30
+  plain <- apply_criteria(dat, cf_criteria() |> include(~ age >= 18, label = "a"), id = "participant_id")
+  pron  <- apply_criteria(dat, cf_criteria() |> include(~ .data$age >= 18, label = "a"), id = "participant_id")
+  expect_identical(cohort(pron), cohort(plain))
+
+  plain <- apply_criteria(dat, cf_criteria() |> exclude(~ age < thr, label = "e"), id = "participant_id")
+  pron  <- apply_criteria(dat, cf_criteria() |> exclude(~ age < .env$thr, label = "e"), id = "participant_id")
+  expect_identical(cohort(pron), cohort(plain))
+})
+
+test_that(".data works in select_within()", {
+  dat <- mock_cluster_rct(n_participants = 80, seed = 1)
+  dat <- dat[!is.na(dat$age), ]
+  plain <- apply_criteria(
+    dat, cf_criteria() |> select_within(by = "cluster_id", ~ age == max(age, na.rm = TRUE), label = "s"),
+    id = "participant_id"
+  )
+  pron <- apply_criteria(
+    dat,
+    cf_criteria() |>
+      select_within(by = "cluster_id", ~ .data$age == max(.data$age, na.rm = TRUE), label = "s"),
+    id = "participant_id"
+  )
+  expect_identical(cohort(pron), cohort(plain))
+})
+
+test_that(".data / .env resolve a column shadowed by a local variable", {
+  dat <- mock_parallel_rct(n_participants = 60, seed = 1)
+  age <- 999
+  col <- apply_criteria(dat, cf_criteria() |> include(~ .data$age >= 18, label = "a"), id = "participant_id")
+  expect_identical(nrow(cohort(col)), sum(dat$age >= 18, na.rm = TRUE))
+  loc <- apply_criteria(dat, cf_criteria() |> include(~ rep(.env$age >= 18, length(.data$age)), label = "a"),
+                        id = "participant_id")
+  expect_identical(nrow(cohort(loc)), nrow(dat))
 })

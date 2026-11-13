@@ -185,7 +185,7 @@ test_that("exclusion header has no colon when there are no child reasons", {
   dat <- suppressWarnings(mock_cohortflow(n_participants = 100, seed = 1))
   crit <- cf_criteria() |>
     exclude(~ withdrew, label = "Withdrew consent")
-  flow <- apply_criteria(dat, crit)
+  flow <- suppressMessages(apply_criteria(dat, crit))
   d <- as_consort_diagram(flow)
 
   excl_labels <- consort_layout(d)$excl_boxes$label
@@ -541,7 +541,7 @@ test_that("singleton category with exclusions draws an exclusion box", {
   crit <- cf_criteria() |>
     include(~ !is.na(age), label = "Age recorded", category = "Valid age") |>
     include(~ eligible_screen, label = "Passed screening", category = "Screening")
-  flow <- apply_criteria(dat, crit)
+  flow <- suppressMessages(apply_criteria(dat, crit))
   d <- as_consort_diagram(flow)
 
   # Both categories are singletons with exclusions, so both should have boxes
@@ -553,7 +553,7 @@ test_that("singleton category exclusion box has correct count from child", {
   dat <- suppressWarnings(mock_cohortflow(n_participants = 100, seed = 1))
   crit <- cf_criteria() |>
     include(~ !is.na(age), label = "Age recorded", category = "Valid age")
-  flow <- apply_criteria(dat, crit)
+  flow <- suppressMessages(apply_criteria(dat, crit))
   d <- as_consort_diagram(flow)
 
   # Get the exclusion box label
@@ -617,5 +617,48 @@ test_that("NA arm values get their own arm cascade after a randomise() step", {
     col <- col[order(-col$y), ]
     gaps <- (col$y[-nrow(col)] - col$h[-nrow(col)] / 2) - (col$y[-1L] + col$h[-1L] / 2)
     expect_true(all(gaps > 0))
+  }
+})
+
+# ---------------------------------------------------------------------------
+# Scalar column-name arguments (smoke-test 5e)
+
+test_that("as_consort_diagram() rejects non-scalar column-name arguments", {
+  flow <- make_flow_parallel_rct()
+  for (b in list(c("arm", "sex"), NA_character_, "", 1)) {
+    expect_error(as_consort_diagram(flow, branch_by = b), "`branch_by` must be a single column name",
+                 fixed = TRUE)
+  }
+  expect_error(as_consort_diagram(flow, branch_by = "arm", count_by = c("a", "b")),
+               "`count_by` must be a single column name", fixed = TRUE)
+  expect_error(as_consort_diagram(flow, branch_by = "arm", stage_by = ""),
+               "`stage_by` must be a single column name", fixed = TRUE)
+  expect_error(as_consort_diagram(flow, branch_by = "arm", stage_by = "arm", stage_label_by = 1),
+               "`stage_label_by` must be a single column name", fixed = TRUE)
+})
+
+# ---------------------------------------------------------------------------
+# Degenerate flows (smoke-test 5f)
+
+test_that("as_consort_diagram() renders degenerate flows without warnings", {
+  dat <- mock_parallel_rct(n_participants = 40, seed = 1)
+  crit_plain <- cf_criteria() |> include(~ age >= 18, label = "Adults")
+  crit_rand  <- cf_criteria() |>
+    include(~ age > 1000, label = "Nobody") |>
+    randomise(by = "participant_id", arms = "arm") |>
+    exclude(~ withdrew, label = "Withdrew")
+  flows <- list(
+    zero_rows      = apply_criteria(dat[0, ], crit_plain, id = "participant_id"),
+    zero_rows_rand = apply_criteria(dat[0, ], crit_rand, id = "participant_id"),
+    all_out        = apply_criteria(dat, crit_rand, id = "participant_id")
+  )
+
+  png(tempfile(fileext = ".png"))
+  on.exit(grDevices::dev.off(), add = TRUE)
+  for (nm in names(flows)) {
+    for (bb in list(NULL, "arm")) {
+      expect_no_warning(p <- as_consort_diagram(flows[[nm]], branch_by = bb))
+      expect_no_warning(print(p))
+    }
   }
 })

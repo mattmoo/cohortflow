@@ -92,13 +92,13 @@ test_that("ambiguous labels / label-category clashes abort", {
   dup_crit <- cf_criteria() |>
     include(~ !is.na(age), label = "Check") |>
     include(~ age >= 18, label = "Check")
-  dup <- apply_criteria(dat, dup_crit)
+  dup <- suppressMessages(apply_criteria(dat, dup_crit))
   expect_error(cohort(dup, at = "Check"), "matches 2 steps by label")
 
   clash_crit <- cf_criteria() |>
     include(~ !is.na(age), label = "Age", category = "Eligibility") |>
     include(~ age >= 18, label = "Adults", category = "Age")
-  clash <- apply_criteria(dat, clash_crit)
+  clash <- suppressMessages(apply_criteria(dat, clash_crit))
   expect_error(cohort(clash, at = "Age"), "both a step label and a category")
 })
 
@@ -134,14 +134,14 @@ test_that("label and category can be used explicitly when at= is ambiguous", {
   clash_crit <- cf_criteria() |>
     include(~ !is.na(age), label = "Age", category = "Eligibility") |>
     include(~ age >= 18, label = "Adults", category = "Age")
-  clash <- apply_criteria(dat, clash_crit)
+  clash <- suppressMessages(apply_criteria(dat, clash_crit))
   expect_identical(cohort(clash, label = "Age"), cohort(clash, step_number = 1))
   expect_identical(cohort(clash, category = "Age"), cohort(clash, step_number = 2))
 
   dup_crit <- cf_criteria() |>
     include(~ !is.na(age), label = "Check") |>
     include(~ age >= 18, label = "Check")
-  dup <- apply_criteria(dat, dup_crit)
+  dup <- suppressMessages(apply_criteria(dat, dup_crit))
   expect_error(cohort(dup, label = "Check"), "use `step_number`")
 })
 

@@ -119,6 +119,15 @@ validate_hierarchy <- function(hierarchy, data) {
 # ---------------------------------------------------------------------------
 # Per-step, per-level attrition counting
 
+# Distinct unit keys at one hierarchy level, ignoring rows with an `NA` in any
+# of `level_cols` (the same completeness test the grouped evaluators use). A
+# single-column key would otherwise count `NA` as a unit, and a composite key
+# would count a pasted `"C01\rNA"`.
+.level_unit_keys <- function(data, level_cols) {
+  complete <- stats::complete.cases(data[level_cols])
+  unique(.composite_key(data[complete, , drop = FALSE], level_cols))
+}
+
 # Computes, for each hierarchy level (finest -> coarsest), the number of
 # distinct units at risk/surviving/failing at a single step.
 #
@@ -135,6 +144,12 @@ validate_hierarchy <- function(hierarchy, data) {
 # extension -- Campbell, Elbourne & Altman, BMJ 2004;328:702-8 -- expects
 # cluster-flow and participant-flow to be reported separately).
 #
+# A row with an `NA` in any of a level's columns is not a unit at that level
+# (see `.level_unit_keys()`), so it never adds a phantom unit to `n_risk` or
+# `n_fail`. It still counts at any level whose own key is complete: an
+# expected participant with no cluster is one participant at risk and zero
+# clusters.
+#
 # @keywords internal
 .hierarchy_step_counts <- function(before, after, hierarchy, step_type, by) {
   is_group_step <- step_type %in% c("group_include", "group_exclude")
@@ -148,8 +163,8 @@ validate_hierarchy <- function(hierarchy, data) {
 
   rows <- lapply(seq_along(hierarchy), function(i) {
     level_cols <- hierarchy[[i]]
-    before_ids <- unique(.composite_key(before, level_cols))
-    after_ids  <- unique(.composite_key(after, level_cols))
+    before_ids <- .level_unit_keys(before, level_cols)
+    after_ids  <- .level_unit_keys(after, level_cols)
     n_fail_ids <- length(setdiff(before_ids, after_ids))
 
     consequential <- is_group_step && !is.na(by_level_idx) && i < by_level_idx

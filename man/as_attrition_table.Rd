@@ -116,7 +116,10 @@ coarsest), each with a \code{level} column and an additional \code{n_consequenti
 column (see \code{\link[=apply_criteria]{apply_criteria()}}'s \code{hierarchy} argument for the counting
 rule). When a character vector of level name(s), only those levels are
 returned, in the order given. Cannot be combined with \code{group_x}/\code{group_y},
-\code{branch_by}, or \code{count_by}.}
+\code{branch_by}, or \code{count_by}. A row with an \code{NA} in any of a level's
+columns is not a unit at that level, but still counts at every level
+whose own key is complete: an expected participant with no cluster is one
+participant at risk and zero clusters.}
 
 \item{level_labels}{Optional display names for the column blocks produced
 by \code{levels}. Either a vector positionally aligned with \code{levels}, or a
@@ -230,7 +233,9 @@ column block for clusters, e.g. \emph{"Cluster too small -- 42 participants
 removed, 3 clusters removed"}. Shading (\code{shade}/\code{shade_fn}) is computed
 \emph{per level} -- each level's colour gradient is scaled across that level's
 own values, not across all levels combined. \code{levels} cannot be combined
-with \code{group_x}/\code{group_y}/\code{branch_by}/\code{count_by}.
+with \code{group_x}/\code{group_y}/\code{branch_by}/\code{count_by}. Rows with an \code{NA} in a
+level's column(s) are not counted as units at that level (they still count
+at any level whose own key is complete).
 }
 
 \examples{
