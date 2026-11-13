@@ -15,6 +15,11 @@
 #'   * For `select_within`: evaluated per group; must return a logical vector
 #'     identifying which rows within the group to keep.
 #'   * For `randomise`: must be `NULL` (a randomise step never removes rows).
+#'
+#'   Formula predicates are evaluated with a data mask, so the rlang pronouns
+#'   work in every step type: `.data$age` always refers to the column and
+#'   `.env$age` to a variable in the formula's environment, which avoids
+#'   ambiguity when a column and a local variable share a name.
 #' @param label A short human-readable description of this criterion.
 #' @param type One of `"include"`, `"exclude"`, `"group_include"`,
 #'   `"group_exclude"`, `"select_within"`, or `"randomise"`.
@@ -218,8 +223,12 @@ eval_criterion <- function(criterion, data) {
   stopifnot(inherits(criterion, "cf_criterion"), is.data.frame(data))
 
   result <- if (is_formula(criterion$predicate)) {
-    eval(criterion$predicate[[2L]], envir = data,
-         enclos = environment(criterion$predicate))
+    # eval_tidy() (not base eval()) so the `.data` / `.env` pronouns work, as
+    # they do in grouped steps and as check_criteria() assumes.
+    rlang::eval_tidy(
+      rlang::new_quosure(criterion$predicate[[2L]], environment(criterion$predicate)),
+      data = data
+    )
   } else {
     criterion$predicate(data)
   }
@@ -340,8 +349,10 @@ eval_select_criterion <- function(criterion, data) {
     grp_data <- data[grp_rows, , drop = FALSE]
 
     result <- if (is_formula(criterion$predicate)) {
-      eval(criterion$predicate[[2L]], envir = grp_data,
-           enclos = environment(criterion$predicate))
+      rlang::eval_tidy(
+        rlang::new_quosure(criterion$predicate[[2L]], environment(criterion$predicate)),
+        data = grp_data
+      )
     } else {
       criterion$predicate(grp_data)
     }

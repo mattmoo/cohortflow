@@ -144,3 +144,17 @@ test_that("continue_criteria() without the needed join fails up front", {
   flow2 <- continue_criteria(flow, more, join = join, by = "pid")
   expect_equal(nrow(cohort(flow2)), 2L)
 })
+
+test_that("check_criteria() and apply_criteria() agree on pronouns, n(), locals and pkg::fn", {
+  dat <- mock_cluster_rct(n_participants = 80, seed = 1)
+  min_age <- 18
+  crit <- cf_criteria() |>
+    include(~ .data$age >= .env$min_age, label = "Adults (pronouns)") |>
+    include(~ age >= min_age, label = "Adults (local)") |>
+    exclude(~ base::isTRUE(FALSE) & .data$withdrew, label = "No-op exclude") |>
+    group_include(by = "cluster_id", ~ n() >= 2, label = "Cluster size") |>
+    select_within(by = "cluster_id", ~ .data$age == max(.data$age), label = "Oldest per cluster")
+  expect_invisible(check_criteria(crit, dat))
+  expect_no_error(flow <- apply_criteria(dat, crit, id = "participant_id"))
+  expect_s3_class(flow, "cf_flow")
+})

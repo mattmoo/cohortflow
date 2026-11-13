@@ -25,7 +25,12 @@ scalar logical. The result is broadcast back to all rows in each group.
 \item For \code{select_within}: evaluated per group; must return a logical vector
 identifying which rows within the group to keep.
 \item For \code{randomise}: must be \code{NULL} (a randomise step never removes rows).
-}}
+}
+
+Formula predicates are evaluated with a data mask, so the rlang pronouns
+work in every step type: \code{.data$age} always refers to the column and
+\code{.env$age} to a variable in the formula's environment, which avoids
+ambiguity when a column and a local variable share a name.}
 
 \item{label}{A short human-readable description of this criterion.}
 
