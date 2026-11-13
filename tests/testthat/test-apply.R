@@ -2,7 +2,7 @@ test_that("apply_criteria() returns a cf_flow object", {
   dat  <- suppressWarnings(mock_cohortflow(100, seed = 1))
   crit <- cf_criteria() |>
     include(~ eligible_screen, label = "Screening")
-  flow <- apply_criteria(dat, crit)
+  flow <- suppressMessages(apply_criteria(dat, crit))
   expect_s3_class(flow, "cf_flow")
   expect_named(flow, c("data", "criteria", "steps", "hierarchy", "id"))
 })

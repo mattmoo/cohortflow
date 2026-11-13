@@ -17,7 +17,7 @@ make_flow_categorised <- function() {
     include(~ eligible_screen,      label = "Passed screening", category = "Eligible at screening") |>
     include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
     exclude(~ withdrew,             label = "Withdrew consent", category = "Consent")
-  apply_criteria(dat, crit)
+  suppressMessages(apply_criteria(dat, crit))
 }
 
 make_flow_flat <- function() {
@@ -27,7 +27,7 @@ make_flow_flat <- function() {
     include(~ age >= 18,            label = "Adults only") |>
     include(~ !is.na(consent_date), label = "Consent recorded") |>
     exclude(~ withdrew,             label = "Withdrew consent")
-  apply_criteria(dat, crit)
+  suppressMessages(apply_criteria(dat, crit))
 }
 
 make_flow_no_exclusions <- function() {
@@ -35,7 +35,7 @@ make_flow_no_exclusions <- function() {
   # A criterion that keeps everyone
   crit <- cf_criteria() |>
     include(~ !is.na(participant_id), label = "Has ID")
-  apply_criteria(dat, crit)
+  suppressMessages(apply_criteria(dat, crit))
 }
 
 # ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ make_flow_parallel_rct <- function() {
     include(~ eligible_screen,      label = "Passed screening", category = "Eligible at screening") |>
     include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
     exclude(~ withdrew,             label = "Withdrew consent", category = "Consent")
-  apply_criteria(dat, crit)
+  suppressMessages(apply_criteria(dat, crit))
 }
 
 make_flow_crossover <- function() {
@@ -72,7 +72,7 @@ make_flow_cluster_rct <- function() {
     include(~ eligible_screen,      label = "Passed screening", category = "Eligible at screening") |>
     include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
     exclude(~ withdrew,             label = "Withdrew consent", category = "Consent")
-  apply_criteria(dat, crit)
+  suppressMessages(apply_criteria(dat, crit))
 }
 
 make_flow_stepped_wedge <- function() {

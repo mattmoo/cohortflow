@@ -165,12 +165,13 @@ to the full dataset.
 \examples{
 dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
-  include(~ !is.na(age),        label = "Age recorded",       category = "Valid age") |>
-  include(~ age >= 18,          label = "Adults only",         category = "Valid age") |>
-  include(~ eligible_screen,    label = "Passed screening",    category = "Eligible at screening") |>
-  include(~ !is.na(consent_date), label = "Consent recorded",  category = "Consent") |>
-  exclude(~ withdrew,           label = "Withdrew consent", category = "Consent")
-flow <- apply_criteria(dat, crit)
+  include(~ !is.na(age), label = "Age recorded", category = "Valid age") |>
+  include(~ age >= 18, label = "Adults only", category = "Valid age") |>
+  include(~ eligible_screen, label = "Passed screening",
+          category = "Eligible at screening") |>
+  include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
+  exclude(~ withdrew, label = "Withdrew consent", category = "Consent")
+flow <- apply_criteria(dat, crit, id = "participant_id")
 as_attrition_tibble(flow)
 }
 \seealso{

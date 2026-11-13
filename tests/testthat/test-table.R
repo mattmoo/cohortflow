@@ -307,7 +307,7 @@ test_that("singleton category has NA n_removed and pct_removed on category row",
   crit <- cf_criteria() |>
     include(~ !is.na(age), label = "Age recorded", category = "Valid age") |>
     include(~ eligible_screen, label = "Passed screening", category = "Screening")
-  flow <- apply_criteria(dat, crit)
+  flow <- suppressMessages(apply_criteria(dat, crit))
   out  <- as_attrition_tibble(flow)
 
   # Both categories have only one step each

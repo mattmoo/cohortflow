@@ -166,7 +166,7 @@ test_that("flow$hierarchy is stored and NULL by default", {
   dat  <- suppressWarnings(mock_cohortflow(50, seed = 1))
   crit <- cf_criteria() |> include(~ eligible_screen, label = "Screening")
 
-  flow_no_h <- apply_criteria(dat, crit)
+  flow_no_h <- suppressMessages(apply_criteria(dat, crit))
   expect_null(flow_no_h$hierarchy)
   expect_null(flow_no_h$steps[[1]]$hierarchy_counts)
 
@@ -199,8 +199,8 @@ test_that("expected rows with no cluster add no phantom cluster", {
   crit <- cf_criteria() |>
     include(~ !is.na(cluster_id), label = "Has cluster") |>
     include(~ !is.na(age),        label = "Age recorded")
-  flow <- apply_criteria(dat, crit, id = "participant_id", expected = exp,
-                         by = "participant_id", hierarchy = h)
+  flow <- suppressMessages(apply_criteria(dat, crit, id = "participant_id", expected = exp,
+                                          by = "participant_id", hierarchy = h))
 
   cl1 <- level_counts(flow, 1L, "cluster")
   expect_equal(cl1$n_risk, length(unique(dat$cluster_id)))
@@ -242,8 +242,8 @@ test_that("as_attrition_tibble(levels =) header n matches corrected n_risk", {
   exp <- data.frame(participant_id = c(dat$participant_id, "PX1", "PX2"))
   h   <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
   crit <- cf_criteria() |> include(~ !is.na(age), label = "Age recorded")
-  flow <- apply_criteria(dat, crit, id = "participant_id", expected = exp,
-                         by = "participant_id", hierarchy = h)
+  flow <- suppressMessages(apply_criteria(dat, crit, id = "participant_id", expected = exp,
+                                          by = "participant_id", hierarchy = h))
   tbl <- as_attrition_tibble(flow, levels = NULL)
   hdr <- tbl[tbl$row_type == "header", ]
   for (lvl in names(h)) {

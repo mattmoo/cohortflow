@@ -185,7 +185,7 @@ test_that("exclusion header has no colon when there are no child reasons", {
   dat <- suppressWarnings(mock_cohortflow(n_participants = 100, seed = 1))
   crit <- cf_criteria() |>
     exclude(~ withdrew, label = "Withdrew consent")
-  flow <- apply_criteria(dat, crit)
+  flow <- suppressMessages(apply_criteria(dat, crit))
   d <- as_consort_diagram(flow)
 
   excl_labels <- consort_layout(d)$excl_boxes$label
@@ -541,7 +541,7 @@ test_that("singleton category with exclusions draws an exclusion box", {
   crit <- cf_criteria() |>
     include(~ !is.na(age), label = "Age recorded", category = "Valid age") |>
     include(~ eligible_screen, label = "Passed screening", category = "Screening")
-  flow <- apply_criteria(dat, crit)
+  flow <- suppressMessages(apply_criteria(dat, crit))
   d <- as_consort_diagram(flow)
 
   # Both categories are singletons with exclusions, so both should have boxes
@@ -553,7 +553,7 @@ test_that("singleton category exclusion box has correct count from child", {
   dat <- suppressWarnings(mock_cohortflow(n_participants = 100, seed = 1))
   crit <- cf_criteria() |>
     include(~ !is.na(age), label = "Age recorded", category = "Valid age")
-  flow <- apply_criteria(dat, crit)
+  flow <- suppressMessages(apply_criteria(dat, crit))
   d <- as_consort_diagram(flow)
 
   # Get the exclusion box label
