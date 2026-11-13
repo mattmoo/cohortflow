@@ -275,7 +275,12 @@ eval_group_criterion <- function(criterion, data) {
     pred_env$cur_group   <- dplyr::cur_group
     pred_env$cur_group_id <- dplyr::cur_group_id
     quo <- rlang::new_quosure(criterion$predicate[[2L]], env = pred_env)
-    summary <- dplyr::summarise(grp, .pass = !!quo, .groups = "drop")
+    # dplyr's own error names `.pass` and the group but not the criterion,
+    # and says nothing about why a row-wise predicate is wrong here.
+    summary <- rlang::try_fetch(
+      dplyr::summarise(grp, .pass = !!quo, .groups = "drop"),
+      error = function(e) .abort_group_eval(e, criterion$label)
+    )
   } else {
     # Function receives the grouped data frame; must return a 1-row-per-group
     # tibble with columns: <by_col>, .pass
@@ -318,6 +323,26 @@ eval_group_criterion <- function(criterion, data) {
   out <- unname(pass_map[as.character(.composite_key(data, by_col))])
   out[!stats::complete.cases(data[by_col])] <- NA
   out
+}
+
+# Re-throws an error from a group predicate's summarise() call, naming the
+# criterion and chaining the original. dplyr gives its "must be size 1" error
+# no class, so the size case is recognised by message; anything else (or a
+# future rewording) still gets a correct, if less specific, header.
+.abort_group_eval <- function(e, label) {
+  msgs <- character(0L)
+  cnd  <- e
+  while (!is.null(cnd)) {
+    msgs <- c(msgs, conditionMessage(cnd))
+    cnd  <- cnd$parent
+  }
+  if (any(grepl("must be size 1", msgs, fixed = TRUE))) {
+    rlang::abort(c(
+      sprintf("Group criterion \"%s\" must return one value per group.", label),
+      "i" = "Use summary functions such as n(), mean(), any(), all()."
+    ), parent = e)
+  }
+  rlang::abort(sprintf("Group criterion \"%s\" failed to evaluate.", label), parent = e)
 }
 
 #' Evaluate a select_within criterion -- returns a logical vector (nrow(data))

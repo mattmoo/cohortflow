@@ -403,3 +403,29 @@ test_that("format() and print() show a primitive predicate, not NULL", {
   out <- capture.output(print(crit))
   expect_false(any(grepl("NULL", out, fixed = TRUE)))
 })
+
+# ---------------------------------------------------------------------------
+# Vector-valued group predicates (smoke-test 5g)
+
+test_that("a row-wise predicate in a group step gets a package-level message", {
+  d <- data.frame(grp = c("a", "a", "b"), age = c(10, 20, 30))
+  inc <- cf_criterion(~ age > 18, label = "Adults", type = "group_include", by = "grp")
+  exc <- cf_criterion(~ age > 18, label = "Adults out", type = "group_exclude", by = "grp")
+  expect_error(cohortflow:::eval_group_criterion(inc, d),
+               "Group criterion \"Adults\" must return one value per group", fixed = TRUE)
+  expect_error(cohortflow:::eval_group_criterion(exc, d),
+               "Group criterion \"Adults out\" must return one value per group", fixed = TRUE)
+  err <- tryCatch(cohortflow:::eval_group_criterion(inc, d), error = identity)
+  expect_match(conditionMessage(err), "n(), mean(), any(), all()", fixed = TRUE)
+  expect_false(is.null(err$parent))
+})
+
+test_that("other errors in a group predicate still surface in the chain", {
+  d <- data.frame(grp = c("a", "a", "b"), age = c(10, 20, 30))
+  crit <- cf_criterion(~ stop("boom"), label = "Boom", type = "group_include", by = "grp")
+  err <- tryCatch(cohortflow:::eval_group_criterion(crit, d), error = identity)
+  expect_match(conditionMessage(err), "Group criterion \"Boom\"", fixed = TRUE)
+  expect_no_match(conditionMessage(err), "one value per group", fixed = TRUE)
+  chain <- paste(format(err), collapse = "\n")
+  expect_match(chain, "boom", fixed = TRUE)
+})
