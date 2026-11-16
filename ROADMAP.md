@@ -1,6 +1,6 @@
 # cohortflow Project Execution Plan & Roadmap
 
-> Last updated: 2026-08-04
+> Last updated: 2026-11-17
 
 ## Current Status Summary
 
@@ -92,7 +92,13 @@ cohortflow/
 - [ ] **3.6** CONSORT 2010 template (blue heading boxes, classic layout)
 - [ ] **3.7** Modern parallel trial template
 - [ ] **3.8** Modern crossover trial template
-- [ ] **3.9** Adaptive main-flow row spacing — row y-positions are currently
+- [x] **3.9** Adaptive main-flow row spacing — *Done* by audit item 3.5
+  (content-driven vertical layout): `.consort_group_heights()` measures each
+  row's wrapped box and `.consort_stack_y()` stacks rows by cumulative height
+  with gaps widened for exclusion boxes, for the trunk and for per-arm
+  cascades (shared positions sized to the tallest arm at each row). Verified
+  2026-11-17 with `wrap_width = 20` and nine-line labels before and after a
+  `randomise()` split. Original brief: row y-positions are currently
   spaced evenly (`row_height <- (top - bottom) / (n_main - 1)`), sized for
   the default box height rather than each row's actual (possibly
   `wrap_width`-wrapped, multi-line) box height. A long wrapped label makes
@@ -165,7 +171,7 @@ These are not in the current backlog but would add significant value:
 ### Interoperability
 - [ ] **`dplyr` verb compatibility** — Ensure `cf_flow` objects pass through standard `dplyr` verbs without losing attrition metadata
 - [ ] **REDCap / ODM import** — Helpers to import criteria definitions from common clinical data management formats
-- [ ] **`gtsummary` integration** — Feed final cohort directly into `gtsummary::tbl_summary()` for Table 1 generation
+- [x] **`gtsummary` integration** — *Done:* `cohort(flow)` already feeds `gtsummary::tbl_summary()` directly for a final-cohort Table 1; `stack_cohorts(flow)` gives the per-step version via `tbl_summary(by = step)`. No `gtsummary` dependency added. Original brief: Feed final cohort directly into `gtsummary::tbl_summary()` for Table 1 generation
 
 ---
 
