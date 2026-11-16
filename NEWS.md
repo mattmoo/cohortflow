@@ -1,3 +1,21 @@
+# cohortflow 0.0.0.9012
+
+## New features
+
+* `as_characteristics_tibble()` and `as_characteristics_table()` build a
+  step-wise baseline-characteristics ("Table 1") table: variables as rows,
+  one column per criteria step, each cell summarising the cohort surviving
+  up to and including that step (`cohort(flow, step_number = k)`). Numeric
+  variables show mean (SD) and/or median [Q1, Q3]; factor, character and
+  logical variables show n (%); each variable gets a missing-values row.
+  `steps =` takes the same selectors as `cohort()` to restrict or reorder the
+  columns, `excluded = TRUE` describes the rows removed *at* each step
+  instead, and `level =` summarises one row per hierarchy unit. The table
+  renders through the same flextable, gt and huxtable backends as
+  `as_attrition_table()`.
+* `stack_cohorts()` returns the per-step cohorts stacked with a `step`
+  factor, ready for `gtsummary::tbl_summary(by = step)`.
+
 # cohortflow 0.0.0.9011
 
 ## Smoke-test fixes
