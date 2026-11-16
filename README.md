@@ -142,6 +142,34 @@ as_attrition_table(
 )
 ```
 
+## Step-wise characteristics (Table 1 by step)
+
+`as_characteristics_table()` summarises chosen variables for the cohort at
+each step: variables as rows, one column per criteria step headed by the
+step label and its `n`. Numeric variables show mean (SD) and/or median
+[Q1, Q3]; factor, character and logical variables show n (%). `steps` takes
+the same selectors as `cohort()`, and `excluded = TRUE` describes the rows
+removed *at* each step instead, the usual supplementary table of excluded
+participants:
+
+```r
+as_characteristics_table(
+  flow,
+  vars       = c("age", "sex", "withdrew"),
+  var_labels = c(age = "Age, years", sex = "Sex"),
+  numeric    = c("mean_sd", "median_iqr")
+)
+
+# Just the starting data and the final cohort, as a plain tibble
+as_characteristics_tibble(flow, vars = "age", steps = c(0, "Withdrew consent"),
+                          wide = TRUE)
+```
+
+`as_characteristics_tibble()` is the underlying data layer; `stack_cohorts()`
+returns the per-step cohorts stacked with a `step` factor for other
+summary-table packages, e.g.
+`gtsummary::tbl_summary(stack_cohorts(flow), by = step, include = c(age, sex))`.
+
 ## Hierarchy levels (cluster / within-person CONSORT)
 
 For designs where observational units nest inside a coarser unit -- a
