@@ -18,8 +18,6 @@ diagram <- as_consort_diagram(flow, title = "cohortflow CONSORT preview")
 
 dir.create("man/figures", recursive = TRUE, showWarnings = FALSE)
 
-png("man/figures/consort-diagram-preview.png", width = 1400, height = 1000, res = 150)
-print(diagram)
-dev.off()
+save_consort_diagram(diagram, "man/figures/consort-diagram-preview.png", dpi = 150)
 
 message("Wrote man/figures/consort-diagram-preview.png")

@@ -357,9 +357,9 @@
 #'
 #' The returned object is a [ggplot2::ggplot()] plot (with an additional
 #' `consort_diagram` class), so it can be drawn with `print()`, combined
-#' with `+` and further `ggplot2` layers/themes, or exported with
-#' [ggplot2::ggsave()] or by opening an appropriate graphics device (e.g.
-#' [grDevices::png()]) before drawing.
+#' with `+` and further `ggplot2` layers/themes, or written to a PNG, TIFF,
+#' PDF, SVG or EPS file sized to fit its layout with
+#' [save_consort_diagram()].
 #'
 #' @inheritParams as_attrition_tibble
 #' @param main_fill Fill colour for main-flow boxes. Default `NA` (no
@@ -419,7 +419,8 @@
 #'   `print()`. The underlying box/arrow layout data frames are available
 #'   via `attr(x, "consort_layout")` for introspection or custom rendering.
 #' @seealso [as_attrition_tibble()] for the underlying plain-tibble data
-#'   layer, [as_attrition_table()] for formatted table output.
+#'   layer, [as_attrition_table()] for formatted table output,
+#'   [save_consort_diagram()] to export for manuscript submission.
 #' @export
 #'
 #' @examples
@@ -1156,7 +1157,8 @@ as_consort_diagram <- function(
     branch_excl_arrows  = branch_excl_arrow_df,
     stage_boxes         = stage_df,
     stage_arrows        = stage_arrow_df,
-    has_title           = !is.null(title)
+    has_title           = !is.null(title),
+    text_size           = text_size
   )
 
   class(gg) <- c("consort_diagram", class(gg))

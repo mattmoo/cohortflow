@@ -1,3 +1,16 @@
+# cohortflow 0.0.0.9013
+
+## New features
+
+* `save_consort_diagram()` writes a CONSORT diagram (or a `cf_flow`, drawn
+  with default settings) to PNG, TIFF, JPEG, PDF, SVG or EPS, choosing the
+  format from the file extension. Defaults suit manuscript submission:
+  300 dpi, a white background, `ragg` devices for raster output when
+  installed, `cairo_pdf()` for PDF (embeds fonts), and `svglite` for SVG
+  when installed. When `width` and `height` are omitted the page size comes
+  from the diagram layout, so box text fits its boxes and longer pipelines
+  give taller files; supplying one dimension keeps the aspect ratio.
+
 # cohortflow 0.0.0.9012
 
 ## New features
