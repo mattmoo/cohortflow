@@ -11,6 +11,14 @@
   from the diagram layout, so box text fits its boxes and longer pipelines
   give taller files; supplying one dimension keeps the aspect ratio.
 
+## Bug fixes
+
+* `as_attrition_table()` now shows every percentage to `digits` decimal
+  places, keeping trailing zeros: a 10% removal reads `10.0%` rather than
+  `10%`, and the final row `90.0% included`. This applies to plain,
+  `group_x`/`group_y` and `levels =` tables, matching
+  `as_consort_diagram()`.
+
 # cohortflow 0.0.0.9012
 
 ## New features

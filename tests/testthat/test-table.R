@@ -1071,3 +1071,39 @@ test_that("renderers reject non-scalar column-name arguments", {
   # A well-formed but missing column keeps the existing message.
   expect_error(as_attrition_tibble(flow, branch_by = "nope"), "not found in surviving cohort")
 })
+
+# Percentage cells from a rendered table: every non-empty cell ending in "%"
+# or "% included", across all percentage columns.
+pct_cells <- function(ft) {
+  df <- ft$body$dataset
+  vals <- unlist(df[grepl("pct", names(df))], use.names = FALSE)
+  vals[!is.na(vals) & grepl("%", vals)]
+}
+
+test_that("as_attrition_table() keeps trailing zeros in percentages", {
+  skip_if_not_installed("flextable")
+  d    <- tibble::tibble(id = 1:10, x = c(0, 1:9), g = rep(c("a", "b"), 5))
+  crit <- cf_criteria() |> include(~ x > 0, label = "Positive")
+  flow <- apply_criteria(d, crit, id = "id")
+
+  ft <- as_attrition_table(flow)
+  expect_setequal(pct_cells(ft), c("10.0%", "90.0% included"))
+  expect_setequal(pct_cells(as_attrition_table(flow, digits = 2L)), c("10.00%", "90.00% included"))
+  expect_setequal(pct_cells(as_attrition_table(flow, digits = 0L)), c("10%", "90% included"))
+
+  grouped <- pct_cells(as_attrition_table(flow, group_x = "g"))
+  expect_true(all(grepl("^[0-9]+[.][0-9]%", grouped)))
+  expect_true("100.0% included" %in% grouped)
+})
+
+test_that("as_attrition_table(levels = ) keeps trailing zeros in percentages", {
+  skip_if_not_installed("flextable")
+  dat  <- mock_cluster_rct(n_clusters = 6, seed = 1)
+  crit <- cf_criteria() |> include(~ !is.na(age), label = "Age recorded")
+  hier <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
+  flow <- apply_criteria(dat, crit, hierarchy = hier, id = "participant_id")
+  cells <- pct_cells(as_attrition_table(flow, levels = c("participant", "cluster"), digits = 2L))
+  expect_gt(length(cells), 0L)
+  expect_true(all(grepl("^[0-9]+[.][0-9]{2}%", cells)))
+  expect_true("100.00% included" %in% cells)
+})

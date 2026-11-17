@@ -43,7 +43,7 @@ per step is produced.}
 Default \code{"Final cohort"}.}
 
 \item{digits}{Integer. Number of decimal places for \code{pct_removed}. Default
-\code{1}.}
+\code{1}. Formatted tables and diagrams keep trailing zeros (\code{"10.0\%"}).}
 
 \item{main_fill}{Fill colour for main-flow boxes. Default \code{NA} (no
 fill / transparent), keeping the diagram colourless unless a fill is

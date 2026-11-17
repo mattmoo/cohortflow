@@ -33,7 +33,7 @@ per step is produced.}
 Default \code{"Final cohort"}.}
 
 \item{digits}{Integer. Number of decimal places for \code{pct_removed}. Default
-\code{1}.}
+\code{1}. Formatted tables and diagrams keep trailing zeros (\code{"10.0\%"}).}
 
 \item{branch_by}{Optional column name (string) for allocation branching.
 When \code{NULL} (default), the table has a single \code{n} column unless the
