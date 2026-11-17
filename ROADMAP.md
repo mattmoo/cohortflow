@@ -88,7 +88,7 @@ cohortflow/
   - [x] `branch_by` parameter for parallel/crossover trial arms
   - [x] `stage_by` and `stage_label_by` for crossover period/arm labels
   - [x] `count_by` for distinct participant counts in crossover data
-- [ ] **3.5** Support export to PNG/SVG/PDF for manuscript submission
+- [x] **3.5** Support export to PNG/SVG/PDF for manuscript submission — *Done:* `save_consort_diagram()` (PNG/TIFF/JPEG/PDF/SVG/EPS by extension, 300 dpi, layout-derived size)
 - [ ] **3.6** CONSORT 2010 template (blue heading boxes, classic layout)
 - [ ] **3.7** Modern parallel trial template
 - [ ] **3.8** Modern crossover trial template

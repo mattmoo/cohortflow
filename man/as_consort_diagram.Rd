@@ -138,9 +138,9 @@ final) is identical across all three output types.
 
 The returned object is a \code{\link[ggplot2:ggplot]{ggplot2::ggplot()}} plot (with an additional
 \code{consort_diagram} class), so it can be drawn with \code{print()}, combined
-with \code{+} and further \code{ggplot2} layers/themes, or exported with
-\code{\link[ggplot2:ggsave]{ggplot2::ggsave()}} or by opening an appropriate graphics device (e.g.
-\code{\link[grDevices:png]{grDevices::png()}}) before drawing.
+with \code{+} and further \code{ggplot2} layers/themes, or written to a PNG, TIFF,
+PDF, SVG or EPS file sized to fit its layout with
+\code{\link[=save_consort_diagram]{save_consort_diagram()}}.
 }
 \examples{
 dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
@@ -154,5 +154,6 @@ as_consort_diagram(flow)
 }
 \seealso{
 \code{\link[=as_attrition_tibble]{as_attrition_tibble()}} for the underlying plain-tibble data
-layer, \code{\link[=as_attrition_table]{as_attrition_table()}} for formatted table output.
+layer, \code{\link[=as_attrition_table]{as_attrition_table()}} for formatted table output,
+\code{\link[=save_consort_diagram]{save_consort_diagram()}} to export for manuscript submission.
 }

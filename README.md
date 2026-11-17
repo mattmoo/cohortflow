@@ -76,6 +76,10 @@ ft <- as_attrition_table(flow, backend = "flextable")
 # CONSORT flow diagram
 diagram <- as_consort_diagram(flow)
 print(diagram)
+
+# Save it for a manuscript (format from the extension; sized to fit the layout)
+save_consort_diagram(diagram, "consort.pdf")
+save_consort_diagram(diagram, "consort.png", dpi = 300)
 ```
 
 ## Visual output

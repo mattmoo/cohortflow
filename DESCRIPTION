@@ -1,6 +1,6 @@
 Package: cohortflow
 Title: Define and Apply Cohort Inclusion/Exclusion Criteria
-Version: 0.0.0.9012
+Version: 0.0.0.9013
 Authors@R:
     person("Matthew", "Moore", , "matthew.moore@auckland.ac.nz", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-0730-8027"))
@@ -23,6 +23,8 @@ Suggests:
     gt,
     huxtable,
     officer,
+    ragg,
+    svglite,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Imports:
