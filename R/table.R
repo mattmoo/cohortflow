@@ -73,7 +73,7 @@
 #' @param final_label Character string for the trailing final-cohort row.
 #'   Default `"Final cohort"`.
 #' @param digits Integer. Number of decimal places for `pct_removed`. Default
-#'   `1`.
+#'   `1`. Formatted tables and diagrams keep trailing zeros (`"10.0%"`).
 #' @param branch_by Optional column name (string) for allocation branching.
 #'   When `NULL` (default), the table has a single `n` column unless the
 #'   pipeline has a [randomise()] step, in which case its `arms` column is
@@ -969,7 +969,7 @@ as_attrition_table <- function(
 
     grid <- .attrition_build_level_grid(
       tbl, levels, level_labels_resolved, shade, shade_fn, shade_palette,
-      show_consequential
+      show_consequential, digits
     )
 
     return(switch(backend,
@@ -1003,7 +1003,7 @@ as_attrition_table <- function(
     )
 
     shade_colours <- .attrition_shade_colours(tbl, shade, shade_fn, shade_palette)
-    grid <- .attrition_build_grid(tbl, group_x, group_y, shade_colours)
+    grid <- .attrition_build_grid(tbl, group_x, group_y, shade_colours, digits)
 
     return(switch(backend,
       flextable = .attrition_flextable_grouped(grid, criterion_col_label,
@@ -1038,13 +1038,13 @@ as_attrition_table <- function(
   switch(backend,
     flextable = .attrition_flextable(tbl, criterion_col_label,
                                      n_col_label, removed_col_label,
-                                     pct_col_label, shade_colours),
+                                     pct_col_label, shade_colours, digits),
     gt        = .attrition_gt(tbl, criterion_col_label,
                               n_col_label, removed_col_label,
-                              pct_col_label, shade_colours),
+                              pct_col_label, shade_colours, digits),
     huxtable  = .attrition_huxtable(tbl, criterion_col_label,
                                     n_col_label, removed_col_label,
-                                    pct_col_label, shade_colours)
+                                    pct_col_label, shade_colours, digits)
   )
 }
 
@@ -1102,6 +1102,15 @@ as_attrition_table <- function(
 # Shared display helper -- formats the tibble for display
 # ---------------------------------------------------------------------------
 
+# Formats percentages to a fixed number of decimal places, keeping trailing
+# zeros (`1` -> "1.0" with `digits = 1`) so a column lines up. `NA` stays
+# `NA` for the callers to blank or dash.
+.format_pct <- function(x, digits) {
+  out <- sprintf("%.*f", as.integer(digits), x)
+  out[is.na(x)] <- NA_character_
+  out
+}
+
 # Converts the raw attrition tibble to a display data frame and returns
 # recommended column widths for flextable (inches). Any column beyond the
 # standard set (row_type, label, indent_level, n, n_removed, pct_removed,
@@ -1109,7 +1118,7 @@ as_attrition_table <- function(
 # display data frame as-is (character, blank/NA except on the final row).
 .attrition_display <- function(tbl, criterion_col_label,
                                n_col_label, removed_col_label,
-                               pct_col_label) {
+                               pct_col_label, digits = 1L) {
 
   # The final row's percentage is the percentage *retained*/*included*, not
   # removed, so it is labelled explicitly (e.g. "83.5% included") to avoid
@@ -1119,9 +1128,9 @@ as_attrition_table <- function(
     tbl$row_type == "header"               ~ NA_character_,
     # An NA final percentage (zero-row flow) must not render as "NA% included"
     tbl$row_type == "final" & is.na(tbl$pct_removed) ~ NA_character_,
-    tbl$row_type == "final"                ~ paste0(tbl$pct_removed, "% included"),
+    tbl$row_type == "final"                ~ paste0(.format_pct(tbl$pct_removed, digits), "% included"),
     is.na(tbl$pct_removed) | tbl$pct_removed == 0 ~ "\u2014",
-    TRUE                                   ~ paste0(tbl$pct_removed, "%")
+    TRUE                                   ~ paste0(.format_pct(tbl$pct_removed, digits), "%")
   )
 
   n_removed_str <- dplyr::case_when(
@@ -1162,7 +1171,7 @@ as_attrition_table <- function(
 
 .attrition_flextable <- function(tbl, criterion_col_label,
                                  n_col_label, removed_col_label,
-                                 pct_col_label, shade_colours = NULL) {
+                                 pct_col_label, shade_colours = NULL, digits = 1L) {
 
   if (!.has_namespace("flextable")) {
     rlang::abort(
@@ -1177,7 +1186,7 @@ as_attrition_table <- function(
 
   display <- .attrition_display(tbl, criterion_col_label,
                                 n_col_label, removed_col_label,
-                                pct_col_label)
+                                pct_col_label, digits)
   df          <- display$df
   col_w       <- display$col_widths
   branch_cols <- display$branch_cols
@@ -1264,7 +1273,7 @@ as_attrition_table <- function(
 
 .attrition_gt <- function(tbl, criterion_col_label,
                           n_col_label, removed_col_label,
-                          pct_col_label, shade_colours = NULL) {
+                          pct_col_label, shade_colours = NULL, digits = 1L) {
 
   if (!.has_namespace("gt")) {
     rlang::abort(
@@ -1274,7 +1283,7 @@ as_attrition_table <- function(
 
   display <- .attrition_display(tbl, criterion_col_label,
                                 n_col_label, removed_col_label,
-                                pct_col_label)
+                                pct_col_label, digits)
   df          <- display$df
   branch_cols <- display$branch_cols
 
@@ -1382,7 +1391,7 @@ as_attrition_table <- function(
 
 .attrition_huxtable <- function(tbl, criterion_col_label,
                                 n_col_label, removed_col_label,
-                                pct_col_label, shade_colours = NULL) {
+                                pct_col_label, shade_colours = NULL, digits = 1L) {
 
   if (!.has_namespace("huxtable")) {
     rlang::abort(
@@ -1392,7 +1401,7 @@ as_attrition_table <- function(
 
   display <- .attrition_display(tbl, criterion_col_label,
                                 n_col_label, removed_col_label,
-                                pct_col_label)
+                                pct_col_label, digits)
   df          <- display$df
   branch_cols <- display$branch_cols
   n_cols      <- ncol(df)
@@ -1469,7 +1478,7 @@ as_attrition_table <- function(
 # row skeleton plus one {n, n_removed, pct_removed, shade} column set per
 # group_x value (prefixed x1__, x2__, ...). This is consumed by the three
 # backend-specific *_grouped() renderers below.
-.attrition_build_grid <- function(tbl, group_x, group_y, shade_colours) {
+.attrition_build_grid <- function(tbl, group_x, group_y, shade_colours, digits = 1L) {
   has_x <- !is.null(group_x)
   has_y <- !is.null(group_y)
 
@@ -1514,7 +1523,8 @@ as_attrition_table <- function(
     n_x      = max(length(x_vals), 1L),
     n_skel   = n_skel,
     has_x    = has_x,
-    has_y    = has_y
+    has_y    = has_y,
+    digits   = digits
   )
 }
 
@@ -1571,8 +1581,8 @@ as_attrition_table <- function(
     # removed, so it is labelled explicitly (e.g. "83.5% included") to avoid
     # reading as if it shared the "% removed" semantics of the column header.
     pct_str <- ifelse(df_full$row_type == "final",
-                      paste0(pct_col, "% included"),
-                      paste0(pct_col, "%"))
+                      paste0(.format_pct(pct_col, grid$digits), "% included"),
+                      paste0(.format_pct(pct_col, grid$digits), "%"))
     pct_str[is.na(pct_col)] <- ""
     display[[paste0(pfx, "pct_removed")]] <- pct_str
   }
@@ -1933,7 +1943,7 @@ as_attrition_table <- function(
 # rather than assumed, so a future change to row construction fails loudly.
 .attrition_build_level_grid <- function(tbl, levels, level_labels, shade,
                                         shade_fn, shade_palette,
-                                        show_consequential = NULL) {
+                                        show_consequential = NULL, digits = 1L) {
   row_keys <- lapply(split(tbl, tbl$level), function(d) {
     paste(d$row_type, d$label, d$indent_level, sep = "\r")
   })
@@ -1970,7 +1980,7 @@ as_attrition_table <- function(
     disp <- .attrition_display(
       sub[c("row_type", "label", "indent_level", "n", "n_removed",
             "pct_removed")],
-      "", "", "", ""
+      "", "", "", "", digits
     )
 
     n_col   <- paste0("n_", lvl)

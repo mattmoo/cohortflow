@@ -49,7 +49,7 @@ per step is produced.}
 Default \code{"Final cohort"}.}
 
 \item{digits}{Integer. Number of decimal places for \code{pct_removed}. Default
-\code{1}.}
+\code{1}. Formatted tables and diagrams keep trailing zeros (\code{"10.0\%"}).}
 
 \item{criterion_col_label}{Column header for the criterion/label column.
 Default \code{"Criterion"}.}
