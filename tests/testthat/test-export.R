@@ -8,8 +8,8 @@ make_export_flow <- function(n_steps) {
 }
 
 expect_nonempty_file <- function(path) {
-  expect_true(file.exists(path))
-  expect_gt(file.size(path), 0)
+  testthat::expect_true(file.exists(path))
+  testthat::expect_gt(file.size(path), 0)
 }
 
 # Pixel width and height from a PNG's IHDR chunk (bytes 17-24, big-endian).

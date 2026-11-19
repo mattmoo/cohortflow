@@ -16,9 +16,9 @@ make_flow_chars <- function() {
 expect_cell <- function(tbl, variable, level, step, count, stat) {
   row <- tbl[tbl$variable == variable & tbl$step == step &
                (if (is.na(level)) is.na(tbl$level) else !is.na(tbl$level) & tbl$level == level), ]
-  expect_equal(nrow(row), 1L)
-  if (!is.null(count)) expect_identical(row$count, as.integer(count))
-  expect_identical(row$stat, stat)
+  testthat::expect_equal(nrow(row), 1L)
+  if (!is.null(count)) testthat::expect_identical(row$count, as.integer(count))
+  testthat::expect_identical(row$stat, stat)
 }
 
 # ---------------------------------------------------------------------------
