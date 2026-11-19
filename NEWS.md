@@ -1,3 +1,11 @@
+# cohortflow 0.0.0.9014
+
+## New features
+
+* `excluded()` gains `only = FALSE`. With `only = TRUE` it returns just the
+  rows removed at the selected step, rather than every row removed up to and
+  including it: `excluded(flow, at = 2, only = TRUE)`.
+
 # cohortflow 0.0.0.9013
 
 ## New features

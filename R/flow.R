@@ -259,19 +259,42 @@ cohort <- function(flow, flag = FALSE, at = NULL, step_number = NULL, label = NU
 #' and including a chosen step), with additional
 #' columns `cf_step` (integer), `cf_label` (character), `cf_type` (character),
 #' and `cf_category` (character, `NA` if the criterion had no category).
-#' Rows are in step order. Rows removed at a single step `k` are
-#' `excluded(flow) |> dplyr::filter(cf_step == k)`.
+#' Rows are in step order. Set `only = TRUE` to get just the rows removed at
+#' the selected step itself.
 #'
 #' @inheritParams cohort
 #' @inheritSection cohort Intermediate steps
+#' @param only Logical. When `FALSE` (default), returns rows removed by every
+#'   step up to and including the selected step. When `TRUE`, returns only the
+#'   rows removed at the selected step (for a `category` selector, the last
+#'   step in that category). Step `0` removes nothing, so
+#'   `step_number = 0, only = TRUE` returns no rows. With no selector, `TRUE`
+#'   gives the rows removed at the last step.
 #' @return A tibble with original columns plus `cf_step`, `cf_label`,
 #'   `cf_type`, `cf_category`.
+#' @examples
+#' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
+#' crit <- cf_criteria() |>
+#'   include(~ !is.na(age), label = "Age recorded") |>
+#'   include(~ eligible_screen, label = "Passed screening") |>
+#'   exclude(~ withdrew, label = "Withdrew consent")
+#' flow <- apply_criteria(dat, crit)
+#' excluded(flow)                                   # removed at any step
+#' excluded(flow, at = 2)                           # removed by steps 1-2
+#' excluded(flow, at = 2, only = TRUE)              # removed at step 2 only
+#' excluded(flow, label = "Withdrew consent", only = TRUE)
 #' @export
-excluded <- function(flow, at = NULL, step_number = NULL, label = NULL, category = NULL) {
+excluded <- function(flow, at = NULL, step_number = NULL, label = NULL, category = NULL,
+                     only = FALSE) {
   if (!inherits(flow, "cf_flow")) rlang::abort("`flow` must be a `cf_flow` object.")
+  if (!is.logical(only) || length(only) != 1L || is.na(only)) {
+    rlang::abort("`only` must be a single `TRUE` or `FALSE`.")
+  }
   k <- .resolve_step(flow, at, step_number, label, category)
+  # Step 0 removes nothing: seq_len(0)[0] is empty, so `only` yields no rows.
+  steps <- if (only) seq_len(k)[k] else seq_len(k)
 
-  chunks <- lapply(flow$steps[seq_len(k)], function(s) {
+  chunks <- lapply(flow$steps[steps], function(s) {
     if (length(s$excluded_ids) == 0L) return(NULL)
     rows <- flow$data[flow$data$.cf_row_id %in% s$excluded_ids, , drop = FALSE]
     rows$cf_step     <- s$step
