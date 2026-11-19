@@ -34,7 +34,7 @@
 # via svglite with a cairo fallback; `NULL` lets ggsave pick by extension
 # (ragg for raster formats when installed).
 .consort_export_device <- function(ext) {
-  cairo <- isTRUE(unname(capabilities("cairo")))
+  cairo <- ext %in% c("pdf", "svg") && .cairo_usable()
   switch(ext,
     pdf = if (cairo) grDevices::cairo_pdf else grDevices::pdf,
     svg = if (requireNamespace("svglite", quietly = TRUE)) {
@@ -46,6 +46,24 @@
     },
     NULL
   )
+}
+
+# Whether cairo devices actually open. `capabilities("cairo")` only reports
+# that R was built with cairo: on macOS without XQuartz the cairo module
+# fails to load, and `cairo_pdf()` then warns and opens no device. So open a
+# throwaway cairo PDF and check a device appeared.
+.cairo_usable <- function() {
+  if (!isTRUE(unname(capabilities("cairo")))) return(FALSE)
+  tmp <- tempfile(fileext = ".pdf")
+  on.exit(unlink(tmp), add = TRUE)
+  prev <- grDevices::dev.cur()
+  before <- grDevices::dev.list()
+  suppressWarnings(tryCatch(grDevices::cairo_pdf(tmp), error = function(e) NULL))
+  opened <- setdiff(grDevices::dev.list(), before)
+  if (length(opened) == 0L) return(FALSE)
+  grDevices::dev.off(opened[1L])
+  if (prev > 1L) grDevices::dev.set(prev)
+  TRUE
 }
 
 #' Save a CONSORT diagram for manuscript submission

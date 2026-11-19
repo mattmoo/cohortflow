@@ -29,6 +29,20 @@ test_that("save_consort_diagram() writes PNG and PDF and returns path invisibly"
   }
 })
 
+test_that("PDF export falls back to pdf() when cairo will not load", {
+  local_mocked_bindings(.cairo_usable = function() FALSE)
+  expect_identical(.consort_export_device("pdf"), grDevices::pdf)
+  path <- withr::local_tempfile(fileext = ".pdf")
+  save_consort_diagram(as_consort_diagram(make_export_flow(2)), path)
+  expect_nonempty_file(path)
+})
+
+test_that(".cairo_usable() leaves the open devices unchanged", {
+  before <- grDevices::dev.list()
+  expect_type(.cairo_usable(), "logical")
+  expect_identical(grDevices::dev.list(), before)
+})
+
 test_that("save_consort_diagram() writes SVG", {
   has_svg <- requireNamespace("svglite", quietly = TRUE) || isTRUE(unname(capabilities("cairo")))
   skip_if_not(has_svg, "needs svglite or cairo")
