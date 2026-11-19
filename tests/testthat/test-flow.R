@@ -21,6 +21,36 @@ test_that("cohort() and excluded() counts agree with step records", {
   expect_identical(excluded(f, at = n), excluded(f))
 })
 
+test_that("excluded(only = TRUE) returns just the selected step's rows", {
+  f <- make_flow_categorised()
+  n <- length(f$steps)
+  for (k in seq_len(n)) {
+    ex <- excluded(f, at = k, only = TRUE)
+    expect_equal(nrow(ex), f$steps[[k]]$n_fail)
+    expect_true(all(ex$cf_step == k))
+    expect_identical(ex, excluded(f, at = k)[excluded(f, at = k)$cf_step == k, ])
+  }
+  expect_identical(excluded(f, only = TRUE), excluded(f, at = n, only = TRUE))
+  expect_identical(excluded(f, label = "Adults only", only = TRUE),
+                   excluded(f, at = 2, only = TRUE))
+  expect_identical(excluded(f, category = "Valid age", only = TRUE),
+                   excluded(f, at = 2, only = TRUE))
+})
+
+test_that("excluded(only = TRUE) at step 0 is empty but typed", {
+  f <- make_flow_categorised()
+  ex <- excluded(f, step_number = 0, only = TRUE)
+  expect_equal(nrow(ex), 0L)
+  expect_identical(names(ex), names(excluded(f)))
+})
+
+test_that("excluded() validates `only`", {
+  f <- make_flow_categorised()
+  expect_error(excluded(f, only = NA), "`only` must be")
+  expect_error(excluded(f, only = "yes"), "`only` must be")
+  expect_error(excluded(f, only = c(TRUE, FALSE)), "`only` must be")
+})
+
 test_that("at = 0 gives the starting data and no exclusions", {
   f <- make_flow_categorised()
   co <- cohort(f, at = 0)

@@ -4,7 +4,14 @@
 \alias{excluded}
 \title{Extract excluded rows from a flow object}
 \usage{
-excluded(flow, at = NULL, step_number = NULL, label = NULL, category = NULL)
+excluded(
+  flow,
+  at = NULL,
+  step_number = NULL,
+  label = NULL,
+  category = NULL,
+  only = FALSE
+)
 }
 \arguments{
 \item{flow}{A \code{cf_flow} object produced by \code{\link[=apply_criteria]{apply_criteria()}}.}
@@ -17,6 +24,13 @@ see the section "Intermediate steps".}
 \item{label}{Optional exact step label.}
 
 \item{category}{Optional category name (last step in that category).}
+
+\item{only}{Logical. When \code{FALSE} (default), returns rows removed by every
+step up to and including the selected step. When \code{TRUE}, returns only the
+rows removed at the selected step (for a \code{category} selector, the last
+step in that category). Step \code{0} removes nothing, so
+\verb{step_number = 0, only = TRUE} returns no rows. With no selector, \code{TRUE}
+gives the rows removed at the last step.}
 }
 \value{
 A tibble with original columns plus \code{cf_step}, \code{cf_label},
@@ -27,8 +41,8 @@ Returns a flat tibble of all rows removed at any step (or, with \code{at}, up to
 and including a chosen step), with additional
 columns \code{cf_step} (integer), \code{cf_label} (character), \code{cf_type} (character),
 and \code{cf_category} (character, \code{NA} if the criterion had no category).
-Rows are in step order. Rows removed at a single step \code{k} are
-\code{excluded(flow) |> dplyr::filter(cf_step == k)}.
+Rows are in step order. Set \code{only = TRUE} to get just the rows removed at
+the selected step itself.
 }
 \section{Intermediate steps}{
 
@@ -45,3 +59,15 @@ and a category is an error: use \code{label} or \code{category} explicitly.
 }
 }
 
+\examples{
+dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
+crit <- cf_criteria() |>
+  include(~ !is.na(age), label = "Age recorded") |>
+  include(~ eligible_screen, label = "Passed screening") |>
+  exclude(~ withdrew, label = "Withdrew consent")
+flow <- apply_criteria(dat, crit)
+excluded(flow)                                   # removed at any step
+excluded(flow, at = 2)                           # removed by steps 1-2
+excluded(flow, at = 2, only = TRUE)              # removed at step 2 only
+excluded(flow, label = "Withdrew consent", only = TRUE)
+}
