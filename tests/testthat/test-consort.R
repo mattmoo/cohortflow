@@ -275,13 +275,42 @@ test_that("stage_by requires branch_by", {
   )
 })
 
-test_that("count_by requires branch_by", {
-  flow <- make_flow_crossover()
-  expect_error(
-    as_consort_diagram(flow, count_by = "participant_id"),
-    "requires.*branch_by",
-    class = "rlang_error"
+test_that("count_by without a hierarchy errors and says how to fix the call", {
+  # Before 0.0.0.9016 this call was valid (any column, branch boxes only).
+  flow <- make_flow_parallel_rct()
+  err <- expect_error(
+    as_consort_diagram(flow, branch_by = "arm", count_by = "participant_id"),
+    class = "cohortflow_count_by_hierarchy"
   )
+  msg <- conditionMessage(err)
+  expect_match(msg, "needs a flow built with a hierarchy", fixed = TRUE)
+  expect_match(msg, "every box and row", fixed = TRUE)
+  expect_match(msg, "cf_hierarchy(unit = \"participant_id\")", fixed = TRUE)
+})
+
+test_that("count_by that is not a hierarchy level lists the levels", {
+  flow <- make_flow_hierarchy()
+  err <- expect_error(
+    as_consort_diagram(flow, branch_by = "arm", count_by = "site"),
+    class = "cohortflow_count_by_hierarchy"
+  )
+  expect_match(conditionMessage(err), "participant (participant_id), cluster (cluster_id)",
+               fixed = TRUE)
+})
+
+test_that("count_by counts the trunk at the hierarchy level, without branch_by", {
+  flow <- make_flow_crossover()
+  d    <- as_consort_diagram(flow, count_by = "participant_id")
+  main <- consort_layout(d)$main_boxes
+  n_of <- function(lbl) as.integer(gsub(",", "", sub(".*\\(n=([0-9,]+)\\).*", "\\1", lbl)))
+  # header: distinct participants, not participant-period rows
+  expect_equal(n_of(main$label[1]), dplyr::n_distinct(flow$data$participant_id))
+  expect_lt(n_of(main$label[1]), nrow(flow$data))
+  # final box: participants with any surviving row
+  expect_equal(n_of(main$label[nrow(main)]), dplyr::n_distinct(cohort(flow)$participant_id))
+  # the level name works as well as its column
+  d2 <- as_consort_diagram(flow, count_by = "participant")
+  expect_identical(consort_layout(d2)$main_boxes$label, main$label)
 })
 
 test_that("stage_label_by requires stage_by", {
@@ -505,9 +534,14 @@ test_that("as_consort_diagram() splits the trunk at the randomise() step", {
   expect_false(any(grepl("Withdrew after allocation", main_boxes$label)))
   expect_false(any(grepl("Final cohort", main_boxes$label)))
 
+  # The exclusion step's label sits beside the number removed, in the arm's
+  # exclusion box; the arm's main box below says how many remain.
   branch_boxes <- consort_layout(d)$branch_boxes
-  expect_true(any(grepl("Withdrew after allocation", branch_boxes$label)))
+  expect_false(any(grepl("Withdrew after allocation", branch_boxes$label)))
+  expect_true(any(startsWith(branch_boxes$label, "Remaining\n(n=")))
   expect_true(any(grepl("Final cohort", branch_boxes$label)))
+  branch_excl <- consort_layout(d)$branch_excl_boxes
+  expect_true(all(startsWith(branch_excl$label, "Withdrew after allocation (n=")))
 })
 
 test_that("as_consort_diagram() draws per-arm exclusion boxes after a randomise() step", {
@@ -522,12 +556,27 @@ test_that("as_consort_diagram() draws per-arm exclusion boxes after a randomise(
   expect_true(all(branch_excl_boxes$branch %in% arm_values))
 })
 
-test_that("as_consort_diagram() errors combining count_by with a randomise() split", {
-  flow <- make_flow_randomise()
-  expect_error(
-    as_consort_diagram(flow, count_by = "participant_id"),
-    "count_by.*randomise"
-  )
+test_that("count_by works with a randomise() split, counting each arm's units", {
+  dat  <- mock_cluster_rct(n_clusters = 8, n_participants = 200, seed = 1)
+  crit <- cf_criteria() |>
+    include(~ !is.na(age), label = "Age recorded", reason = "Age missing") |>
+    randomise(by = "cluster_id", arms = "arm") |>
+    exclude(~ withdrew, label = "Withdrew after allocation")
+  flow <- apply_criteria(dat, crit, id = "participant_id",
+                         hierarchy = cf_hierarchy(participant = "participant_id",
+                                                  cluster = "cluster_id"))
+  d <- as_consort_diagram(flow, count_by = "cluster")
+  lay <- consort_layout(d)
+  n_of <- function(lbl) as.integer(sub(".*\\(n=([0-9]+)\\).*", "\\1", lbl))
+
+  expect_equal(n_of(lay$main_boxes$label[1]), dplyr::n_distinct(stats::na.omit(dat$cluster_id)))
+  arm_boxes <- lay$branch_boxes[grepl("_label$", lay$branch_boxes$id), ]
+  entered <- dat[!is.na(dat$age), ]
+  for (i in seq_len(nrow(arm_boxes))) {
+    expect_equal(n_of(arm_boxes$label[i]),
+                 dplyr::n_distinct(entered$cluster_id[entered$arm == arm_boxes$branch[i]]))
+  }
+  expect_equal(sum(n_of(arm_boxes$label)), n_of(lay$main_boxes$label[nrow(lay$main_boxes)]))
 })
 
 test_that("as_consort_diagram() does not overlap boxes across arms after a randomise() split", {

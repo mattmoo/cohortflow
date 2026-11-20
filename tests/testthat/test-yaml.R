@@ -135,7 +135,7 @@ test_that("import_criteria() still reads the legacy fn_args format", {
     "    fn_args: d",
     sep = "\n"
   )
-  crit <- import_criteria(text = yml)
+  expect_warning(crit <- import_criteria(text = yml), class = "cohortflow_legacy_yaml")
   res  <- cohortflow:::eval_criterion(crit$steps[[1]], data.frame(age = c(1, NA)))
   expect_equal(res, c(TRUE, FALSE))
 })

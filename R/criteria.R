@@ -55,11 +55,36 @@ cf_criteria <- function(...) {
 #' always remove rows whose `by` value is `NA`. To see the raw predicate
 #' values, `NA` included, use [criteria_status()] with `mode = "independent"`.
 #'
+#' @section Labels:
+#' A step has up to two pieces of text, and diagrams put each next to the
+#' count it describes:
+#'
+#' * `label` names the step. For `include()`, `group_include()` and
+#'   `select_within()` it describes the rows **kept** ("Aged 18 or over"),
+#'   and an uncategorised step's main box in [as_consort_diagram()] shows it
+#'   with the number remaining. For `exclude()` and `group_exclude()` it
+#'   describes the rows **removed** ("Withdrew consent"), so the diagram
+#'   shows it in the exclusion box with the number removed, and the main box
+#'   below reads "Remaining (n = ...)".
+#' * `reason` describes the rows **removed**, for exclusion boxes. Exclusion
+#'   steps default to their label. For inclusion steps the label would read
+#'   backwards in an exclusion box ("Aged 18 or over (n=6)" for six people
+#'   *under* 18), so give a `reason` ("Under 18"). Without one, an
+#'   uncategorised inclusion step's exclusion box just says "Excluded", and
+#'   one listed under a category falls back to its label with a warning.
+#'
+#' Attrition tables list every step by `label`, beside a "Removed" column.
+#'
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
 #' @param predicate A one-sided formula or a function evaluated row-wise.
-#' @param label A short human-readable description of this criterion.
+#' @param label A short human-readable description of this criterion. See
+#'   the Labels section.
 #' @param category An optional string grouping this step with others for
 #'   display (e.g. `"Valid age"`). `NULL` leaves it uncategorised.
+#' @param reason An optional short description of the rows this step
+#'   removes, shown in diagram exclusion boxes. `NULL` (default) uses `label`
+#'   for exclusion steps; for inclusion steps it should be set. See the
+#'   Labels section.
 #'
 #' @return The updated `cf_criteria` object.
 #' @family criteria builders
@@ -67,11 +92,12 @@ cf_criteria <- function(...) {
 #'
 #' @examples
 #' cf_criteria() |>
-#'   include(~ age >= 18, label = "Adults", category = "Valid age")
-include <- function(criteria, predicate, label, category = NULL) {
+#'   include(~ age >= 18, label = "Adults", category = "Valid age",
+#'           reason = "Under 18")
+include <- function(criteria, predicate, label, category = NULL, reason = NULL) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label,
-                       type = "include", category = category)
+                       type = "include", category = category, reason = reason)
   criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
@@ -79,6 +105,8 @@ include <- function(criteria, predicate, label, category = NULL) {
 #' Add an exclusion criterion to a criteria pipeline
 #'
 #' @inheritSection include Missing values
+#' @inheritSection include Labels
+#' @inheritParams include
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
 #' @param predicate A one-sided formula or a function evaluated row-wise.
 #' @param label A short human-readable description of this criterion.
@@ -93,10 +121,10 @@ include <- function(criteria, predicate, label, category = NULL) {
 #' cf_criteria() |>
 #'   include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
 #'   exclude(~ withdrew, label = "Withdrew consent", category = "Consent")
-exclude <- function(criteria, predicate, label, category = NULL) {
+exclude <- function(criteria, predicate, label, category = NULL, reason = NULL) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label,
-                       type = "exclude", category = category)
+                       type = "exclude", category = category, reason = reason)
   criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
@@ -108,6 +136,7 @@ exclude <- function(criteria, predicate, label, category = NULL) {
 #' where the predicate returns `TRUE` are kept; all rows in failing groups are
 #' removed.
 #'
+#' @inheritParams include
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
 #' @param by One or more column names (character vector) to group by; supply
 #'   more than one for composite (multi-column) grouping.
@@ -125,10 +154,10 @@ exclude <- function(criteria, predicate, label, category = NULL) {
 #' @examples
 #' cf_criteria() |>
 #'   group_include(by = "cluster_id", ~ n() >= 5, label = "Cluster size >= 5")
-group_include <- function(criteria, by, predicate, label, category = NULL) {
+group_include <- function(criteria, by, predicate, label, category = NULL, reason = NULL) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label,
-                       type = "group_include", by = by, category = category)
+                       type = "group_include", by = by, category = category, reason = reason)
   criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
@@ -138,6 +167,7 @@ group_include <- function(criteria, by, predicate, label, category = NULL) {
 #' The predicate is evaluated per group; groups where the predicate returns
 #' `TRUE` are removed (all their rows dropped).
 #'
+#' @inheritParams include
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
 #' @param by One or more column names (character vector) to group by; supply
 #'   more than one for composite (multi-column) grouping.
@@ -154,10 +184,10 @@ group_include <- function(criteria, by, predicate, label, category = NULL) {
 #' cf_criteria() |>
 #'   group_exclude(by = "cluster_id", ~ mean(is.na(age)) > 0.5,
 #'                 label = "Excessive missing age in cluster")
-group_exclude <- function(criteria, by, predicate, label, category = NULL) {
+group_exclude <- function(criteria, by, predicate, label, category = NULL, reason = NULL) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label,
-                       type = "group_exclude", by = by, category = category)
+                       type = "group_exclude", by = by, category = category, reason = reason)
   criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
@@ -170,6 +200,7 @@ group_exclude <- function(criteria, by, predicate, label, category = NULL) {
 #' This is the natural way to select one (or more) records per unit, e.g. the
 #' index operation per patient.
 #'
+#' @inheritParams include
 #' @param criteria A `cf_criteria` object (or `NULL` to start a new one).
 #' @param by One or more column names (character vector) defining the
 #'   grouping (e.g. `"participant_id"`); supply more than one for composite
@@ -190,10 +221,10 @@ group_exclude <- function(criteria, by, predicate, label, category = NULL) {
 #'   select_within(by = "participant_id",
 #'                 ~ consent_date == min(consent_date, na.rm = TRUE),
 #'                 label = "Index operation per patient")
-select_within <- function(criteria, by, predicate, label, category = NULL) {
+select_within <- function(criteria, by, predicate, label, category = NULL, reason = NULL) {
   criteria <- .ensure_criteria(criteria)
   crit <- cf_criterion(predicate = predicate, label = label,
-                       type = "select_within", by = by, category = category)
+                       type = "select_within", by = by, category = category, reason = reason)
   criteria$steps <- c(criteria$steps, list(crit))
   criteria
 }
@@ -272,9 +303,10 @@ print.cf_criteria <- function(x, ...) {
       arms_str   <- if (!is.null(s$arms))     sprintf(" [arms: %s]", s$arms) else ""
       cat_str    <- if (!is.null(s$category)) sprintf(" {%s}",      s$category) else ""
       type_label <- s$type
-      cat(sprintf("  %2d. [%s][%s] (%s)%s%s%s %s\n          %s\n",
+      reason_str <- if (!is.null(s$reason)) sprintf("\n          removes: %s", s$reason) else ""
+      cat(sprintf("  %2d. [%s][%s] (%s)%s%s%s %s\n          %s%s\n",
                   i, type_sym, pred_type, type_label, by_str, arms_str, cat_str,
-                  s$label, pred_str))
+                  s$label, pred_str, reason_str))
     }
   }
   invisible(x)

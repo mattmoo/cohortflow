@@ -46,10 +46,16 @@ Use \code{final_label = "Randomised"} when appropriate. Cannot be combined
 with \code{group_x}/\code{group_y}. Rows whose branch value is \code{NA} form their own
 branch, labelled \code{branch_na_label}.}
 
-\item{count_by}{Optional column name (string) for distinct counts. When
-supplied, counts are computed as \code{n_distinct(count_by)} rather than
-\code{nrow()}. Essential for crossover data where one participant has several
-event rows.}
+\item{count_by}{Optional hierarchy level to count instead of rows: a level
+name from the flow's \code{\link[=cf_hierarchy]{cf_hierarchy()}}, or the column of a single-column
+level (e.g. \code{"participant_id"}). Every count (\code{n}, \code{n_removed},
+\code{pct_removed} and the branch columns) is then the number of distinct
+units, and a unit counts as removed at the step where it loses its last
+row. Essential for crossover and other designs with several rows per
+participant. Requires \code{apply_criteria(hierarchy = )}; without a
+hierarchy, or with a column that is not a level, it errors and says how
+to fix the call. (Before cohortflow 0.0.0.9016 \code{count_by} took any
+column and changed only the branch columns, leaving \code{n} counting rows.)}
 
 \item{group_x}{Optional column name (string), present in \code{flow$data}, used
 to repeat the attrition table across the "column" direction (e.g. trial

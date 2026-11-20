@@ -51,8 +51,8 @@ which rows are kept; the flow just records the extra counts.
 
 ```{r}
 crit <- cf_criteria() |>
-  include(~ eligible_screen, label = "Passed screening") |>
-  include(~ !is.na(consent_date), label = "Consented") |>
+  include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
+  include(~ !is.na(consent_date), label = "Consented", reason = "Did not consent") |>
   group_include(by = "cluster_id", ~ n() >= 20,
                 label = "Cluster recruited 20 or more") |>
   randomise(by = "cluster_id", arms = "arm") |>
@@ -104,7 +104,7 @@ toy <- data.frame(
 )
 toy_flow <- apply_criteria(
   toy,
-  cf_criteria() |> include(~ consented, label = "Consented"),
+  cf_criteria() |> include(~ consented, label = "Consented", reason = "Did not consent"),
   id = "pid",
   hierarchy = cf_hierarchy(participant = "pid", cluster = "cluster")
 )
@@ -148,7 +148,7 @@ h_sw <- cf_hierarchy(
 )
 
 crit_sw <- cf_criteria() |>
-  include(~ !is.na(consent_date), label = "Consented") |>
+  include(~ !is.na(consent_date), label = "Consented", reason = "Did not consent") |>
   exclude(~ withdrew, label = "Withdrew") |>
   group_include(by = c("cluster_id", "period"), ~ n() >= 8,
                 label = "Cluster-period has 8 or more")
@@ -193,8 +193,10 @@ as_characteristics_tibble(
 
 - `levels` cannot be combined with `group_x`, `group_y`, `branch_by` or
   `count_by` in the same table.
-- `as_consort_diagram()` counts rows. For a cluster trial, report cluster
-  counts in the attrition table alongside the participant-level diagram.
+- `as_consort_diagram()` draws one level at a time: rows by default, or a
+  hierarchy level with `count_by` (`count_by = "cluster"` draws a
+  cluster-flow diagram). For a cluster trial, draw the participant-level
+  diagram and report cluster counts in the attrition table alongside it.
 - `cf_hierarchy()` does not require strict nesting, but its counts are
   easiest to read when each level nests in the next.
 

@@ -13,13 +13,13 @@ library(cohortflow)
 
 dat <- mock_parallel_rct(n_participants = 300, seed = 2024)
 crit <- cf_criteria() |>
-  include(~ !is.na(age), label = "Age recorded", category = "Age") |>
-  include(~ age >= 18, label = "Aged 18 or over", category = "Age") |>
-  include(~ eligible_screen, label = "Passed screening") |>
-  include(~ !is.na(consent_date), label = "Consented") |>
+  include(~ !is.na(age), label = "Age recorded", reason = "Age missing", category = "Age") |>
+  include(~ age >= 18, label = "Aged 18 or over", reason = "Under 18", category = "Age") |>
+  include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
+  include(~ !is.na(consent_date), label = "Consented", reason = "Did not consent") |>
   randomise(by = "participant_id", arms = "arm") |>
   exclude(~ withdrew, label = "Withdrew consent") |>
-  include(~ baseline_complete, label = "Baseline complete")
+  include(~ baseline_complete, label = "Baseline complete", reason = "Baseline incomplete")
 flow <- apply_criteria(dat, crit, id = "participant_id")
 ```
 

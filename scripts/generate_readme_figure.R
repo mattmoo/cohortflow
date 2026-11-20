@@ -8,12 +8,13 @@ if (requireNamespace("pkgload", quietly = TRUE)) {
 dat <- mock_parallel_rct(n_participants = 220, seed = 7)
 
 crit <- cf_criteria() |>
-  include(~ !is.na(age), label = "Age recorded", category = "Valid age") |>
-  include(~ age >= 18, label = "Adults only", category = "Valid age") |>
-  include(~ eligible_screen, label = "Passed screening", category = "Eligible at screening") |>
+  include(~ !is.na(age), label = "Age recorded", reason = "Age missing",
+          category = "Valid age") |>
+  include(~ age >= 18, label = "Adults only", reason = "Under 18", category = "Valid age") |>
+  include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
   exclude(~ withdrew, label = "Withdrew consent")
 
-flow <- apply_criteria(dat, crit)
+flow <- apply_criteria(dat, crit, id = "participant_id")
 diagram <- as_consort_diagram(flow, title = "cohortflow CONSORT preview")
 
 dir.create("man/figures", recursive = TRUE, showWarnings = FALSE)

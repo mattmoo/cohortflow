@@ -203,7 +203,25 @@ cohort <- function(flow, flag = FALSE, at = NULL, step_number = NULL, label = NU
   }
   if (has_label) return(.step_by_label(flow, at, "at"))
   if (has_category) return(.step_by_category(flow, at, "at"))
-  rlang::abort(sprintf("`at` = \"%s\" matches no step label or category.", at))
+  rlang::abort(c(
+    sprintf("`at` = \"%s\" matches no step label or category.", at),
+    .step_number_hint(flow, at)
+  ))
+}
+
+# A string that matched no label but reads as a valid step number almost
+# always comes from mixing numbers and labels in an atomic vector
+# (`c(0, "Consented")` turns 0 into "0"). The string is not resolved as a
+# number (a label may legitimately be "1"); the error just says what to do.
+.step_number_hint <- function(flow, x) {
+  if (!grepl("^[0-9]+$", x)) return(character(0L))
+  k <- as.numeric(x)
+  if (k > length(flow$steps)) return(character(0L))
+  c("i" = sprintf(
+    paste("\"%s\" is text, not a number: c() turns numbers into text when they are mixed",
+          "with labels. Did you mean step %s? Pass a list instead, e.g. list(%s, \"<label>\")."),
+    x, x, x
+  ))
 }
 
 .step_labels <- function(flow) vapply(flow$steps, function(s) s$label, character(1L))
@@ -234,7 +252,9 @@ cohort <- function(flow, flag = FALSE, at = NULL, step_number = NULL, label = NU
     rlang::abort(sprintf("`%s` must be a single non-missing string.", arg))
   }
   hits <- .step_numbers(flow)[.step_labels(flow) == x]
-  if (length(hits) == 0L) rlang::abort(sprintf("`%s` = \"%s\" matches no step label.", arg, x))
+  if (length(hits) == 0L) {
+    rlang::abort(c(sprintf("`%s` = \"%s\" matches no step label.", arg, x), .step_number_hint(flow, x)))
+  }
   if (length(hits) > 1L) {
     rlang::abort(sprintf(
       "`%s` = \"%s\" matches %d steps by label (%s); use `step_number` instead.",

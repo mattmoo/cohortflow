@@ -4,7 +4,7 @@
 \alias{exclude}
 \title{Add an exclusion criterion to a criteria pipeline}
 \usage{
-exclude(criteria, predicate, label, category = NULL)
+exclude(criteria, predicate, label, category = NULL, reason = NULL)
 }
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
@@ -15,6 +15,11 @@ exclude(criteria, predicate, label, category = NULL)
 
 \item{category}{An optional string grouping this step with others for
 display. \code{NULL} leaves it uncategorised.}
+
+\item{reason}{An optional short description of the rows this step
+removes, shown in diagram exclusion boxes. \code{NULL} (default) uses \code{label}
+for exclusion steps; for inclusion steps it should be set. See the
+Labels section.}
 }
 \value{
 The updated \code{cf_criteria} object.
@@ -38,6 +43,29 @@ To make the intent explicit, handle \code{NA} in the predicate itself, e.g.
 Grouped steps (\code{\link[=group_include]{group_include()}}, \code{\link[=group_exclude]{group_exclude()}}, \code{\link[=select_within]{select_within()}})
 always remove rows whose \code{by} value is \code{NA}. To see the raw predicate
 values, \code{NA} included, use \code{\link[=criteria_status]{criteria_status()}} with \code{mode = "independent"}.
+}
+
+\section{Labels}{
+
+A step has up to two pieces of text, and diagrams put each next to the
+count it describes:
+\itemize{
+\item \code{label} names the step. For \code{include()}, \code{group_include()} and
+\code{select_within()} it describes the rows \strong{kept} ("Aged 18 or over"),
+and an uncategorised step's main box in \code{\link[=as_consort_diagram]{as_consort_diagram()}} shows it
+with the number remaining. For \code{exclude()} and \code{group_exclude()} it
+describes the rows \strong{removed} ("Withdrew consent"), so the diagram
+shows it in the exclusion box with the number removed, and the main box
+below reads "Remaining (n = ...)".
+\item \code{reason} describes the rows \strong{removed}, for exclusion boxes. Exclusion
+steps default to their label. For inclusion steps the label would read
+backwards in an exclusion box ("Aged 18 or over (n=6)" for six people
+\emph{under} 18), so give a \code{reason} ("Under 18"). Without one, an
+uncategorised inclusion step's exclusion box just says "Excluded", and
+one listed under a category falls back to its label with a warning.
+}
+
+Attrition tables list every step by \code{label}, beside a "Removed" column.
 }
 
 \examples{

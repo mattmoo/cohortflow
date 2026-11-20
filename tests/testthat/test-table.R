@@ -469,12 +469,30 @@ test_that("branch_by errors when column not found", {
   )
 })
 
-test_that("count_by requires branch_by", {
+test_that("count_by counts every row at the hierarchy level, without branch_by", {
   flow <- make_flow_crossover()
-  expect_error(
-    as_attrition_tibble(flow, count_by = "participant_id"),
-    "requires.*branch_by"
-  )
+  out  <- as_attrition_tibble(flow, count_by = "participant_id")
+  rows <- as_attrition_tibble(flow)
+  expect_identical(out$label, rows$label)
+  expect_equal(out$n[out$row_type == "header"], dplyr::n_distinct(flow$data$participant_id))
+  expect_equal(out$n[out$row_type == "final"], dplyr::n_distinct(cohort(flow)$participant_id))
+  # removals add up: header minus every removal is the final count
+  step_removed <- sum(out$n_removed[out$row_type == "step"])
+  expect_equal(out$n[out$row_type == "header"] - step_removed,
+               out$n[out$row_type == "final"])
+  # each step row matches the participant-level counts apply_criteria() kept
+  per_level <- as_attrition_tibble(flow, levels = "participant")
+  expect_equal(out$n, per_level$n)
+})
+
+test_that("count_by counts units lost with their group as removed", {
+  flow <- make_flow_hierarchy()   # has a group_include() by cluster
+  out  <- as_attrition_tibble(flow, count_by = "participant")
+  grp  <- out[out$label == "Cluster size >= 15", ]
+  hc   <- flow$steps[[3]]$hierarchy_counts
+  hc   <- hc[hc$level == "participant", ]
+  expect_equal(grp$n_removed, hc$n_consequential + hc$n_fail)
+  expect_gt(grp$n_removed, 0L)
 })
 
 test_that("count_by uses distinct counts", {
@@ -497,11 +515,19 @@ test_that("count_by uses distinct counts", {
   }
 })
 
-test_that("count_by errors when column not found", {
+test_that("count_by errors, with the fix, when the flow has no hierarchy or no such level", {
   flow <- make_flow_parallel_rct()
   expect_error(
-    as_attrition_tibble(flow, branch_by = "arm", count_by = "nonexistent"),
-    "not found"
+    as_attrition_tibble(flow, branch_by = "arm", count_by = "participant_id"),
+    "needs a flow built with a hierarchy", class = "cohortflow_count_by_hierarchy"
+  )
+  expect_error(
+    as_attrition_table(flow, branch_by = "arm", count_by = "participant_id"),
+    class = "cohortflow_count_by_hierarchy"
+  )
+  expect_error(
+    as_attrition_tibble(make_flow_crossover(), count_by = "nonexistent"),
+    "is not a level of the flow's hierarchy", class = "cohortflow_count_by_hierarchy"
   )
 })
 

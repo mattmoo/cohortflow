@@ -4,7 +4,7 @@
 \alias{group_include}
 \title{Add a group-level inclusion criterion}
 \usage{
-group_include(criteria, by, predicate, label, category = NULL)
+group_include(criteria, by, predicate, label, category = NULL, reason = NULL)
 }
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
@@ -20,6 +20,11 @@ data frame and returns a tibble with columns \verb{<by>} and \code{.pass}.}
 
 \item{category}{An optional string grouping this step with others for
 display. \code{NULL} leaves it uncategorised.}
+
+\item{reason}{An optional short description of the rows this step
+removes, shown in diagram exclusion boxes. \code{NULL} (default) uses \code{label}
+for exclusion steps; for inclusion steps it should be set. See the
+Labels section.}
 }
 \value{
 The updated \code{cf_criteria} object.

@@ -1,3 +1,58 @@
+# cohortflow 0.0.0.9016
+
+## Breaking changes
+
+* CONSORT diagrams put every number beside text that describes those
+  people. An uncategorised `exclude()` or `group_exclude()` step's label now
+  appears in its exclusion box with the number removed ("Withdrew consent
+  (n=4)"), and the main box below it reads "Remaining (n=118)". Previously
+  the main box showed "Withdrew consent (n=118)", which read as 118
+  withdrawals. The new `remaining_label` argument changes that text.
+  `include()`-type steps keep their label on the main box.
+* `count_by` now counts distinct units in every box and row, not only the
+  arm boxes and columns. In `as_attrition_tibble()`, `as_attrition_table()`
+  and `as_consort_diagram()`, `n`, `n_removed` and the percentages all count
+  units, so a crossover trial reports participants throughout instead of
+  participant-periods in the trunk and participants in the arms. A unit
+  counts as removed at the step where it loses its last row. `count_by` must
+  name a level of the flow's hierarchy (a level name, or the column of a
+  single-column level), so the flow needs `apply_criteria(hierarchy = )`.
+  Old calls without a hierarchy, or naming a column that is not a level,
+  fail with an error (class `cohortflow_count_by_hierarchy`) that explains
+  the change and shows the `cf_hierarchy()` call to add.
+
+## New features
+
+* `include()`, `exclude()`, `group_include()`, `group_exclude()`,
+  `select_within()` and `cf_criterion()` gain `reason`: a description of the
+  rows the step removes ("Under 18" for `include(~ age >= 18, "Aged 18 or
+  over")`). Diagram exclusion boxes use it. Exclusion steps default to their
+  label. An inclusion step without one gets an exclusion box that says
+  "Excluded". If it is listed in a category's exclusion box, its label is
+  used and `as_consort_diagram()` warns (class `cohortflow_missing_reason`,
+  at most every 8 hours; `options(cohortflow.warn_missing_reason = FALSE)`
+  turns it off). `reason` is printed with the pipeline and round-trips
+  through `export_criteria()` / `import_criteria()`; it is written only when
+  set, so other files are unchanged. Flows built before `reason` existed
+  still draw.
+* `count_by` no longer requires `branch_by`, and works with a `randomise()`
+  split (each arm's cascade counts the same units as the trunk).
+
+## Better messages for old usage
+
+* A step selector such as `steps = c(0, "Consented")` turns `0` into the
+  text `"0"`, which matches no step. The error now says so and suggests
+  `list(0, "Consented")`. This applies wherever steps are selected
+  (`cohort()`, `excluded()`, `as_characteristics_tibble()`,
+  `stack_cohorts()`). A step labelled `"1"` still resolves by label.
+* `import_criteria()` warns (class `cohortflow_legacy_yaml`) when a file
+  uses the pre-0.0.0.9011 `fn_args` format, naming the step, explaining
+  that default argument values were not stored, and giving the call to
+  re-save the file. A file with a schema `version` newer than 1 is refused
+  with a message to update the package, instead of being misread.
+* The `mock_cohortflow()` deprecation warning lists which generator suits
+  which design, and has class `cohortflow_deprecated`.
+
 # cohortflow 0.0.0.9015
 
 ## Documentation

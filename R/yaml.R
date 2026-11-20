@@ -15,7 +15,11 @@
 #'       expr:   "age >= 18"
 #'       fn_ref: null
 #'       category: null
+#'       reason: "Under 18"   # only written when set
 #' ```
+#'
+#' A file with a higher `version` than this package reads is refused with an
+#' error.
 #'
 #' Formula-based criteria round-trip cleanly. For function predicates
 #' (`kind: function`), `expr` holds the full deparsed function source,
@@ -24,7 +28,8 @@
 #' round-trip and a warning is issued. Named exported functions can be stored
 #' as `"pkg::name"` references via `fn_refs`. Files written by earlier
 #' versions, which stored the function body in `expr` and the argument names
-#' in a separate `fn_args` field, can still be imported.
+#' in a separate `fn_args` field, can still be imported, with a warning that
+#' default argument values were not stored and the file should be re-saved.
 #'
 #' @param criteria A `cf_criteria` object.
 #' @param path A file path to write to. If `NULL` (default), the YAML text is
@@ -57,7 +62,13 @@ export_criteria <- function(criteria, path = NULL, fn_refs = list()) {
     rlang::abort("`criteria` must be a `cf_criteria` object.")
   }
 
-  steps_list <- lapply(criteria$steps, .criterion_to_list, fn_refs = fn_refs)
+  steps_list <- lapply(criteria$steps, function(crit) {
+    out <- .criterion_to_list(crit, fn_refs = fn_refs)
+    # Written only when set, so files for pipelines without a `reason` are
+    # unchanged and still readable by earlier versions.
+    if (!is.null(crit$reason)) out$reason <- crit$reason
+    out
+  })
 
   doc <- list(
     cohortflow_criteria = list(
@@ -131,8 +142,19 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     ))
   }
 
-  doc   <- raw$cohortflow_criteria
-  steps <- lapply(doc$steps, .list_to_criterion, envir = envir)
+  doc     <- raw$cohortflow_criteria
+  version <- rlang::`%||%`(doc$version, 1L)
+  if (!is.numeric(version) || length(version) != 1L || is.na(version) || version > 1) {
+    rlang::abort(c(
+      sprintf("Criteria file has schema version %s; this version of cohortflow reads version 1.",
+              paste(format(version), collapse = ", ")),
+      "i" = "It was probably written by a newer cohortflow. Update the package to import it."
+    ))
+  }
+
+  steps <- lapply(seq_along(doc$steps), function(i) {
+    .list_to_criterion(doc$steps[[i]], envir = envir, step = i, path = path)
+  })
   do.call(cf_criteria, steps)
 }
 
@@ -208,7 +230,7 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
   )
 }
 
-.list_to_criterion <- function(s, envir = parent.frame()) {
+.list_to_criterion <- function(s, envir = parent.frame(), step = NA_integer_, path = NULL) {
   kind     <- rlang::`%||%`(s$kind, "formula")
   by_val   <- rlang::`%||%`(s$by,   NULL)
   arms_val <- rlang::`%||%`(s$arms, NULL)
@@ -229,6 +251,18 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
     } else if (!is.null(s$fn_args)) {
       # Legacy format: `expr` holds only the body and `fn_args` the
       # argument names, so the function is rebuilt from the two parts.
+      # Default argument values were not stored, so they are lost.
+      rlang::warn(c(
+        sprintf("Step %d (\"%s\") uses the old `fn_args` criteria-file format.", step, s$label),
+        "i" = paste("Files written by cohortflow before 0.0.0.9011 stored only the function",
+                    "body and argument names, so default argument values were lost."),
+        "i" = sprintf("Re-save the file to upgrade it: %s",
+                      if (is.null(path)) {
+                        "export_criteria(import_criteria(text = <yaml>), path = <file>)."
+                      } else {
+                        sprintf("export_criteria(import_criteria(\"%s\"), \"%s\").", path, path)
+                      })
+      ), class = "cohortflow_legacy_yaml")
       args_str <- if (nzchar(s$fn_args)) s$fn_args else "d"
       fn_text  <- sprintf("function(%s) %s", args_str, s$expr)
       pred     <- eval(parse(text = fn_text, keep.source = FALSE), envir = envir)
@@ -239,5 +273,5 @@ import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
   }
 
   cf_criterion(predicate = pred, label = s$label, type = s$type, by = by_val,
-               category = s$category, arms = arms_val)
+               category = s$category, arms = arms_val, reason = s$reason)
 }

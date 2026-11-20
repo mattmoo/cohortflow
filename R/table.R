@@ -84,10 +84,16 @@
 #'   Use `final_label = "Randomised"` when appropriate. Cannot be combined
 #'   with `group_x`/`group_y`. Rows whose branch value is `NA` form their own
 #'   branch, labelled `branch_na_label`.
-#' @param count_by Optional column name (string) for distinct counts. When
-#'   supplied, counts are computed as `n_distinct(count_by)` rather than
-#'   `nrow()`. Essential for crossover data where one participant has several
-#'   event rows.
+#' @param count_by Optional hierarchy level to count instead of rows: a level
+#'   name from the flow's [cf_hierarchy()], or the column of a single-column
+#'   level (e.g. `"participant_id"`). Every count (`n`, `n_removed`,
+#'   `pct_removed` and the branch columns) is then the number of distinct
+#'   units, and a unit counts as removed at the step where it loses its last
+#'   row. Essential for crossover and other designs with several rows per
+#'   participant. Requires `apply_criteria(hierarchy = )`; without a
+#'   hierarchy, or with a column that is not a level, it errors and says how
+#'   to fix the call. (Before cohortflow 0.0.0.9016 `count_by` took any
+#'   column and changed only the branch columns, leaving `n` counting rows.)
 #' @param group_x Optional column name (string), present in `flow$data`, used
 #'   to repeat the attrition table across the "column" direction (e.g. trial
 #'   site). See the Grouping section.
@@ -211,10 +217,6 @@ as_attrition_tibble <- function(
       rlang::abort(sprintf("Column `%s` not found in surviving cohort.", branch_by))
     }
   }
-  if (!is.null(count_by) && is.null(branch_by)) {
-    rlang::abort("`count_by` requires `branch_by` to be specified.")
-  }
-
   .attrition_tibble_core(
     flow, show_categories, assessed_label, final_label, digits,
     branch_by, count_by, branch_na_label
@@ -234,6 +236,14 @@ as_attrition_tibble <- function(
   digits  <- as.integer(digits)
   steps   <- flow$steps
   n_start <- nrow(flow$data)
+  count_cols <- NULL
+  if (!is.null(count_by)) {
+    # Every row counts distinct units at the `count_by` hierarchy level.
+    lvl        <- .resolve_count_level(flow, count_by)
+    count_cols <- lvl$cols
+    steps      <- .steps_counted_at_level(steps, lvl$level)
+    n_start    <- length(.level_unit_keys(flow$data, count_cols))
+  }
   n_end   <- n_start - sum(vapply(steps, `[[`, integer(1L), "n_fail"))
   randomise_step_num <- if (!is.null(randomise_step)) randomise_step$step else NA_integer_
 
@@ -279,10 +289,76 @@ as_attrition_tibble <- function(
 
   # -- Branch columns ---------------------------------------------------------
   if (!is.null(branch_by)) {
-    out <- .attrition_add_branch_columns(out, flow, branch_by, count_by, branch_na_label)
+    out <- .attrition_add_branch_columns(out, flow, branch_by, count_cols, branch_na_label)
   }
 
   out
+}
+
+# Resolves `count_by` to a level of `flow$hierarchy`: a level name, or the
+# column of a single-column level. Counting distinct units needs per-step
+# unit counts, which apply_criteria() records only when given a hierarchy.
+# Before 0.0.0.9016 `count_by` was any column and changed only the branch
+# counts, so old calls land here; the errors say how to update them.
+.resolve_count_level <- function(flow, count_by) {
+  example <- sprintf(
+    "apply_criteria(data, criteria, hierarchy = cf_hierarchy(unit = \"%s\"))", count_by
+  )
+  why <- paste(
+    "`count_by` counts distinct units in every box and row (not only the arm",
+    "counts), using the per-step unit counts that `apply_criteria(hierarchy = )` records."
+  )
+  hierarchy <- flow$hierarchy
+  if (is.null(hierarchy)) {
+    rlang::abort(c(
+      sprintf("`count_by = \"%s\"` needs a flow built with a hierarchy.", count_by),
+      "i" = why,
+      "i" = sprintf("Rebuild the flow, e.g. %s.", example)
+    ), class = "cohortflow_count_by_hierarchy")
+  }
+
+  idx <- match(count_by, names(hierarchy))
+  if (is.na(idx)) {
+    idx <- which(vapply(hierarchy, function(cols) identical(unname(cols), count_by), logical(1L)))[1L]
+  }
+  if (is.na(idx)) {
+    levels_str <- paste0(
+      names(hierarchy), " (", vapply(hierarchy, paste, character(1L), collapse = " + "), ")",
+      collapse = ", "
+    )
+    rlang::abort(c(
+      sprintf("`count_by = \"%s\"` is not a level of the flow's hierarchy.", count_by),
+      "x" = sprintf("The hierarchy has: %s.", levels_str),
+      "i" = "Pass a level name, or the column of a single-column level.",
+      "i" = why,
+      "i" = sprintf("To count by another column, add it to `cf_hierarchy()`, e.g. %s.", example)
+    ), class = "cohortflow_count_by_hierarchy")
+  }
+
+  steps <- flow$steps
+  if (length(steps) > 0L && is.null(steps[[1L]]$hierarchy_counts)) {
+    rlang::abort(c(
+      sprintf("`count_by = \"%s\"` needs per-level counts, which `flow` does not have.", count_by),
+      "i" = "Re-run `apply_criteria()` with `hierarchy = ` (flows saved by older versions lack them)."
+    ), class = "cohortflow_count_by_hierarchy")
+  }
+
+  list(level = names(hierarchy)[idx], cols = hierarchy[[idx]])
+}
+
+# Step records with their row counts replaced by one hierarchy level's unit
+# counts. A unit counts as removed at a step when it loses its last row there,
+# whether it failed the step itself or its group did (`n_consequential`), so
+# the boxes still add up: each step's removals take n_in down to n_pass.
+.steps_counted_at_level <- function(steps, level) {
+  lapply(steps, function(s) {
+    hc <- s$hierarchy_counts
+    hc <- hc[hc$level == level, , drop = FALSE]
+    s$n_in   <- hc$n_risk[[1L]]
+    s$n_pass <- hc$n_pass[[1L]]
+    s$n_fail <- hc$n_risk[[1L]] - hc$n_pass[[1L]]
+    s
+  })
 }
 
 
@@ -395,19 +471,12 @@ as_attrition_tibble <- function(
 # rather than adding extra rows below it. Rows with an `NA` branch value form
 # their own column, named `branch_na_label`, so the branch columns always sum
 # to the final row's total.
-.attrition_add_branch_columns <- function(tbl, flow, branch_by, count_by,
+.attrition_add_branch_columns <- function(tbl, flow, branch_by, count_cols = NULL,
                                           branch_na_label = "Missing") {
   cohort_data <- cohort(flow)
 
-  # Count function: distinct count_by or nrow
-  count_fn <- if (!is.null(count_by)) {
-    if (!count_by %in% names(cohort_data)) {
-      rlang::abort(sprintf("Column `%s` not found in surviving cohort.", count_by))
-    }
-    function(d) dplyr::n_distinct(d[[count_by]])
-  } else {
-    nrow
-  }
+  # Count function: distinct units at the `count_by` level, or rows
+  count_fn <- .count_fn(count_cols)
 
   # Split cohort by branch_by (an NA branch, if any, comes last)
   branch_values <- .cf_group_values(cohort_data[[branch_by]])
@@ -442,6 +511,13 @@ as_attrition_tibble <- function(
   }
 
   tbl
+}
+
+# Counts rows, or with `count_cols` (a hierarchy level's columns) distinct
+# complete units, matching the per-level counts of `.hierarchy_step_counts()`.
+.count_fn <- function(count_cols = NULL) {
+  if (is.null(count_cols)) return(nrow)
+  function(d) length(.level_unit_keys(d, count_cols))
 }
 
 # Build one step row. `pct_denom` is the denominator used for `pct_removed`

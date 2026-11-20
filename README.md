@@ -56,10 +56,10 @@ dat <- mock_parallel_rct(n_participants = 200, seed = 1)
 
 # Define criteria pipeline
 crit <- cf_criteria() |>
-  include(~ !is.na(age),     label = "Age recorded",    category = "Age") |>
-  include(~ age >= 18,       label = "Adults only",     category = "Age") |>
-  include(~ eligible_screen, label = "Passed screening", category = "Screening") |>
-  exclude(~ withdrew,        label = "Withdrew consent")
+  include(~ !is.na(age), label = "Age recorded", reason = "Age missing", category = "Age") |>
+  include(~ age >= 18,   label = "Adults only",  reason = "Under 18",    category = "Age") |>
+  include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
+  exclude(~ withdrew, label = "Withdrew consent")
 
 # Apply criteria
 flow <- apply_criteria(dat, crit)

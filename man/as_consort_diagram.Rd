@@ -26,7 +26,8 @@ as_consort_diagram(
   stage_by = NULL,
   stage_label_by = NULL,
   count_by = NULL,
-  branch_na_label = "Missing"
+  branch_na_label = "Missing",
+  remaining_label = "Remaining"
 )
 }
 \arguments{
@@ -106,16 +107,23 @@ stage-specific nodes are drawn.}
 \item{stage_label_by}{Optional column name (string) providing labels for
 each stage (e.g. crossover \code{arm}). Ignored when \code{stage_by} is \code{NULL}.}
 
-\item{count_by}{Optional column name (string) for distinct counts. When
-supplied, counts are computed as \code{n_distinct(count_by)} rather than
-\code{nrow()}. Essential for crossover data where one participant has
-several event rows. Not currently supported together with a
-\code{randomise()}-driven split (per-arm cascades always use row counts).}
+\item{count_by}{Optional hierarchy level to count instead of rows: a level
+name from the flow's \code{\link[=cf_hierarchy]{cf_hierarchy()}}, or the column of a single-column
+level (e.g. \code{"participant_id"}). Every box, trunk, arms and stages, then
+counts distinct units, so a crossover trial reports participants rather
+than participant-periods throughout. Requires
+\code{apply_criteria(hierarchy = )}; see \code{\link[=as_attrition_tibble]{as_attrition_tibble()}}.}
 
 \item{branch_na_label}{Character string used to label the branch formed by
 \code{NA} values in \code{branch_by} (and, in \code{\link[=as_consort_diagram]{as_consort_diagram()}}, the stage
 formed by \code{NA} values in \code{stage_by}). Default \code{"Missing"}. Ignored when
 the column has no \code{NA} values.}
+
+\item{remaining_label}{Text for the main box below an uncategorised
+\code{\link[=exclude]{exclude()}} or \code{\link[=group_exclude]{group_exclude()}} step. That step's label describes the
+rows it removed, so it appears in the exclusion box beside the number
+removed, and the main box shows this text beside the number remaining.
+Default \code{"Remaining"}.}
 }
 \value{
 A \code{consort_diagram} object (a \code{ggplot2} \code{ggplot}), drawable via
@@ -142,14 +150,35 @@ with \code{+} and further \code{ggplot2} layers/themes, or written to a PNG, TIF
 PDF, SVG or EPS file sized to fit its layout with
 \code{\link[=save_consort_diagram]{save_consort_diagram()}}.
 }
+\section{Box text}{
+
+Each main box shows the number remaining after its step, and each
+exclusion box the number removed, each beside text describing those rows:
+\itemize{
+\item An uncategorised \code{\link[=include]{include()}}-type step keeps its label on the main box
+("Aged 18 or over (n=194)"). Its exclusion box shows the step's
+\code{reason} if set ("Under 18 (n=6)"), else "Excluded (n=6)".
+\item An uncategorised \code{\link[=exclude]{exclude()}}-type step's label goes in the exclusion box
+("Withdrew consent (n=4)") and the main box reads \code{remaining_label}
+("Remaining (n=118)").
+\item A category's main box shows the category name. Its exclusion box lists
+each step by \code{reason}, falling back to the label; an inclusion step
+without a \code{reason} reads backwards there, so this case warns (at most
+every 8 hours; \code{options(cohortflow.warn_missing_reason = FALSE)} turns
+the warning off).
+}
+}
+
 \examples{
 dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 crit <- cf_criteria() |>
-  include(~ !is.na(age),          label = "Age recorded",    category = "Valid age") |>
-  include(~ age >= 18,            label = "Adults only",     category = "Valid age") |>
-  include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
-  exclude(~ withdrew,             label = "Withdrew consent", category = "Consent")
-flow <- apply_criteria(dat, crit)
+  include(~ !is.na(age), label = "Age recorded", category = "Valid age",
+          reason = "Age missing") |>
+  include(~ age >= 18, label = "Adults only", category = "Valid age",
+          reason = "Under 18") |>
+  include(~ !is.na(consent_date), label = "Consent recorded", reason = "No consent") |>
+  exclude(~ withdrew, label = "Withdrew consent")
+flow <- apply_criteria(dat, crit, id = "participant_id")
 as_consort_diagram(flow)
 }
 \seealso{

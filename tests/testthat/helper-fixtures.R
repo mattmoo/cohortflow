@@ -61,7 +61,10 @@ make_flow_crossover <- function() {
     include(~ eligible_screen,      label = "Passed screening", category = "Eligible at screening") |>
     include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
     exclude(~ withdrew,             label = "Withdrew consent", category = "Consent")
-  apply_criteria(dat, crit, id = "event_id")
+  # The participant level lets `count_by = "participant_id"` count people
+  # rather than participant-periods.
+  apply_criteria(dat, crit, id = "event_id",
+                 hierarchy = cf_hierarchy(participant = "participant_id"))
 }
 
 make_flow_cluster_rct <- function() {

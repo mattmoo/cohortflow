@@ -81,11 +81,16 @@ utils::globalVariables(c(
 # Emit a one-time-per-session deprecation warning for mock_cohortflow().
 .deprecate_mock_cohortflow <- function() {
   rlang::warn(
-    paste(
-      "`mock_cohortflow()` is deprecated. Use a design-specific generator",
-      "instead: mock_parallel_rct(), mock_crossover(), mock_cluster_rct(),",
-      "or mock_stepped_wedge()."
+    c(
+      "`mock_cohortflow()` is deprecated and will be removed in a future version.",
+      "i" = paste("Use the generator for your design; each adds an `arm` column and",
+                  "the design's structure, which `mock_cohortflow()` never modelled:"),
+      "*" = "mock_parallel_rct(): individually randomised parallel-group trial.",
+      "*" = "mock_cluster_rct(): clusters randomised (the closest match for `n_periods = 1`).",
+      "*" = "mock_stepped_wedge(): clusters crossing over in periods (for `n_periods > 1`).",
+      "*" = "mock_crossover(): each participant receives every arm, one row per period."
     ),
+    class         = c("cohortflow_deprecated", "lifecycle_warning_deprecated"),
     .frequency    = "once",
     .frequency_id = "cohortflow_mock_cohortflow_deprecated"
   )
