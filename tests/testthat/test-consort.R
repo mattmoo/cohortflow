@@ -307,6 +307,38 @@ test_that("crossover branching with stage_by creates stage boxes", {
   expect_gt(nrow(consort_layout(d)$stage_boxes), 0L)
 })
 
+test_that("stage boxes stack below their branch box without overlapping", {
+  flow <- make_flow_crossover()
+  for (ww in list(NULL, 4L)) {
+    d <- as_consort_diagram(
+      flow,
+      branch_by = "sequence",
+      stage_by = "period",
+      stage_label_by = "arm",
+      count_by = "participant_id",
+      wrap_width = ww
+    )
+    lay <- consort_layout(d)
+    for (br in unique(lay$stage_boxes$branch)) {
+      st <- lay$stage_boxes[lay$stage_boxes$branch == br, ]
+      st <- st[order(-st$y), ]
+      parent <- lay$branch_boxes[lay$branch_boxes$label == br |
+                                   startsWith(lay$branch_boxes$label, paste0(br, "\n")), ]
+      tops <- st$y + st$h / 2
+      bottoms <- st$y - st$h / 2
+      # first stage sits wholly below the branch box
+      expect_lt(tops[1], parent$y[1] - parent$h[1] / 2)
+      # consecutive stages leave a positive gap
+      if (nrow(st) > 1L) {
+        expect_true(all(bottoms[-nrow(st)] > tops[-1]))
+      }
+      # every stage arrow has positive length (points downwards)
+      arr <- lay$stage_arrows[startsWith(lay$stage_arrows$id, "stage_arrow_"), ]
+      expect_true(all(arr$y0 > arr$y1))
+    }
+  }
+})
+
 test_that("count_by uses distinct counts", {
   flow <- make_flow_crossover()
   d <- as_consort_diagram(

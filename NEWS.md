@@ -1,3 +1,12 @@
+# cohortflow 0.0.0.9015
+
+## Bug fixes
+
+* `as_consort_diagram(stage_by = )` no longer draws stage boxes on top of
+  each other. Stages (e.g. crossover periods) now stack below their branch
+  box with the same gap as the rest of the diagram, and a wrapped label
+  pushes later stages down instead of overlapping them.
+
 # cohortflow 0.0.0.9014
 
 ## New features
