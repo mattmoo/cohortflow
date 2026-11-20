@@ -10,12 +10,16 @@
 Define and apply inclusion/exclusion criteria for cohort studies, then generate transparent attrition outputs for reporting.
 
 `cohortflow` helps you:
+
 - Build readable criteria pipelines with formulas or functions
 - Apply criteria step-by-step to a dataset
 - Extract final cohort and excluded records
 - Produce attrition tables as a tibble or formatted table (`flextable`, `gt`, `huxtable`), including per-hierarchy-level CONSORT cluster reporting
-- Render a CONSORT-style flow diagram summarising participant flow
+- Render a CONSORT-style flow diagram summarising participant flow, split by arm after randomisation
+- Describe the cohort, or the people removed, at every step with a step-wise "Table 1"
 - Export/import criteria pipelines as YAML for reproducibility
+
+Documentation and worked examples: <https://mattmoo.github.io/cohortflow/>
 
 ## Installation
 
@@ -53,7 +57,6 @@ dat <- mock_parallel_rct(n_participants = 200, seed = 1)
 # Define criteria pipeline
 crit <- cf_criteria() |>
   include(~ !is.na(age),     label = "Age recorded",    category = "Age") |>
-
   include(~ age >= 18,       label = "Adults only",     category = "Age") |>
   include(~ eligible_screen, label = "Passed screening", category = "Screening") |>
   exclude(~ withdrew,        label = "Withdrew consent")
@@ -88,151 +91,33 @@ Example CONSORT flow diagram generated from `as_consort_diagram(flow)`:
 
 ![CONSORT diagram preview](man/figures/consort-diagram-preview.png)
 
-Regenerate this figure:
+## Learn more
 
-```r
-source("scripts/generate_readme_figure.R")
-```
+The [package website](https://mattmoo.github.io/cohortflow/) has the full
+[function reference](https://mattmoo.github.io/cohortflow/reference/) and these articles:
 
-## Attrition table backends
-
-`as_attrition_table()` supports:
-- `backend = "flextable"` for Word-friendly outputs
-- `backend = "gt"` for HTML/LaTeX/Word workflows
-- `backend = "huxtable"` for multi-format table output
-
-Optional backends are in `Suggests`, so install the ones you plan to use.
-
-## Grouped attrition tables
-
-For designs with a natural cross-tabulation -- for example a stepped-wedge
-trial with sites and periods -- `as_attrition_tibble()` and
-`as_attrition_table()` accept `group_x` and `group_y` to repeat the full
-attrition block once per group, arranged as columns (`group_x`) and/or row
-blocks (`group_y`):
-
-```r
-dat  <- mock_stepped_wedge(n_clusters = 6, n_sites = 2, n_periods = 3)
-crit <- cf_criteria() |>
-  include(~ !is.na(age), label = "Age recorded") |>
-  exclude(~ withdrew,    label = "Withdrew consent")
-flow <- apply_criteria(dat, crit, id = "event_id")
-
-ft <- as_attrition_table(
-  flow,
-  backend       = "flextable",
-  group_x       = "site_id",
-  group_y       = "period",
-  group_x_label = "Site",
-  group_y_label = "Period"
-)
-```
-
-Cells can be shaded based on a column (e.g. `pct_removed` or `n_removed`)
-via `shade`, or with a custom function via `shade_fn` for full control over
-which rows are highlighted and with what colour:
-
-```r
-# Shade by percentage removed using a colour ramp
-as_attrition_table(flow, shade = "pct_removed")
-
-# Custom rule: highlight steps that removed >5% of the cohort
-as_attrition_table(
-  flow,
-  shade_fn = function(tbl) {
-    ifelse(tbl$row_type == "step" & !is.na(tbl$pct_removed) & tbl$pct_removed > 5,
-           "#FFCCCC", NA_character_)
-  }
-)
-```
-
-## Step-wise characteristics (Table 1 by step)
-
-`as_characteristics_table()` summarises chosen variables for the cohort at
-each step: variables as rows, one column per criteria step headed by the
-step label and its `n`. Numeric variables show mean (SD) and/or median
-[Q1, Q3]; factor, character and logical variables show n (%). `steps` takes
-the same selectors as `cohort()`, and `excluded = TRUE` describes the rows
-removed *at* each step instead, the usual supplementary table of excluded
-participants:
-
-```r
-as_characteristics_table(
-  flow,
-  vars       = c("age", "sex", "withdrew"),
-  var_labels = c(age = "Age, years", sex = "Sex"),
-  numeric    = c("mean_sd", "median_iqr")
-)
-
-# Just the starting data and the final cohort, as a plain tibble
-as_characteristics_tibble(flow, vars = "age", steps = c(0, "Withdrew consent"),
-                          wide = TRUE)
-```
-
-`as_characteristics_tibble()` is the underlying data layer; `stack_cohorts()`
-returns the per-step cohorts stacked with a `step` factor for other
-summary-table packages, e.g.
-`gtsummary::tbl_summary(stack_cohorts(flow), by = step, include = c(age, sex))`.
-
-## Hierarchy levels (cluster / within-person CONSORT)
-
-For designs where observational units nest inside a coarser unit -- a
-cluster-randomised trial (participants inside clusters) or a within-person
-design (trials inside participants) -- pass `hierarchy` to `apply_criteria()`
-via `cf_hierarchy()`, then request per-level attrition with `levels`. This is
-the reporting form required by the CONSORT cluster extension (Campbell,
-Elbourne & Altman, BMJ 2004;328:702-8): losses at each stage counted at both
-the unit of analysis and the unit of recruitment.
-
-```r
-cl <- mock_cluster_rct(n_clusters = 20, seed = 1)
-h  <- cf_hierarchy(participant = "participant_id", cluster = "cluster_id")
-
-crit <- cf_criteria() |>
-  include(~ !is.na(age), label = "Age recorded") |>
-  group_exclude(by = "cluster_id", ~ dplyr::n() < 10, label = "Cluster too small") |>
-  exclude(~ withdrew,    label = "Withdrew consent")
-
-flow_cl <- apply_criteria(cl, crit, hierarchy = h)
-
-# Plain tibble: one stacked block per level
-as_attrition_tibble(flow_cl, levels = c("participant", "cluster"))
-
-# Formatted table: one column block per level on the same row
-as_attrition_table(
-  flow_cl,
-  levels       = c("participant", "cluster"),
-  level_labels = c(participant = "Participants", cluster = "Clusters")
-)
-```
-
-Each criterion row reads across both levels at once, e.g. *"Cluster too
-small -- 42 participants removed, 3 clusters removed"*. Shading
-(`shade`/`shade_fn`) is computed per level. `levels` cannot be combined with
-`group_x`/`group_y`/`branch_by`/`count_by`.
-
-## Reproducibility with YAML
-
-```r
-# Export criteria pipeline
-export_criteria(crit, path = "criteria.yml")
-
-# Re-import later
-crit2 <- import_criteria(path = "criteria.yml")
-```
+- [Get started](https://mattmoo.github.io/cohortflow/articles/cohortflow.html):
+  one trial from raw data to diagram, table and YAML.
+- [Writing criteria](https://mattmoo.github.io/cohortflow/articles/writing-criteria.html):
+  formula and function predicates, categories, missing values, grouped
+  steps and the randomisation point.
+- [Attrition tables](https://mattmoo.github.io/cohortflow/articles/attrition-tables.html):
+  the three table backends, site-by-period grids, shading and arm columns.
+- [CONSORT diagrams](https://mattmoo.github.io/cohortflow/articles/consort-diagrams.html):
+  styling, per-arm cascades after randomisation, crossover periods and
+  saving figures for journals.
+- [Describing who was excluded](https://mattmoo.github.io/cohortflow/articles/describing-exclusions.html):
+  step-wise Table 1, overlapping exclusion reasons and gtsummary.
+- [Staged pipelines and missing units](https://mattmoo.github.io/cohortflow/articles/staged-pipelines.html):
+  units with no record, two-stage eligibility and intermediate cohorts.
+- [Hierarchical and cluster designs](https://mattmoo.github.io/cohortflow/articles/hierarchical-designs.html):
+  clusters and participants counted side by side (CONSORT cluster extension).
+- [Study design gallery](https://mattmoo.github.io/cohortflow/articles/design-gallery.html):
+  parallel, crossover, cluster and stepped-wedge trials end to end.
 
 ## Package workflow at a glance
 
-```mermaid
-flowchart LR
-  A[Define criteria\ncf_criteria + include/exclude] --> B[Apply\napply_criteria]
-  B --> C[Final cohort\ncohort]
-  B --> D[Excluded records\nexcluded]
-  B --> E[Attrition tibble\nas_attrition_tibble]
-  E --> F[Formatted table\nas_attrition_table]
-  E --> H[CONSORT diagram\nas_consort_diagram]
-  A --> G[YAML export/import\nexport_criteria / import_criteria]
-```
+![cohortflow workflow: define criteria, apply them, then report](man/figures/workflow.svg)
 
 ## License
 

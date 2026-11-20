@@ -1,0 +1,176 @@
+---
+title: "Describing who was excluded"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.align = "center")
+has_upset <- requireNamespace("UpSetR", quietly = TRUE)
+has_gtsummary <- requireNamespace("gtsummary", quietly = TRUE)
+```
+
+```{r setup, message = FALSE}
+library(cohortflow)
+
+dat <- mock_parallel_rct(n_participants = 300, seed = 2024)
+crit <- cf_criteria() |>
+  include(~ !is.na(age), label = "Age recorded", category = "Age") |>
+  include(~ age >= 18, label = "Aged 18 or over", category = "Age") |>
+  include(~ eligible_screen, label = "Passed screening") |>
+  include(~ !is.na(consent_date), label = "Consented") |>
+  randomise(by = "participant_id", arms = "arm") |>
+  exclude(~ withdrew, label = "Withdrew consent") |>
+  include(~ baseline_complete, label = "Baseline complete")
+flow <- apply_criteria(dat, crit, id = "participant_id")
+```
+
+An attrition table says how many people each criterion removed. Readers
+and reviewers also ask **who** was removed: did the exclusions change the
+make-up of the cohort, and do the reasons overlap? This article covers
+three tools for that:
+
+- `as_characteristics_table()`: a "Table 1" with one column per step.
+- `criteria_status()`: every row's result on every criterion, for auditing
+  and for plotting overlapping reasons.
+- `stack_cohorts()`: the cohort at each step, stacked for other
+  summary-table packages.
+
+## Table 1 at every step
+
+`as_characteristics_table()` summarises the chosen variables for the cohort
+remaining after each step. Numeric variables show the mean (SD), the median
+[Q1, Q3], or both; categorical and logical variables show n (%); a
+"Missing" row appears when there are missing values.
+
+```{r}
+as_characteristics_table(
+  flow,
+  vars = c("age", "sex", "ethnicity"),
+  var_labels = c(age = "Age, years", sex = "Sex", ethnicity = "Ethnicity"),
+  numeric = c("mean_sd", "median_iqr"),
+  backend = "gt"
+)
+```
+
+`randomise()` steps are left out by default, since they remove nobody.
+
+### Choosing the columns
+
+`steps` picks and orders the columns, using the same selectors as
+`cohort()`: a step number (`0` is the starting data), a step label or a
+category name. When you mix numbers and labels, put them in a `list()`, since
+`c()` would turn the numbers into text:
+
+```{r}
+as_characteristics_table(
+  flow,
+  vars = c("age", "sex"),
+  steps = list(0, "Consented", "Baseline complete"),
+  backend = "gt"
+)
+```
+
+### The people removed at each step
+
+`excluded = TRUE` describes the rows removed *at* each step instead. This is
+the usual supplementary table comparing excluded and included participants:
+
+```{r}
+as_characteristics_table(
+  flow,
+  vars = c("age", "sex"),
+  excluded = TRUE,
+  backend = "gt"
+)
+```
+
+The people excluded for "Aged 18 or over" have a mean age of about 10, as
+they should: a quick check that the criterion did what was intended.
+
+### As data
+
+`as_characteristics_tibble()` returns the same numbers. The long form has
+one row per variable, level and step, with separate count, percentage and
+display columns, ready for your own formatting or calculation:
+
+```{r}
+long <- as_characteristics_tibble(flow, vars = "sex", steps = list(0, "Baseline complete"))
+long
+```
+
+Use `wide = TRUE` for one column per step, as displayed.
+
+## Every row on every criterion
+
+The cascade records only the *first* criterion each person failed. Someone
+under 18 who also never consented is counted only under age, and their
+missing consent is never recorded. `criteria_status()` shows the full
+picture, with one row per person and one column per criterion.
+
+In the default **cumulative** mode it mirrors the cascade: `TRUE` = reached
+the step and passed, `FALSE` = removed there, `NA` = never reached it.
+
+```{r}
+criteria_status(flow)
+```
+
+In **independent** mode, every criterion is evaluated against everyone,
+regardless of the order of the steps. That shows how much the reasons
+overlap. The cascade puts 27 removals at "Consented", but 56 people never
+consented: the other 29 had already been removed for other reasons.
+
+```{r}
+fails <- criteria_status(flow, mode = "independent", sets = "fail",
+                         na = "false", as = "matrix")
+
+# How many people fail each criterion
+colSums(fails)
+
+# How many criteria each person fails
+table(failed = rowSums(fails))
+```
+
+The arguments shape the result for whatever comes next:
+
+| Argument | Choices |
+|---|---|
+| `sets` | `"pass"` (`TRUE` = met the criterion) or `"fail"` (`TRUE` = a reason for exclusion) |
+| `na` | `"keep"`, `"false"` (treat not-assessed or `NA` as `FALSE`) or `"drop"` rows with any `NA` |
+| `names` | Columns named by step `"label"` or `"step"` number |
+| `keep_data` | Also carry the original data columns |
+| `as` | `"tibble"`, `"data.table"` or a logical `"matrix"` |
+
+Grouped steps (`group_include()`, `group_exclude()`, `select_within()`)
+depend on who else is in the group, so in independent mode they can give a
+different answer than in the cascade, where earlier steps had already
+removed some group members.
+
+### Plotting overlapping reasons
+
+The matrix plugs straight into set-overlap plots such as
+[UpSetR](https://cran.r-project.org/package=UpSetR),
+[ComplexUpset](https://cran.r-project.org/package=ComplexUpset) or
+[eulerr](https://cran.r-project.org/package=eulerr):
+
+```{r, eval = has_upset, warning = FALSE, fig.width = 7.5, fig.height = 4.2, fig.alt = "UpSet plot of exclusion reasons: bars show how many people fail each combination of criteria."}
+UpSetR::upset(as.data.frame(fails * 1), nsets = ncol(fails), order.by = "freq")
+```
+
+## Other summary-table packages
+
+`stack_cohorts()` returns the cohort at each step stacked into one data
+frame with a `step` column, which is the shape that
+[gtsummary](https://www.danieldsjoberg.com/gtsummary/) and similar packages
+expect:
+
+```{r}
+stacked <- stack_cohorts(flow, steps = list(0, "Consented", "Baseline complete"))
+table(stacked$step)
+```
+
+```{r, eval = has_gtsummary}
+gtsummary::tbl_summary(stacked, by = step, include = c(age, sex, ethnicity))
+```
+
+A person appears once for every step they survived, so the columns are not
+independent samples. Use these tables to describe the cohort, not to test
+for differences between columns.

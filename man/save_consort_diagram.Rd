@@ -82,4 +82,12 @@ unlink(c(png_file, pdf_file))
 }
 \seealso{
 \code{\link[=as_consort_diagram]{as_consort_diagram()}}
+
+Other reporting:
+\code{\link[=as_attrition_table]{as_attrition_table()}},
+\code{\link[=as_attrition_tibble]{as_attrition_tibble()}},
+\code{\link[=as_characteristics_table]{as_characteristics_table()}},
+\code{\link[=as_characteristics_tibble]{as_characteristics_tibble()}},
+\code{\link[=as_consort_diagram]{as_consort_diagram()}}
 }
+\concept{reporting}

@@ -50,3 +50,10 @@ the roll-out schedule rather than an unused column.
 mock_stepped_wedge()
 mock_stepped_wedge(n_clusters = 8, n_participants = 400, n_periods = 5, seed = 9)
 }
+\seealso{
+Other mock data:
+\code{\link[=mock_cluster_rct]{mock_cluster_rct()}},
+\code{\link[=mock_crossover]{mock_crossover()}},
+\code{\link[=mock_parallel_rct]{mock_parallel_rct()}}
+}
+\concept{mock data}

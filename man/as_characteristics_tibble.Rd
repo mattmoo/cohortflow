@@ -154,4 +154,12 @@ as_characteristics_tibble(flow, vars = "age", steps = c(0, 3),
 \code{\link[=as_characteristics_table]{as_characteristics_table()}} for a formatted table,
 \code{\link[=stack_cohorts]{stack_cohorts()}} for the per-step rows, \code{\link[=as_attrition_tibble]{as_attrition_tibble()}} for
 the attrition counts themselves.
+
+Other reporting:
+\code{\link[=as_attrition_table]{as_attrition_table()}},
+\code{\link[=as_attrition_tibble]{as_attrition_tibble()}},
+\code{\link[=as_characteristics_table]{as_characteristics_table()}},
+\code{\link[=as_consort_diagram]{as_consort_diagram()}},
+\code{\link[=save_consort_diagram]{save_consort_diagram()}}
 }
+\concept{reporting}

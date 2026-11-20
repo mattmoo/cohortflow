@@ -34,3 +34,15 @@ removed.
 cf_criteria() |>
   group_include(by = "cluster_id", ~ n() >= 5, label = "Cluster size >= 5")
 }
+\seealso{
+Other criteria builders:
+\code{\link[=cf_criteria]{cf_criteria()}},
+\code{\link[=cf_criterion]{cf_criterion()}},
+\code{\link[=check_criteria]{check_criteria()}},
+\code{\link[=exclude]{exclude()}},
+\code{\link[=group_exclude]{group_exclude()}},
+\code{\link[=include]{include()}},
+\code{\link[=randomise]{randomise()}},
+\code{\link[=select_within]{select_within()}}
+}
+\concept{criteria builders}

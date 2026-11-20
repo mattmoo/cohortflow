@@ -7,6 +7,7 @@
 #' @param ... Optional `cf_criterion` objects to include at construction time.
 #'
 #' @return A `cf_criteria` object.
+#' @family criteria builders
 #' @export
 #'
 #' @examples
@@ -61,6 +62,7 @@ cf_criteria <- function(...) {
 #'   display (e.g. `"Valid age"`). `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
+#' @family criteria builders
 #' @export
 #'
 #' @examples
@@ -84,6 +86,7 @@ include <- function(criteria, predicate, label, category = NULL) {
 #'   display. `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
+#' @family criteria builders
 #' @export
 #'
 #' @examples
@@ -116,6 +119,7 @@ exclude <- function(criteria, predicate, label, category = NULL) {
 #'   display. `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
+#' @family criteria builders
 #' @export
 #'
 #' @examples
@@ -143,6 +147,7 @@ group_include <- function(criteria, by, predicate, label, category = NULL) {
 #'   display. `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
+#' @family criteria builders
 #' @export
 #'
 #' @examples
@@ -177,6 +182,7 @@ group_exclude <- function(criteria, by, predicate, label, category = NULL) {
 #'   display. `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
+#' @family criteria builders
 #' @export
 #'
 #' @examples
@@ -212,6 +218,7 @@ select_within <- function(criteria, by, predicate, label, category = NULL) {
 #'   display. `NULL` leaves it uncategorised.
 #'
 #' @return The updated `cf_criteria` object.
+#' @family criteria builders
 #' @export
 #'
 #' @examples

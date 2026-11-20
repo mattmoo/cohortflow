@@ -30,3 +30,30 @@ Treat a criteria file like an R script: do not import files from
 untrusted sources.
 }
 
+\examples{
+yml <- "
+cohortflow_criteria:
+  version: 1
+  steps:
+    - label: Adults only
+      type: include
+      kind: formula
+      expr: age >= 18
+    - label: Withdrew consent
+      type: exclude
+      kind: formula
+      expr: withdrew
+"
+crit <- import_criteria(text = yml)
+crit
+
+dat <- mock_parallel_rct(n_participants = 100, seed = 1)
+apply_criteria(dat, crit)
+}
+\seealso{
+\code{\link[=export_criteria]{export_criteria()}} to write a pipeline.
+
+Other yaml:
+\code{\link[=export_criteria]{export_criteria()}}
+}
+\concept{yaml}

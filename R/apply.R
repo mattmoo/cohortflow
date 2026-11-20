@@ -57,6 +57,7 @@
 #'   at every level (see [as_attrition_tibble()]'s `levels` argument).
 #'
 #' @return A `cf_flow` object.
+#' @family pipeline
 #' @export
 #'
 #' @examples

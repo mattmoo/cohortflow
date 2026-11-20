@@ -36,3 +36,10 @@ rather than \code{arm} being an unused label.
 mock_crossover()
 mock_crossover(n_participants = 60, arm_labels = c("Drug", "Placebo"), seed = 3)
 }
+\seealso{
+Other mock data:
+\code{\link[=mock_cluster_rct]{mock_cluster_rct()}},
+\code{\link[=mock_parallel_rct]{mock_parallel_rct()}},
+\code{\link[=mock_stepped_wedge]{mock_stepped_wedge()}}
+}
+\concept{mock data}

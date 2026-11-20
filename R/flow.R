@@ -114,6 +114,7 @@ print.cf_flow <- function(x, ...) {
 #' cohort(flow, label = "Passed screening") # same, explicit
 #' nrow(cohort(flow, step_number = 0))     # the starting data
 #' excluded(flow, at = 2)                  # removed by steps 1-2
+#' @family flow accessors
 #' @export
 cohort <- function(flow, flag = FALSE, at = NULL, step_number = NULL, label = NULL, category = NULL) {
   if (!inherits(flow, "cf_flow")) rlang::abort("`flow` must be a `cf_flow` object.")
@@ -283,6 +284,7 @@ cohort <- function(flow, flag = FALSE, at = NULL, step_number = NULL, label = NU
 #' excluded(flow, at = 2)                           # removed by steps 1-2
 #' excluded(flow, at = 2, only = TRUE)              # removed at step 2 only
 #' excluded(flow, label = "Withdrew consent", only = TRUE)
+#' @family flow accessors
 #' @export
 excluded <- function(flow, at = NULL, step_number = NULL, label = NULL, category = NULL,
                      only = FALSE) {

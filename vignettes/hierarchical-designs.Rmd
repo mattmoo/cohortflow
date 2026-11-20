@@ -1,0 +1,208 @@
+---
+title: "Hierarchical and cluster designs"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Hierarchical and cluster designs}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.align = "center"
+)
+has_gt <- requireNamespace("gt", quietly = TRUE)
+```
+
+```{r setup}
+library(cohortflow)
+```
+
+In many studies the rows of the data are not the only units that matter.
+Participants sit inside clusters (practices, schools, wards), clusters
+inside sites, and repeated measurements inside participants. Reporting
+needs counts at more than one level: the CONSORT extension for cluster
+trials (Campbell, Elbourne and Altman, *BMJ* 2004;328:702–8) asks for
+losses at each stage to be given for clusters *and* for participants.
+
+cohortflow handles this by recording, at every step, how many distinct units
+were present at each level you declare.
+
+## Declaring the hierarchy
+
+`cf_hierarchy()` names the levels, from finest to coarsest, and maps each to
+the column(s) that identify it:
+
+```{r}
+cl <- mock_cluster_rct(n_clusters = 16, n_participants = 600, seed = 7)
+
+h <- cf_hierarchy(
+  participant = "participant_id",
+  cluster = "cluster_id",
+  site = "site_id"
+)
+h
+```
+
+Pass it to `apply_criteria()` with `hierarchy =`. Nothing changes about
+which rows are kept; the flow just records the extra counts.
+
+```{r}
+crit <- cf_criteria() |>
+  include(~ eligible_screen, label = "Passed screening") |>
+  include(~ !is.na(consent_date), label = "Consented") |>
+  group_include(by = "cluster_id", ~ n() >= 20,
+                label = "Cluster recruited 20 or more") |>
+  randomise(by = "cluster_id", arms = "arm") |>
+  exclude(~ withdrew, label = "Withdrew consent")
+
+flow <- apply_criteria(cl, crit, id = "participant_id", hierarchy = h)
+```
+
+## Counts at every level
+
+`levels` in `as_attrition_tibble()` returns one block per level (`NULL`
+means all of them):
+
+```{r}
+as_attrition_tibble(flow, levels = c("participant", "cluster"))
+```
+
+`as_attrition_table()` puts the levels side by side, which is the layout the
+CONSORT cluster extension describes. Each criterion reads across both
+levels at once:
+
+```{r, eval = has_gt}
+as_attrition_table(
+  flow,
+  levels = c("participant", "cluster"),
+  level_labels = c(participant = "Participants", cluster = "Clusters"),
+  backend = "gt"
+)
+```
+
+## How units are counted
+
+Two rules decide when a coarser unit counts as lost. They matter because a
+naive count of "distinct clusters among the excluded rows" gives the wrong
+answer.
+
+**Row-level steps count from the bottom up.** A cluster is lost at a step
+only when its *last* remaining participant is removed there. Losing some of
+a cluster's participants is not losing the cluster.
+
+A small example makes this concrete. Cluster A has three participants and
+cluster B has two:
+
+```{r}
+toy <- data.frame(
+  pid = c("a1", "a2", "a3", "b1", "b2"),
+  cluster = c("A", "A", "A", "B", "B"),
+  consented = c(TRUE, FALSE, TRUE, FALSE, FALSE)
+)
+toy_flow <- apply_criteria(
+  toy,
+  cf_criteria() |> include(~ consented, label = "Consented"),
+  id = "pid",
+  hierarchy = cf_hierarchy(participant = "pid", cluster = "cluster")
+)
+as_attrition_tibble(toy_flow, levels = NULL)[, c("level", "label", "n", "n_removed")]
+```
+
+Three participants were removed (one from A, two from B), but only one
+cluster, B, was lost, because A still has participants left.
+
+**Group-level steps count from the top down.** `group_include()` and
+`group_exclude()` remove whole clusters, and their participants go with
+them. Those participants were not individually excluded, so they are
+reported in a separate `n_consequential` column rather than as
+`n_removed`. In the trial above, the cluster-size rule removed 5 clusters,
+and with them 37 participants who were otherwise eligible:
+
+```{r}
+tbl <- as_attrition_tibble(flow, levels = c("participant", "cluster"))
+tbl[tbl$label == "Cluster recruited 20 or more",
+    c("level", "n", "n_removed", "n_consequential")]
+```
+
+This is the distinction the cluster extension draws between losing a
+cluster and losing participants.
+
+## Composite levels: stepped-wedge trials
+
+A level can be identified by more than one column. In a stepped-wedge
+trial, each cluster contributes a cluster-period for every period of the
+roll-out, so the cluster-period is identified by `cluster_id` *and*
+`period`:
+
+```{r}
+sw <- mock_stepped_wedge(n_clusters = 8, n_participants = 400,
+                         n_periods = 4, n_sites = 2, seed = 3)
+
+h_sw <- cf_hierarchy(
+  observation = "event_id",
+  cluster_period = c("cluster_id", "period"),
+  cluster = "cluster_id"
+)
+
+crit_sw <- cf_criteria() |>
+  include(~ !is.na(consent_date), label = "Consented") |>
+  exclude(~ withdrew, label = "Withdrew") |>
+  group_include(by = c("cluster_id", "period"), ~ n() >= 8,
+                label = "Cluster-period has 8 or more")
+
+flow_sw <- apply_criteria(sw, crit_sw, id = "event_id", hierarchy = h_sw)
+```
+
+```{r, eval = has_gt}
+as_attrition_table(
+  flow_sw,
+  levels = c("observation", "cluster_period", "cluster"),
+  level_labels = c("Observations", "Cluster-periods", "Clusters"),
+  backend = "gt"
+)
+```
+
+The cluster-period rule removed 12 cluster-periods but only 3 whole
+clusters: the others still had at least one period with enough
+participants.
+
+Stepped-wedge results are also often shown by site and period. `group_x` and
+`group_y` repeat the attrition table for each combination; see
+[Attrition tables](https://mattmoo.github.io/cohortflow/articles/attrition-tables.html#grids-by-site-and-period).
+
+## Characteristics at the cluster level
+
+`as_characteristics_table()` and `stack_cohorts()` take a `level` argument
+to describe units at that level rather than rows. Every variable must be
+constant within a unit, as cluster-level variables such as site and arm are:
+
+```{r}
+as_characteristics_tibble(
+  flow,
+  vars = c("site_id", "arm"),
+  steps = list(0, "Cluster recruited 20 or more"),
+  level = "cluster",
+  wide = TRUE
+)
+```
+
+## Limits
+
+- `levels` cannot be combined with `group_x`, `group_y`, `branch_by` or
+  `count_by` in the same table.
+- `as_consort_diagram()` counts rows. For a cluster trial, report cluster
+  counts in the attrition table alongside the participant-level diagram.
+- `cf_hierarchy()` does not require strict nesting, but its counts are
+  easiest to read when each level nests in the next.
+
+## See also
+
+- [Writing criteria](writing-criteria.html#grouped-data) for the grouped step
+  types.
+- [Staged pipelines and missing units](https://mattmoo.github.io/cohortflow/articles/staged-pipelines.html)
+  for denominators that include units with no data at all.
+- [Study design gallery](https://mattmoo.github.io/cohortflow/articles/design-gallery.html)
+  for complete cluster and stepped-wedge examples.

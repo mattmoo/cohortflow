@@ -41,3 +41,10 @@ participants within a cluster share the same \code{arm}.
 mock_cluster_rct()
 mock_cluster_rct(n_clusters = 20, n_participants = 800, seed = 5)
 }
+\seealso{
+Other mock data:
+\code{\link[=mock_crossover]{mock_crossover()}},
+\code{\link[=mock_parallel_rct]{mock_parallel_rct()}},
+\code{\link[=mock_stepped_wedge]{mock_stepped_wedge()}}
+}
+\concept{mock data}

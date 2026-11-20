@@ -40,3 +40,10 @@ cf_hierarchy(participant = "pid",
              cluster_period = c("cluster_id", "period"),
              cluster = "cluster_id")
 }
+\seealso{
+Other pipeline:
+\code{\link[=apply_criteria]{apply_criteria()}},
+\code{\link[=cf_expected]{cf_expected()}},
+\code{\link[=continue_criteria]{continue_criteria()}}
+}
+\concept{pipeline}

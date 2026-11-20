@@ -99,3 +99,10 @@ flow
 cohort(flow)
 excluded(flow)
 }
+\seealso{
+Other pipeline:
+\code{\link[=cf_expected]{cf_expected()}},
+\code{\link[=cf_hierarchy]{cf_hierarchy()}},
+\code{\link[=continue_criteria]{continue_criteria()}}
+}
+\concept{pipeline}

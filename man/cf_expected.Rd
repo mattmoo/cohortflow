@@ -30,3 +30,10 @@ denominator.
 \examples{
 cf_expected(participant_id = 1:3, visit = c("baseline", "3mo"))
 }
+\seealso{
+Other pipeline:
+\code{\link[=apply_criteria]{apply_criteria()}},
+\code{\link[=cf_hierarchy]{cf_hierarchy()}},
+\code{\link[=continue_criteria]{continue_criteria()}}
+}
+\concept{pipeline}

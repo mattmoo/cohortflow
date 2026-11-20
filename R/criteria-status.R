@@ -86,6 +86,7 @@
 #' m <- criteria_status(flow, mode = "independent", sets = "fail",
 #'                      na = "false", as = "matrix")
 #' colSums(m)
+#' @family flow accessors
 #' @export
 criteria_status <- function(flow,
                             mode = c("cumulative", "independent"),

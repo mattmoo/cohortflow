@@ -2,8 +2,7 @@
 % Please edit documentation in R/yaml.R
 \name{export_criteria}
 \alias{export_criteria}
-\title{Serialises a \code{cf_criteria} object to a human-readable YAML file (or string).
-The schema is self-describing and can be re-imported with \code{\link[=import_criteria]{import_criteria()}}.}
+\title{Export a criteria pipeline to YAML}
 \usage{
 export_criteria(criteria, path = NULL, fn_refs = list())
 }
@@ -50,3 +49,24 @@ versions, which stored the function body in \code{expr} and the argument names
 in a separate \code{fn_args} field, can still be imported.
 }
 
+\examples{
+crit <- cf_criteria() |>
+  include(~ age >= 18, label = "Adults only", category = "Age") |>
+  exclude(~ withdrew,  label = "Withdrew consent")
+
+# As a string
+cat(export_criteria(crit))
+
+# To a file, then back again
+path <- tempfile(fileext = ".yml")
+export_criteria(crit, path = path)
+import_criteria(path = path)
+unlink(path)
+}
+\seealso{
+\code{\link[=import_criteria]{import_criteria()}} to read the file back.
+
+Other yaml:
+\code{\link[=import_criteria]{import_criteria()}}
+}
+\concept{yaml}

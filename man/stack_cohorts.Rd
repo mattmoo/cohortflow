@@ -88,4 +88,10 @@ table(stacked$step)
 }
 \seealso{
 \code{\link[=as_characteristics_tibble]{as_characteristics_tibble()}}, \code{\link[=cohort]{cohort()}}, \code{\link[=excluded]{excluded()}}.
+
+Other flow accessors:
+\code{\link[=cohort]{cohort()}},
+\code{\link[=criteria_status]{criteria_status()}},
+\code{\link[=excluded]{excluded()}}
 }
+\concept{flow accessors}

@@ -74,4 +74,10 @@ excluded(flow, at = 2)                  # removed by steps 1-2
 }
 \seealso{
 \code{\link[=criteria_status]{criteria_status()}} for each row's result on every criterion.
+
+Other flow accessors:
+\code{\link[=criteria_status]{criteria_status()}},
+\code{\link[=excluded]{excluded()}},
+\code{\link[=stack_cohorts]{stack_cohorts()}}
 }
+\concept{flow accessors}

@@ -16,6 +16,7 @@
 #'
 #' @return A tibble with one row per expected combination and one column per
 #'   named argument in `...`.
+#' @family pipeline
 #' @export
 #'
 #' @examples

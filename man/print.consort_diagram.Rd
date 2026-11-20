@@ -19,3 +19,9 @@ Draws a \code{consort_diagram} (produced by \code{\link[=as_consort_diagram]{as_
 current graphics device via the standard \code{ggplot2} print method (which
 opens a new page before drawing).
 }
+\examples{
+dat  <- mock_parallel_rct(n_participants = 100, seed = 1)
+crit <- cf_criteria() |> include(~ age >= 18, label = "Adults only")
+diagram <- as_consort_diagram(apply_criteria(dat, crit))
+print(diagram)
+}

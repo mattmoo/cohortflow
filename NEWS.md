@@ -1,5 +1,20 @@
 # cohortflow 0.0.0.9015
 
+## Documentation
+
+* New package website at <https://mattmoo.github.io/cohortflow/>, with a
+  reference index grouped by task and eight articles.
+* Three vignettes: "Get started", "Writing criteria" (including a worked
+  example of how `include()` and `exclude()` treat missing values) and
+  "Hierarchical and cluster designs".
+* Web-only articles: "Attrition tables", "CONSORT diagrams", "Staged
+  pipelines and missing units", "Describing who was excluded" and a "Study
+  design gallery" covering parallel, crossover, cluster and stepped-wedge
+  trials.
+* Reference pages cross-link related functions, and `export_criteria()`,
+  `import_criteria()`, `plot.cf_flow()` and `print.consort_diagram()` gain
+  examples.
+
 ## Bug fixes
 
 * `as_consort_diagram(stage_by = )` no longer draws stage boxes on top of

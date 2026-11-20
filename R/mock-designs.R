@@ -24,6 +24,7 @@
 #'   `participant_id`, `arm`, demographic columns (`age`, `age_group`,
 #'   `sex`, `ethnicity`), and consent-flow columns (`eligible_screen`,
 #'   `consent_date`, `baseline_complete`, `withdrew`).
+#' @family mock data
 #' @export
 #'
 #' @examples
@@ -87,6 +88,7 @@ mock_parallel_rct <- function(
 #'   are constant within a participant across periods, since they describe
 #'   trial-level (not period-level) status; `withdrew` reflects withdrawal
 #'   at any point during the trial.
+#' @family mock data
 #' @export
 #'
 #' @examples
@@ -173,6 +175,7 @@ mock_crossover <- function(
 #' @return A [tibble::tibble()] with one row per participant, including
 #'   `participant_id`, `cluster_id`, `site_id`, `arm` (cluster-level),
 #'   demographic columns, and consent-flow columns.
+#' @family mock data
 #' @export
 #'
 #' @examples
@@ -275,6 +278,7 @@ mock_cluster_rct <- function(
 #'   including `participant_id`, `event_id`, `cluster_id`, `site_id`,
 #'   `period`, `sequence`, `arm` (derived from `period >= sequence`),
 #'   demographic columns, and consent-flow columns.
+#' @family mock data
 #' @export
 #'
 #' @examples

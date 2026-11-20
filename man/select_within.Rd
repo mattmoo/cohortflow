@@ -38,3 +38,15 @@ cf_criteria() |>
                 ~ consent_date == min(consent_date, na.rm = TRUE),
                 label = "Index operation per patient")
 }
+\seealso{
+Other criteria builders:
+\code{\link[=cf_criteria]{cf_criteria()}},
+\code{\link[=cf_criterion]{cf_criterion()}},
+\code{\link[=check_criteria]{check_criteria()}},
+\code{\link[=exclude]{exclude()}},
+\code{\link[=group_exclude]{group_exclude()}},
+\code{\link[=group_include]{group_include()}},
+\code{\link[=include]{include()}},
+\code{\link[=randomise]{randomise()}}
+}
+\concept{criteria builders}

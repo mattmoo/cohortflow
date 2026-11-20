@@ -17,6 +17,7 @@
 #'
 #' @return A `cf_hierarchy` object (a named list with additional class
 #'   attribute).
+#' @family pipeline
 #' @export
 #'
 #' @examples

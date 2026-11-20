@@ -1,0 +1,208 @@
+---
+title: "Get started with cohortflow"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Get started with cohortflow}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.align = "center"
+)
+has_gt <- requireNamespace("gt", quietly = TRUE)
+```
+
+Most cohort studies and trials report how a starting population was whittled
+down to the analysed cohort: who was assessed, who was excluded and why, and
+how many were left at each stage. That record usually ends up scattered
+across `filter()` calls, hand-counted tables and a flow diagram drawn in
+PowerPoint, and the three drift apart as the analysis changes.
+
+cohortflow keeps a single record. You write the eligibility criteria once as
+a pipeline, apply it to your data, and derive the final cohort, the excluded
+rows, the attrition table and the CONSORT diagram from the same object, so
+they always agree.
+
+```{r setup}
+library(cohortflow)
+```
+
+## Example data
+
+The package ships with generators for four common trial designs. Here we use
+a two-arm parallel-group randomised trial with 300 people assessed for
+eligibility. Like real data, it is untidy: some ages are missing, some
+people failed screening or never consented, and some withdrew.
+
+```{r}
+dat <- mock_parallel_rct(n_participants = 300, seed = 2024)
+dat
+```
+
+## 1. Define the criteria
+
+A pipeline starts with `cf_criteria()`, and each step is added with a pipe.
+`include()` keeps the rows where its condition is `TRUE`; `exclude()` drops
+the rows where its condition is `TRUE`. Each step has a `label` for
+reporting, and steps can share a `category` so they are reported together.
+
+`randomise()` removes nobody. It marks the point at which people were
+allocated, so later reports can show what happened in each arm afterwards.
+
+```{r}
+crit <- cf_criteria() |>
+  include(~ !is.na(age), label = "Age recorded", category = "Age") |>
+  include(~ age >= 18, label = "Aged 18 or over", category = "Age") |>
+  include(~ eligible_screen, label = "Passed screening") |>
+  include(~ !is.na(consent_date), label = "Consented") |>
+  randomise(by = "participant_id", arms = "arm") |>
+  exclude(~ withdrew, label = "Withdrew consent") |>
+  include(~ baseline_complete, label = "Baseline complete")
+
+crit
+```
+
+In the printout, `[+]` marks an inclusion step, `[-]` an exclusion and `[R]`
+the randomisation point. `[~]` means the condition is a formula. The
+[Writing criteria](writing-criteria.html) article covers every step type.
+
+## 2. Apply them
+
+`apply_criteria()` runs the steps in order. Each step sees only the rows that
+survived the steps before it. `id` names the column that identifies a row.
+
+```{r}
+flow <- apply_criteria(dat, crit, id = "participant_id")
+flow
+```
+
+The result is a `cf_flow`: the original data plus a record of which rows
+each step removed. Everything below is read from it.
+
+## 3. Get the cohort
+
+`cohort()` returns the rows that passed every step, and `excluded()` returns
+the rows that were removed, labelled with the step that removed them:
+
+```{r}
+final <- cohort(flow)
+nrow(final)
+
+removed <- excluded(flow)
+table(removed$cf_label)
+```
+
+Both take a step selector (a step number, a label or a category), so you can
+also get the cohort as it stood at an earlier point. For example, here is
+everyone who was randomised:
+
+```{r}
+nrow(cohort(flow, at = "Consented"))
+```
+
+## 4. Attrition table
+
+`as_attrition_tibble()` returns the counts as a plain data frame, ready for
+your own formatting or further calculation:
+
+```{r}
+as_attrition_tibble(flow)
+```
+
+`as_attrition_table()` formats the same data with flextable (the default,
+best for Word), gt or huxtable. Steps that share a category are grouped
+under one heading, and because there is a `randomise()` step, the final row
+is broken out by arm.
+
+```{r, eval = has_gt}
+as_attrition_table(flow, backend = "gt")
+```
+
+The [Attrition tables](https://mattmoo.github.io/cohortflow/articles/attrition-tables.html) article covers
+grouped tables, shading and the other backends.
+
+## 5. CONSORT flow diagram
+
+`as_consort_diagram()` draws the flow. Up to the randomisation box there is
+one shared trunk. After it, each arm gets its own column, so post-allocation
+losses are reported separately for each arm, as CONSORT asks.
+
+```{r, fig.width = 10.2, fig.height = 6.5, fig.alt = "CONSORT flow diagram. 300 people were assessed; 105 were excluded at six steps; after randomisation the Control and Intervention arms finish with 107 and 88."}
+diagram <- as_consort_diagram(flow)
+diagram
+```
+
+Each main box shows the step label and how many people remain after that
+step. Each side box shows how many that step removed, with the reasons
+listed when the step belongs to a category (here, *Age*).
+
+The diagram is a ggplot. Save it for a manuscript with
+`save_consort_diagram()`, which picks the format from the file extension and
+sizes the page so the text fits its boxes:
+
+```{r, eval = FALSE}
+save_consort_diagram(diagram, "consort.pdf")
+save_consort_diagram(diagram, "consort.png", dpi = 300)
+```
+
+The [CONSORT diagrams](https://mattmoo.github.io/cohortflow/articles/consort-diagrams.html) article covers
+styling and other trial designs.
+
+## 6. Who was excluded?
+
+Reviewers often ask whether exclusions changed the make-up of the cohort.
+`as_characteristics_table()` summarises chosen variables at every step, in
+one column per step:
+
+```{r, eval = has_gt}
+as_characteristics_table(
+  flow,
+  vars = c("age", "sex"),
+  steps = list(0, "Consented", "Baseline complete"),
+  var_labels = c(age = "Age, years", sex = "Sex"),
+  backend = "gt"
+)
+```
+
+Use `excluded = TRUE` to describe the people removed at each step instead.
+The [Describing who was excluded](https://mattmoo.github.io/cohortflow/articles/describing-exclusions.html)
+article covers this and overlapping exclusion reasons.
+
+> **Missing values.** A condition that gives `NA` is treated differently by
+> the two step types. `include(~ age >= 18)` *removes* a row with a missing
+> age; `exclude(~ age < 18)` *keeps* it. Here 15 people have no recorded age,
+> so the choice changes the denominator. This pipeline makes the choice
+> visible with a separate "Age recorded" step. See [Missing
+> values](writing-criteria.html#missing-values) for a worked example.
+
+## 7. Save the criteria
+
+A criteria pipeline can be written to YAML and read back, so the exact
+definitions can be kept under version control, shared with collaborators or
+attached to a protocol:
+
+```{r}
+yml <- export_criteria(crit)
+cat(yml)
+
+identical(
+  as_attrition_tibble(apply_criteria(dat, import_criteria(text = yml), id = "participant_id")),
+  as_attrition_tibble(flow)
+)
+```
+
+Pass `path =` to `export_criteria()` and `import_criteria()` to write and
+read a file instead.
+
+## Next steps
+
+- [Writing criteria](writing-criteria.html): formula and function conditions,
+  categories, grouped steps and missing values.
+- [Hierarchical and cluster designs](hierarchical-designs.html): counting
+  clusters and participants side by side.
+- [Study design gallery](https://mattmoo.github.io/cohortflow/articles/design-gallery.html): complete examples
+  for parallel, crossover, cluster and stepped-wedge trials.

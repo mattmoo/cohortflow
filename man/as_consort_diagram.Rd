@@ -156,4 +156,12 @@ as_consort_diagram(flow)
 \code{\link[=as_attrition_tibble]{as_attrition_tibble()}} for the underlying plain-tibble data
 layer, \code{\link[=as_attrition_table]{as_attrition_table()}} for formatted table output,
 \code{\link[=save_consort_diagram]{save_consort_diagram()}} to export for manuscript submission.
+
+Other reporting:
+\code{\link[=as_attrition_table]{as_attrition_table()}},
+\code{\link[=as_attrition_tibble]{as_attrition_tibble()}},
+\code{\link[=as_characteristics_table]{as_characteristics_table()}},
+\code{\link[=as_characteristics_tibble]{as_characteristics_tibble()}},
+\code{\link[=save_consort_diagram]{save_consort_diagram()}}
 }
+\concept{reporting}

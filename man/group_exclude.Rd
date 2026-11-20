@@ -31,3 +31,15 @@ cf_criteria() |>
   group_exclude(by = "cluster_id", ~ mean(is.na(age)) > 0.5,
                 label = "Excessive missing age in cluster")
 }
+\seealso{
+Other criteria builders:
+\code{\link[=cf_criteria]{cf_criteria()}},
+\code{\link[=cf_criterion]{cf_criterion()}},
+\code{\link[=check_criteria]{check_criteria()}},
+\code{\link[=exclude]{exclude()}},
+\code{\link[=group_include]{group_include()}},
+\code{\link[=include]{include()}},
+\code{\link[=randomise]{randomise()}},
+\code{\link[=select_within]{select_within()}}
+}
+\concept{criteria builders}
