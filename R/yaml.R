@@ -1,3 +1,4 @@
+#' Export a criteria pipeline to YAML
 #'
 #' Serialises a `cf_criteria` object to a human-readable YAML file (or string).
 #' The schema is self-describing and can be re-imported with [import_criteria()].
@@ -34,7 +35,23 @@
 #' @return When `path = NULL`, the YAML text as a character string (returned
 #'   visibly, so it prints at the console). Otherwise, invisibly, the
 #'   `criteria` object.
+#' @seealso [import_criteria()] to read the file back.
+#' @family yaml
 #' @export
+#'
+#' @examples
+#' crit <- cf_criteria() |>
+#'   include(~ age >= 18, label = "Adults only", category = "Age") |>
+#'   exclude(~ withdrew,  label = "Withdrew consent")
+#'
+#' # As a string
+#' cat(export_criteria(crit))
+#'
+#' # To a file, then back again
+#' path <- tempfile(fileext = ".yml")
+#' export_criteria(crit, path = path)
+#' import_criteria(path = path)
+#' unlink(path)
 export_criteria <- function(criteria, path = NULL, fn_refs = list()) {
   if (!inherits(criteria, "cf_criteria")) {
     rlang::abort("`criteria` must be a `cf_criteria` object.")
@@ -77,7 +94,29 @@ export_criteria <- function(criteria, path = NULL, fn_refs = list()) {
 #' @param envir The environment in which to evaluate re-parsed expressions.
 #'
 #' @return A `cf_criteria` object.
+#' @seealso [export_criteria()] to write a pipeline.
+#' @family yaml
 #' @export
+#'
+#' @examples
+#' yml <- "
+#' cohortflow_criteria:
+#'   version: 1
+#'   steps:
+#'     - label: Adults only
+#'       type: include
+#'       kind: formula
+#'       expr: age >= 18
+#'     - label: Withdrew consent
+#'       type: exclude
+#'       kind: formula
+#'       expr: withdrew
+#' "
+#' crit <- import_criteria(text = yml)
+#' crit
+#'
+#' dat <- mock_parallel_rct(n_participants = 100, seed = 1)
+#' apply_criteria(dat, crit)
 import_criteria <- function(path = NULL, text = NULL, envir = parent.frame()) {
   if (is.null(path) == is.null(text)) {
     rlang::abort("Exactly one of `path` or `text` must be supplied.")

@@ -1,0 +1,106 @@
+url: https://mattmoo.github.io/cohortflow/
+
+template:
+  bootstrap: 5
+  light-switch: true
+  bslib:
+    primary: "#0B6E69"
+    link-color: "#0B6E69"
+    base_font: {google: "Source Sans 3"}
+    heading_font: {google: "Source Sans 3"}
+    code_font: {google: "Source Code Pro"}
+    font-size-base: 1.0625rem
+
+home:
+  title: "cohortflow: transparent cohort selection and CONSORT reporting in R"
+  description: >
+    Define inclusion and exclusion criteria once, apply them step by step,
+    and report the attrition as CONSORT flow diagrams, attrition tables and
+    step-wise Table 1s, including cluster and stepped-wedge designs.
+  sidebar:
+    structure: [links, license, community, citation, authors, dev]
+
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github, lightswitch]
+
+articles:
+  - title: Workflows
+    navbar: Workflows
+    contents:
+      - cohortflow
+      - writing-criteria
+      - articles/attrition-tables
+      - articles/consort-diagrams
+      - articles/describing-exclusions
+      - articles/staged-pipelines
+  - title: Study designs
+    navbar: Study designs
+    contents:
+      - hierarchical-designs
+      - articles/design-gallery
+
+reference:
+  - title: Defining criteria
+    desc: >
+      Build a criteria pipeline step by step. Row-wise steps (`include()`,
+      `exclude()`) keep or drop individual rows; grouped steps act on whole
+      groups such as clusters or participants; `randomise()` marks the
+      allocation point.
+    contents:
+      - cf_criteria
+      - include
+      - exclude
+      - group_include
+      - group_exclude
+      - select_within
+      - randomise
+      - cf_criterion
+      - check_criteria
+  - title: Applying criteria
+    desc: Run a pipeline against data to get a `cf_flow`.
+    contents:
+      - apply_criteria
+      - continue_criteria
+      - cf_hierarchy
+      - cf_expected
+  - title: Inspecting a flow
+    desc: Get the cohort, the excluded rows, and each row's status at every step.
+    contents:
+      - cohort
+      - excluded
+      - criteria_status
+      - stack_cohorts
+  - title: Attrition tables
+    contents:
+      - as_attrition_tibble
+      - as_attrition_table
+  - title: CONSORT diagrams
+    contents:
+      - as_consort_diagram
+      - save_consort_diagram
+      - plot.cf_flow
+      - print.consort_diagram
+  - title: Baseline characteristics
+    desc: Step-wise "Table 1" of the cohort, or of the rows removed, at each step.
+    contents:
+      - as_characteristics_tibble
+      - as_characteristics_table
+  - title: Reproducibility
+    contents:
+      - export_criteria
+      - import_criteria
+  - title: Example data
+    desc: Synthetic data for four common trial designs.
+    contents:
+      - mock_parallel_rct
+      - mock_crossover
+      - mock_cluster_rct
+      - mock_stepped_wedge
+  - title: Deprecated
+    contents:
+      - mock_cohortflow
+
+news:
+  cran_dates: false

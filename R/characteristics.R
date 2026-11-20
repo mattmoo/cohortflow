@@ -41,6 +41,7 @@
 #' flow <- apply_criteria(dat, crit, id = "participant_id")
 #' stacked <- stack_cohorts(flow)
 #' table(stacked$step)
+#' @family flow accessors
 #' @export
 stack_cohorts <- function(flow,
                           steps = NULL,
@@ -190,6 +191,7 @@ stack_cohorts <- function(flow,
 #' # Only the starting data and the final cohort, with both numeric summaries
 #' as_characteristics_tibble(flow, vars = "age", steps = c(0, 3),
 #'                           numeric = c("mean_sd", "median_iqr"), wide = TRUE)
+#' @family reporting
 #' @export
 as_characteristics_tibble <- function(flow,
                                       vars,
@@ -608,6 +610,7 @@ as_characteristics_tibble <- function(flow,
 #'                            excluded = TRUE)
 #' }
 #' }
+#' @family reporting
 #' @export
 as_characteristics_table <- function(flow,
                                      vars,

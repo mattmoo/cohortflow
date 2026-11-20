@@ -45,3 +45,15 @@ cf_criteria() |>
   include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
   exclude(~ withdrew, label = "Withdrew consent", category = "Consent")
 }
+\seealso{
+Other criteria builders:
+\code{\link[=cf_criteria]{cf_criteria()}},
+\code{\link[=cf_criterion]{cf_criterion()}},
+\code{\link[=check_criteria]{check_criteria()}},
+\code{\link[=group_exclude]{group_exclude()}},
+\code{\link[=group_include]{group_include()}},
+\code{\link[=include]{include()}},
+\code{\link[=randomise]{randomise()}},
+\code{\link[=select_within]{select_within()}}
+}
+\concept{criteria builders}

@@ -421,6 +421,7 @@
 #' @seealso [as_attrition_tibble()] for the underlying plain-tibble data
 #'   layer, [as_attrition_table()] for formatted table output,
 #'   [save_consort_diagram()] to export for manuscript submission.
+#' @family reporting
 #' @export
 #'
 #' @examples
@@ -1183,6 +1184,12 @@ as_consort_diagram <- function(
 #' @param ... Additional arguments passed on to [ggplot2::print.ggplot()].
 #' @return `x`, invisibly.
 #' @export
+#'
+#' @examples
+#' dat  <- mock_parallel_rct(n_participants = 100, seed = 1)
+#' crit <- cf_criteria() |> include(~ age >= 18, label = "Adults only")
+#' diagram <- as_consort_diagram(apply_criteria(dat, crit))
+#' print(diagram)
 print.consort_diagram <- function(x, ...) {
   NextMethod()
   invisible(x)
@@ -1197,6 +1204,15 @@ print.consort_diagram <- function(x, ...) {
 #' @param ... Additional arguments passed on to [as_consort_diagram()].
 #' @return A `consort_diagram` object, invisibly printed.
 #' @export
+#'
+#' @examples
+#' dat  <- mock_parallel_rct(n_participants = 100, seed = 1)
+#' crit <- cf_criteria() |>
+#'   include(~ age >= 18, label = "Adults only") |>
+#'   exclude(~ withdrew,  label = "Withdrew consent")
+#' flow <- apply_criteria(dat, crit)
+#' plot(flow)
+#' plot(flow, wrap_width = 20, title = "Participant flow")
 plot.cf_flow <- function(x, ...) {
   d <- as_consort_diagram(x, ...)
   print(d)

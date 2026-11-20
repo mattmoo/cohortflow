@@ -28,6 +28,7 @@
 #' @return A `cf_flow` object whose `criteria` and `steps` are the
 #'   concatenation of `flow`'s existing pipeline and `criteria`, with step
 #'   numbers continuing on from `flow`.
+#' @family pipeline
 #' @export
 #'
 #' @examples

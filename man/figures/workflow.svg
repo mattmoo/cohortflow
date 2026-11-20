@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 330" width="880" height="330" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">cohortflow workflow</title>
+  <desc id="d">Define criteria with cf_criteria and include or exclude, apply them with apply_criteria to get a flow, then extract the cohort, attrition tables, CONSORT diagrams and step-wise characteristics. Criteria can be exported to and imported from YAML.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4A5560"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="880" height="330" rx="14" fill="#FFFFFF"/>
+
+  <!-- Define -->
+  <rect x="24" y="88" width="210" height="96" rx="10" fill="#E6F2F1" stroke="#0B6E69" stroke-width="1.5"/>
+  <text x="129" y="116" text-anchor="middle" font-size="15" font-weight="700" fill="#0B6E69">1. Define criteria</text>
+  <text x="129" y="140" text-anchor="middle" font-size="12.5" font-family="Consolas, Menlo, monospace" fill="#1F2933">cf_criteria() |&gt;</text>
+  <text x="129" y="158" text-anchor="middle" font-size="12.5" font-family="Consolas, Menlo, monospace" fill="#1F2933">include() |&gt; exclude()</text>
+
+  <!-- YAML -->
+  <rect x="24" y="236" width="210" height="64" rx="10" fill="#F4F5F7" stroke="#8A96A3" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="129" y="262" text-anchor="middle" font-size="13.5" font-weight="700" fill="#3E4C59">Share as YAML</text>
+  <text x="129" y="282" text-anchor="middle" font-size="12" font-family="Consolas, Menlo, monospace" fill="#3E4C59">export_criteria()</text>
+  <path d="M129 184 L129 232" stroke="#4A5560" stroke-width="1.4" fill="none" marker-end="url(#a)" marker-start="url(#a)"/>
+
+  <!-- Apply -->
+  <rect x="292" y="88" width="196" height="96" rx="10" fill="#0B6E69"/>
+  <text x="390" y="122" text-anchor="middle" font-size="15" font-weight="700" fill="#FFFFFF">2. Apply</text>
+  <text x="390" y="146" text-anchor="middle" font-size="12.5" font-family="Consolas, Menlo, monospace" fill="#FFFFFF">apply_criteria()</text>
+  <text x="390" y="166" text-anchor="middle" font-size="12" fill="#D5ECEA">→ a cf_flow</text>
+  <path d="M234 136 L288 136" stroke="#4A5560" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+
+  <!-- Outputs -->
+  <g font-size="12.5">
+    <rect x="560" y="22" width="296" height="56" rx="9" fill="#FFFFFF" stroke="#0B6E69" stroke-width="1.3"/>
+    <text x="576" y="45" font-weight="700" font-size="14" fill="#1F2933">Cohort and exclusions</text>
+    <text x="576" y="65" font-family="Consolas, Menlo, monospace" fill="#3E4C59">cohort()  excluded()  criteria_status()</text>
+
+    <rect x="560" y="94" width="296" height="56" rx="9" fill="#FFFFFF" stroke="#0B6E69" stroke-width="1.3"/>
+    <text x="576" y="117" font-weight="700" font-size="14" fill="#1F2933">Attrition table</text>
+    <text x="576" y="137" font-family="Consolas, Menlo, monospace" fill="#3E4C59">as_attrition_table()</text>
+
+    <rect x="560" y="166" width="296" height="56" rx="9" fill="#FFFFFF" stroke="#0B6E69" stroke-width="1.3"/>
+    <text x="576" y="189" font-weight="700" font-size="14" fill="#1F2933">CONSORT flow diagram</text>
+    <text x="576" y="209" font-family="Consolas, Menlo, monospace" fill="#3E4C59">as_consort_diagram()</text>
+
+    <rect x="560" y="238" width="296" height="56" rx="9" fill="#FFFFFF" stroke="#0B6E69" stroke-width="1.3"/>
+    <text x="576" y="261" font-weight="700" font-size="14" fill="#1F2933">Table 1 at each step</text>
+    <text x="576" y="281" font-family="Consolas, Menlo, monospace" fill="#3E4C59">as_characteristics_table()</text>
+  </g>
+  <g stroke="#4A5560" stroke-width="1.4" fill="none">
+    <path d="M488 136 L520 136 L520 50 L556 50" marker-end="url(#a)"/>
+    <path d="M520 122 L520 122 M520 122 L556 122" marker-end="url(#a)"/>
+    <path d="M520 136 L520 194 L556 194" marker-end="url(#a)"/>
+    <path d="M520 194 L520 266 L556 266" marker-end="url(#a)"/>
+  </g>
+</svg>

@@ -33,6 +33,7 @@
 #' @return `NULL`, invisibly. Called for its side effect of aborting when a
 #'   criterion refers to a column not in `data`.
 #' @seealso [apply_criteria()], [continue_criteria()].
+#' @family criteria builders
 #' @export
 #'
 #' @examples

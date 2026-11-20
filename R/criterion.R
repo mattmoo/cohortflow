@@ -42,6 +42,7 @@
 #'   all other types.
 #'
 #' @return A `cf_criterion` object (an S3 list).
+#' @family criteria builders
 #' @export
 #'
 #' @examples

@@ -59,4 +59,15 @@ try(check_criteria(bad, dat))
 }
 \seealso{
 \code{\link[=apply_criteria]{apply_criteria()}}, \code{\link[=continue_criteria]{continue_criteria()}}.
+
+Other criteria builders:
+\code{\link[=cf_criteria]{cf_criteria()}},
+\code{\link[=cf_criterion]{cf_criterion()}},
+\code{\link[=exclude]{exclude()}},
+\code{\link[=group_exclude]{group_exclude()}},
+\code{\link[=group_include]{group_include()}},
+\code{\link[=include]{include()}},
+\code{\link[=randomise]{randomise()}},
+\code{\link[=select_within]{select_within()}}
 }
+\concept{criteria builders}

@@ -120,4 +120,10 @@ colSums(m)
 }
 \seealso{
 \code{\link[=cohort]{cohort()}} for the cohort itself, \code{\link[=excluded]{excluded()}} for removed rows.
+
+Other flow accessors:
+\code{\link[=cohort]{cohort()}},
+\code{\link[=excluded]{excluded()}},
+\code{\link[=stack_cohorts]{stack_cohorts()}}
 }
+\concept{flow accessors}

@@ -53,3 +53,10 @@ more_crit <- cf_criteria() |>
 flow2 <- continue_criteria(flow, more_crit)
 flow2
 }
+\seealso{
+Other pipeline:
+\code{\link[=apply_criteria]{apply_criteria()}},
+\code{\link[=cf_expected]{cf_expected()}},
+\code{\link[=cf_hierarchy]{cf_hierarchy()}}
+}
+\concept{pipeline}

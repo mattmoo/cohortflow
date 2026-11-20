@@ -18,3 +18,12 @@ A \code{consort_diagram} object, invisibly printed.
 A thin wrapper around \code{\link[=as_consort_diagram]{as_consort_diagram()}} so that \code{plot(flow)} draws a
 CONSORT flow diagram directly from a \code{cf_flow} object.
 }
+\examples{
+dat  <- mock_parallel_rct(n_participants = 100, seed = 1)
+crit <- cf_criteria() |>
+  include(~ age >= 18, label = "Adults only") |>
+  exclude(~ withdrew,  label = "Withdrew consent")
+flow <- apply_criteria(dat, crit)
+plot(flow)
+plot(flow, wrap_width = 20, title = "Participant flow")
+}

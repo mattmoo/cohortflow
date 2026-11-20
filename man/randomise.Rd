@@ -38,3 +38,15 @@ cf_criteria() |>
   randomise(by = "cluster_id", arms = "arm") |>
   exclude(~ withdrew, label = "Withdrew after allocation")
 }
+\seealso{
+Other criteria builders:
+\code{\link[=cf_criteria]{cf_criteria()}},
+\code{\link[=cf_criterion]{cf_criterion()}},
+\code{\link[=check_criteria]{check_criteria()}},
+\code{\link[=exclude]{exclude()}},
+\code{\link[=group_exclude]{group_exclude()}},
+\code{\link[=group_include]{group_include()}},
+\code{\link[=include]{include()}},
+\code{\link[=select_within]{select_within()}}
+}
+\concept{criteria builders}

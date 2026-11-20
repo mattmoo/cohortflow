@@ -138,6 +138,7 @@
 #' `FALSE` before it); this column is omitted entirely when there is no
 #' `randomise()` step, so existing pipelines see no schema change.
 #' @seealso [as_attrition_table()] for formatted table output.
+#' @family reporting
 #' @export
 #'
 #' @examples
@@ -862,6 +863,7 @@ as_attrition_tibble <- function(
 #'   has one N/Removed/% column block per level, as described in the
 #'   Hierarchy levels section.
 #' @seealso [as_attrition_tibble()] for the underlying plain-tibble data layer.
+#' @family reporting
 #' @export
 #'
 #' @examples

@@ -44,3 +44,15 @@ values, \code{NA} included, use \code{\link[=criteria_status]{criteria_status()}
 cf_criteria() |>
   include(~ age >= 18, label = "Adults", category = "Valid age")
 }
+\seealso{
+Other criteria builders:
+\code{\link[=cf_criteria]{cf_criteria()}},
+\code{\link[=cf_criterion]{cf_criterion()}},
+\code{\link[=check_criteria]{check_criteria()}},
+\code{\link[=exclude]{exclude()}},
+\code{\link[=group_exclude]{group_exclude()}},
+\code{\link[=group_include]{group_include()}},
+\code{\link[=randomise]{randomise()}},
+\code{\link[=select_within]{select_within()}}
+}
+\concept{criteria builders}

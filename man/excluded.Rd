@@ -71,3 +71,10 @@ excluded(flow, at = 2)                           # removed by steps 1-2
 excluded(flow, at = 2, only = TRUE)              # removed at step 2 only
 excluded(flow, label = "Withdrew consent", only = TRUE)
 }
+\seealso{
+Other flow accessors:
+\code{\link[=cohort]{cohort()}},
+\code{\link[=criteria_status]{criteria_status()}},
+\code{\link[=stack_cohorts]{stack_cohorts()}}
+}
+\concept{flow accessors}

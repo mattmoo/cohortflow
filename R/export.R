@@ -108,6 +108,7 @@
 #'   `device =` to override the device choice.
 #' @return `path`, invisibly.
 #' @seealso [as_consort_diagram()]
+#' @family reporting
 #' @export
 #'
 #' @examples

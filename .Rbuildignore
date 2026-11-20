@@ -9,3 +9,7 @@
 ^\.vscode$
 ^\.Rprofile$
 ^Rplots\.pdf$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^vignettes/articles$

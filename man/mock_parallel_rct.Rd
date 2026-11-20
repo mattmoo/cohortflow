@@ -33,3 +33,10 @@ repeated measures -- the simplest of the four designs.
 mock_parallel_rct()
 mock_parallel_rct(n_participants = 300, arm_labels = c("Placebo", "Drug"), seed = 7)
 }
+\seealso{
+Other mock data:
+\code{\link[=mock_cluster_rct]{mock_cluster_rct()}},
+\code{\link[=mock_crossover]{mock_crossover()}},
+\code{\link[=mock_stepped_wedge]{mock_stepped_wedge()}}
+}
+\concept{mock data}

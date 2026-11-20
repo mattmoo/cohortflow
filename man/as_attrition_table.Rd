@@ -283,4 +283,12 @@ flextable::save_as_docx(ft, path = "attrition.docx")
 }
 \seealso{
 \code{\link[=as_attrition_tibble]{as_attrition_tibble()}} for the underlying plain-tibble data layer.
+
+Other reporting:
+\code{\link[=as_attrition_tibble]{as_attrition_tibble()}},
+\code{\link[=as_characteristics_table]{as_characteristics_table()}},
+\code{\link[=as_characteristics_tibble]{as_characteristics_tibble()}},
+\code{\link[=as_consort_diagram]{as_consort_diagram()}},
+\code{\link[=save_consort_diagram]{save_consort_diagram()}}
 }
+\concept{reporting}

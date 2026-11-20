@@ -13,6 +13,9 @@ Description: Define inclusion and exclusion criteria for cohort studies using
     Parts of this package were developed with the assistance of GitHub Copilot
     (powered by Claude), an AI coding assistant.
 License: MIT + file LICENSE
+URL: https://mattmoo.github.io/cohortflow/,
+    https://github.com/mattmoo/cohortflow
+BugReports: https://github.com/mattmoo/cohortflow/issues
 Encoding: UTF-8
 Depends:
     R (>= 4.1.0)
@@ -22,12 +25,16 @@ Suggests:
     flextable,
     gt,
     huxtable,
+    knitr,
     officer,
     ragg,
+    rmarkdown,
     svglite,
     testthat (>= 3.0.0),
     withr
+VignetteBuilder: knitr
 Config/testthat/edition: 3
+Config/Needs/website: gtsummary, UpSetR
 Imports:
     dplyr,
     ggplot2,
