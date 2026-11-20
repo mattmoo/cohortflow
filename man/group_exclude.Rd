@@ -4,7 +4,7 @@
 \alias{group_exclude}
 \title{Add a group-level exclusion criterion}
 \usage{
-group_exclude(criteria, by, predicate, label, category = NULL)
+group_exclude(criteria, by, predicate, label, category = NULL, reason = NULL)
 }
 \arguments{
 \item{criteria}{A \code{cf_criteria} object (or \code{NULL} to start a new one).}
@@ -18,6 +18,11 @@ more than one for composite (multi-column) grouping.}
 
 \item{category}{An optional string grouping this step with others for
 display. \code{NULL} leaves it uncategorised.}
+
+\item{reason}{An optional short description of the rows this step
+removes, shown in diagram exclusion boxes. \code{NULL} (default) uses \code{label}
+for exclusion steps; for inclusion steps it should be set. See the
+Labels section.}
 }
 \value{
 The updated \code{cf_criteria} object.

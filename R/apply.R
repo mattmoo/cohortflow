@@ -171,6 +171,7 @@ apply_criteria <- function(data, criteria, id = NULL, expected = NULL, by = NULL
       by           = s$by,
       category     = s$category,
       arms         = s$arms,
+      reason       = s$reason,
       n_in         = n_in,
       n_pass       = nrow(current),
       n_fail       = nrow(excluded_rows),

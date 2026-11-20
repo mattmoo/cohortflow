@@ -76,18 +76,90 @@
   } else {
     ""
   }
+  # An uncategorised step's box is headed by what it removed (its `reason`,
+  # which exclusion steps default to their label) beside the number removed;
+  # an inclusion step without a reason says just "Excluded".
+  heading <- "Excluded"
+  if (!has_children && .consort_row_reason(group$row) != "") {
+    heading <- .consort_row_reason(group$row)
+  }
   # Only add colon if there are child reason lines below
-  header <- sprintf("Excluded (n=%s%s)%s", .format_n(removal$n_removed, big_mark), pct,
+  header <- sprintf("%s (n=%s%s)%s", heading, .format_n(removal$n_removed, big_mark), pct,
                     if (has_children) ":" else "")
 
   if (!has_children) return(header)
 
   reason_lines <- vapply(group$children, function(cr) {
-    cr_pct <- if (!is.na(cr$pct_removed)) sprintf(", %.*f%%", digits, cr$pct_removed) else ""
-    sprintf("\u2022 %s (n=%s%s)", cr$label, .format_n(cr$n_removed, big_mark), cr_pct)
+    cr_pct  <- if (!is.na(cr$pct_removed)) sprintf(", %.*f%%", digits, cr$pct_removed) else ""
+    cr_text <- .consort_row_reason(cr)
+    if (cr_text == "") cr_text <- cr$label
+    sprintf("\u2022 %s (n=%s%s)", cr_text, .format_n(cr$n_removed, big_mark), cr_pct)
   }, character(1L))
 
   c(header, reason_lines)
+}
+
+# The removal text of an attrition row annotated by .consort_annotate_steps(),
+# or "" when there is none (header/category/final rows, inclusion steps
+# without a `reason`).
+.consort_row_reason <- function(row) {
+  if (!"reason" %in% names(row) || is.na(row$reason)) "" else row$reason
+}
+
+# Records each step's type and removal text on the attrition tibble's step
+# rows. Every step contributes exactly one "step" row, in step order, with or
+# without categories, so the two line up by position.
+.consort_annotate_steps <- function(tbl, steps) {
+  step_rows <- which(tbl$row_type == "step")
+  if (length(step_rows) != length(steps)) {
+    rlang::abort("Internal error: attrition rows do not match the flow's steps.")
+  }
+  tbl$step_type <- NA_character_
+  tbl$reason    <- NA_character_
+  tbl$step_type[step_rows] <- vapply(steps, function(s) s$type, character(1L))
+  tbl$reason[step_rows]    <- vapply(steps, .step_reason, character(1L))
+  tbl
+}
+
+# Main-box text for a group: the row's label beside the number remaining
+# after it. An uncategorised exclusion step's label describes the rows it
+# removed (shown in its exclusion box), so its main box says
+# `remaining_label` instead.
+.consort_main_label <- function(group, big_mark, remaining_label) {
+  r <- group$row
+  n_survive <- r$n - .consort_group_removal(group)$n_removed
+  text <- r$label
+  if (identical(r$row_type, "step") && "step_type" %in% names(r) &&
+        isTRUE(r$step_type %in% c("exclude", "group_exclude"))) {
+    text <- remaining_label
+  }
+  sprintf("%s\n(n=%s)", text, .format_n(n_survive, big_mark))
+}
+
+# Inclusion steps listed under a category without a `reason` fall back to
+# their label, which describes the rows kept and so reads backwards in an
+# exclusion list. Warn (at most every 8 hours) naming them, unless
+# `options(cohortflow.warn_missing_reason = FALSE)`.
+.warn_missing_reasons <- function(tbl) {
+  if (!isTRUE(getOption("cohortflow.warn_missing_reason", TRUE))) return(invisible(NULL))
+  if (!"step_type" %in% names(tbl)) return(invisible(NULL))
+  miss <- tbl$row_type == "step" & tbl$indent_level == 2L & is.na(tbl$reason)
+  if (!any(miss)) return(invisible(NULL))
+  labels <- unique(tbl$label[miss])
+  rlang::warn(
+    c(
+      sprintf("Exclusion boxes list %d inclusion step%s by label: %s.",
+              length(labels), if (length(labels) == 1L) "" else "s",
+              paste0("\"", labels, "\"", collapse = ", ")),
+      "i" = paste("An inclusion step's label describes the rows it keeps, so under",
+                  "\"Excluded\" it reads backwards (e.g. \"Aged 18 or over (n=6)\" for six people under 18)."),
+      "i" = "Give these steps a `reason`, e.g. include(~ age >= 18, \"Aged 18 or over\", reason = \"Under 18\").",
+      "i" = "`options(cohortflow.warn_missing_reason = FALSE)` turns this warning off."
+    ),
+    class = "cohortflow_missing_reason",
+    .frequency = "regularly",
+    .frequency_id = "cohortflow_missing_reason"
+  )
 }
 
 # Determine whether a main-flow group should have an exclusion box drawn.
@@ -190,15 +262,12 @@
 # group's own y.
 .consort_build_cascade <- function(groups, x, y_positions, wrap_width, big_mark,
                                    digits, gap_x, id_prefix = "main",
-                                   prev_bottom_y = NULL) {
+                                   prev_bottom_y = NULL, remaining_label = "Remaining") {
   n <- length(groups)
 
   main_rows <- vector("list", n)
   for (i in seq_len(n)) {
-    r <- groups[[i]]$row
-    n_removed <- .consort_group_removal(groups[[i]])$n_removed
-    n_survive <- r$n - n_removed
-    label <- sprintf("%s\n(n=%s)", r$label, .format_n(n_survive, big_mark))
+    label <- .consort_main_label(groups[[i]], big_mark, remaining_label)
     dims  <- .consort_box_dims(label, wrap_width = wrap_width)
     main_rows[[i]] <- data.frame(
       id = paste0(id_prefix, "_box_", i), x = x, y = y_positions[i],
@@ -292,11 +361,10 @@
 # Main-box and exclusion-box heights for a list of groups (exclusion height
 # is 0 when the group has no exclusion box). Position-independent, so it can
 # be computed before any box is placed and used to drive the vertical layout.
-.consort_group_heights <- function(groups, wrap_width, big_mark, digits) {
+.consort_group_heights <- function(groups, wrap_width, big_mark, digits,
+                                   remaining_label = "Remaining") {
   h <- vapply(groups, function(g) {
-    r <- g$row
-    n_survive <- r$n - .consort_group_removal(g)$n_removed
-    label <- sprintf("%s\n(n=%s)", r$label, .format_n(n_survive, big_mark))
+    label <- .consort_main_label(g, big_mark, remaining_label)
     .consort_box_dims(label, wrap_width = wrap_width)$h
   }, numeric(1L))
   excl_h <- vapply(groups, function(g) {
@@ -408,11 +476,33 @@
 #'   stage-specific nodes are drawn.
 #' @param stage_label_by Optional column name (string) providing labels for
 #'   each stage (e.g. crossover `arm`). Ignored when `stage_by` is `NULL`.
-#' @param count_by Optional column name (string) for distinct counts. When
-#'   supplied, counts are computed as `n_distinct(count_by)` rather than
-#'   `nrow()`. Essential for crossover data where one participant has
-#'   several event rows. Not currently supported together with a
-#'   `randomise()`-driven split (per-arm cascades always use row counts).
+#' @param count_by Optional hierarchy level to count instead of rows: a level
+#'   name from the flow's [cf_hierarchy()], or the column of a single-column
+#'   level (e.g. `"participant_id"`). Every box, trunk, arms and stages, then
+#'   counts distinct units, so a crossover trial reports participants rather
+#'   than participant-periods throughout. Requires
+#'   `apply_criteria(hierarchy = )`; see [as_attrition_tibble()].
+#' @param remaining_label Text for the main box below an uncategorised
+#'   [exclude()] or [group_exclude()] step. That step's label describes the
+#'   rows it removed, so it appears in the exclusion box beside the number
+#'   removed, and the main box shows this text beside the number remaining.
+#'   Default `"Remaining"`.
+#'
+#' @section Box text:
+#' Each main box shows the number remaining after its step, and each
+#' exclusion box the number removed, each beside text describing those rows:
+#'
+#' * An uncategorised [include()]-type step keeps its label on the main box
+#'   ("Aged 18 or over (n=194)"). Its exclusion box shows the step's
+#'   `reason` if set ("Under 18 (n=6)"), else "Excluded (n=6)".
+#' * An uncategorised [exclude()]-type step's label goes in the exclusion box
+#'   ("Withdrew consent (n=4)") and the main box reads `remaining_label`
+#'   ("Remaining (n=118)").
+#' * A category's main box shows the category name. Its exclusion box lists
+#'   each step by `reason`, falling back to the label; an inclusion step
+#'   without a `reason` reads backwards there, so this case warns (at most
+#'   every 8 hours; `options(cohortflow.warn_missing_reason = FALSE)` turns
+#'   the warning off).
 #'
 
 #' @return A `consort_diagram` object (a `ggplot2` `ggplot`), drawable via
@@ -427,11 +517,13 @@
 #' @examples
 #' dat  <- mock_parallel_rct(n_participants = 200, seed = 1)
 #' crit <- cf_criteria() |>
-#'   include(~ !is.na(age),          label = "Age recorded",    category = "Valid age") |>
-#'   include(~ age >= 18,            label = "Adults only",     category = "Valid age") |>
-#'   include(~ !is.na(consent_date), label = "Consent recorded", category = "Consent") |>
-#'   exclude(~ withdrew,             label = "Withdrew consent", category = "Consent")
-#' flow <- apply_criteria(dat, crit)
+#'   include(~ !is.na(age), label = "Age recorded", category = "Valid age",
+#'           reason = "Age missing") |>
+#'   include(~ age >= 18, label = "Adults only", category = "Valid age",
+#'           reason = "Under 18") |>
+#'   include(~ !is.na(consent_date), label = "Consent recorded", reason = "No consent") |>
+#'   exclude(~ withdrew, label = "Withdrew consent")
+#' flow <- apply_criteria(dat, crit, id = "participant_id")
 #' as_consort_diagram(flow)
 as_consort_diagram <- function(
   flow,
@@ -455,7 +547,8 @@ as_consort_diagram <- function(
   stage_by         = NULL,
   stage_label_by   = NULL,
   count_by         = NULL,
-  branch_na_label  = "Missing"
+  branch_na_label  = "Missing",
+  remaining_label  = "Remaining"
 ) {
   if (!inherits(flow, "cf_flow")) {
     rlang::abort("`flow` must be a `cf_flow` object.")
@@ -464,6 +557,12 @@ as_consort_diagram <- function(
   .check_scalar_col(count_by, "count_by")
   .check_scalar_col(stage_by, "stage_by")
   .check_scalar_col(stage_label_by, "stage_label_by")
+  if (!is.character(remaining_label) || length(remaining_label) != 1L ||
+        is.na(remaining_label) || !nzchar(remaining_label)) {
+    rlang::abort("`remaining_label` must be a single non-empty string.")
+  }
+  count_cols <- if (!is.null(count_by)) .resolve_count_level(flow, count_by)$cols
+  count_fn   <- .count_fn(count_cols)
 
   # -- Validate branching parameters ----------------------------------------
   # A `randomise()` step (if present) supplies default `branch_by` (from its
@@ -477,9 +576,6 @@ as_consort_diagram <- function(
       rlang::abort(sprintf("Column `%s` not found in surviving cohort.", branch_by))
     }
   }
-  if (!is.null(count_by) && is.null(branch_by)) {
-    rlang::abort("`count_by` requires `branch_by` to be specified.")
-  }
   if (!is.null(stage_by) && is.null(branch_by)) {
     rlang::abort("`stage_by` requires `branch_by` to be specified.")
   }
@@ -492,8 +588,11 @@ as_consort_diagram <- function(
     show_categories = show_categories,
     assessed_label  = assessed_label,
     final_label     = final_label,
-    digits          = digits
+    digits          = digits,
+    count_by        = count_by
   )
+  tbl <- .consort_annotate_steps(tbl, flow$steps)
+  .warn_missing_reasons(tbl)
 
   groups <- .consort_group_rows(tbl)
   n_main <- length(groups)
@@ -512,12 +611,6 @@ as_consort_diagram <- function(
   }
   use_split_cascade <- !is.na(split_idx)
 
-  if (use_split_cascade && !is.null(count_by)) {
-    rlang::abort(
-      "`count_by` is not yet supported together with a `randomise()` step (per-arm cascades use row-level counts)."
-    )
-  }
-
   # No rows reach the branch point (a zero-row flow, or every row excluded
   # before the randomise() step), so there are no arm values to split on.
   # Draw the plain linear cascade rather than laying out zero arms.
@@ -527,7 +620,6 @@ as_consort_diagram <- function(
       branch_by         <- NULL
       stage_by          <- NULL
       stage_label_by    <- NULL
-      count_by          <- NULL
       split_idx         <- NA_integer_
       use_split_cascade <- FALSE
     }
@@ -541,7 +633,8 @@ as_consort_diagram <- function(
   # Vertical positions are derived from box content (see .consort_stack_y()):
   # the shared trunk stacks down from `top`, and any per-arm cascades below a
   # randomise() split stack down from the bottom of the split box.
-  pre_heights <- .consort_group_heights(pre_groups, wrap_width, big_mark, digits)
+  pre_heights <- .consort_group_heights(pre_groups, wrap_width, big_mark, digits,
+                                        remaining_label = remaining_label)
   main_y      <- .consort_stack_y(pre_heights$h, pre_heights$excl_h, top_edge = top,
                                   gap_y = gap_y, gap_pad = gap_pad)
   main_x     <- 0.24
@@ -557,7 +650,7 @@ as_consort_diagram <- function(
   trunk <- .consort_build_cascade(
     pre_groups, x = main_x, y_positions = main_y,
     wrap_width = wrap_width, big_mark = big_mark, digits = digits,
-    gap_x = gap_x, id_prefix = "main"
+    gap_x = gap_x, id_prefix = "main", remaining_label = remaining_label
   )
   main_df       <- trunk$main_df
   main_arrow_df <- trunk$main_arrow_df
@@ -592,16 +685,6 @@ as_consort_diagram <- function(
 
   if (!is.null(branch_by)) {
     cohort_data <- cohort(flow)
-
-    # Count function: distinct count_by or nrow
-    count_fn <- if (!is.null(count_by)) {
-      if (!count_by %in% names(cohort_data)) {
-        rlang::abort(sprintf("Column `%s` not found in surviving cohort.", count_by))
-      }
-      function(d) dplyr::n_distinct(d[[count_by]])
-    } else {
-      nrow
-    }
 
     if (use_split_cascade) {
       # ---- Split-trunk rendering ---------------------------------------
@@ -645,12 +728,16 @@ as_consort_diagram <- function(
       for (b in seq_len(n_branches)) {
         arm_data   <- entered_data[.cf_group_match(entered_data[[branch_by]], branch_values[b]), ,
                                    drop = FALSE]
-        arm_entered_n[b] <- nrow(arm_data)
-        arm_flow   <- apply_criteria(arm_data, remaining_criteria, id = ".cf_row_id")
+        arm_entered_n[b] <- count_fn(arm_data)
+        # With `count_by`, the arm's own flow needs the hierarchy so its boxes
+        # count the same units as the trunk.
+        arm_flow   <- apply_criteria(arm_data, remaining_criteria, id = ".cf_row_id",
+                                     hierarchy = if (!is.null(count_by)) flow$hierarchy)
         arm_tbl    <- .attrition_tibble_core(
           arm_flow, show_categories, assessed_label, final_label, digits,
-          branch_by = NULL, count_by = NULL
+          branch_by = NULL, count_by = count_by
         )
+        arm_tbl    <- .consort_annotate_steps(arm_tbl, arm_flow$steps)
         arm_tbl    <- arm_tbl[arm_tbl$row_type != "header", , drop = FALSE]
         arm_groups <- .consort_group_rows(arm_tbl)
 
@@ -668,9 +755,7 @@ as_consort_diagram <- function(
       max_w <- max(vapply(arm_label_dims, `[[`, numeric(1L), "w"))
       for (arm_groups in arm_groups_list) {
         for (g in arm_groups) {
-          r <- g$row
-          n_removed <- .consort_group_removal(g)$n_removed
-          lbl <- sprintf("%s\n(n=%s)", r$label, .format_n(r$n - n_removed, big_mark))
+          lbl <- .consort_main_label(g, big_mark, remaining_label)
           max_w <- max(max_w, .consort_box_dims(lbl, wrap_width = wrap_width)$w)
           if (.consort_has_exclusions(g)) {
             excl_lbl <- paste(.consort_excl_lines(g, digits, big_mark), collapse = "\n")
@@ -701,7 +786,8 @@ as_consort_diagram <- function(
       label_h    <- max(vapply(arm_label_dims, `[[`, numeric(1L), "h"))
       label_y    <- trunk_y0 - gap_y - label_h / 2
       arm_heights <- lapply(arm_groups_list, .consort_group_heights,
-                            wrap_width = wrap_width, big_mark = big_mark, digits = digits)
+                            wrap_width = wrap_width, big_mark = big_mark, digits = digits,
+                            remaining_label = remaining_label)
       post_h      <- do.call(pmax, lapply(arm_heights, `[[`, "h"))
       post_excl_h <- do.call(pmax, lapply(arm_heights, `[[`, "excl_h"))
       step_y     <- .consort_stack_y(post_h, post_excl_h, top_edge = label_y - label_h / 2,
@@ -726,7 +812,8 @@ as_consort_diagram <- function(
           arm_groups_list[[b]], x = branch_xs[b], y_positions = step_y,
           wrap_width = wrap_width, big_mark = big_mark, digits = digits,
           gap_x = gap_x, id_prefix = paste0("branch_", b),
-          prev_bottom_y = label_box$y - label_box$h / 2
+          prev_bottom_y = label_box$y - label_box$h / 2,
+          remaining_label = remaining_label
         )
 
         arm_main <- arm_cascade$main_df

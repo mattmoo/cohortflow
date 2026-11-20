@@ -37,7 +37,11 @@ The schema is self-describing and can be re-imported with \code{\link[=import_cr
       expr:   "age >= 18"
       fn_ref: null
       category: null
+      reason: "Under 18"   # only written when set
 }\if{html}{\out{</div>}}
+
+A file with a higher \code{version} than this package reads is refused with an
+error.
 
 Formula-based criteria round-trip cleanly. For function predicates
 (\verb{kind: function}), \code{expr} holds the full deparsed function source,
@@ -46,7 +50,8 @@ including its argument list and any default values (e.g.
 round-trip and a warning is issued. Named exported functions can be stored
 as \code{"pkg::name"} references via \code{fn_refs}. Files written by earlier
 versions, which stored the function body in \code{expr} and the argument names
-in a separate \code{fn_args} field, can still be imported.
+in a separate \code{fn_args} field, can still be imported, with a warning that
+default argument values were not stored and the file should be re-saved.
 }
 
 \examples{

@@ -40,6 +40,14 @@
 #'   (e.g. `"arm"`). Used by [as_consort_diagram()]/[as_attrition_tibble()]
 #'   to default `branch_by` when not explicitly supplied. Must be `NULL` for
 #'   all other types.
+#' @param reason An optional short description of the rows this step
+#'   *removes*, used wherever removals are listed: the exclusion boxes of
+#'   [as_consort_diagram()]. `NULL` (default) falls back to `label` for the
+#'   exclusion types (`exclude`, `group_exclude`), whose label already
+#'   describes the removed rows. For `include`, `group_include` and
+#'   `select_within` the label describes the rows *kept*, so set `reason`
+#'   (e.g. `label = "Aged 18 or over", reason = "Under 18"`). Must be `NULL`
+#'   for `randomise`. See the Labels section of [include()].
 #'
 #' @return A `cf_criterion` object (an S3 list).
 #' @family criteria builders
@@ -49,9 +57,9 @@
 #' # Row-wise inclusion
 #' cf_criterion(~ age >= 18, label = "Adults only", type = "include")
 #'
-#' # Grouped under a category
+#' # Grouped under a category, with the text shown for the rows it removes
 #' cf_criterion(~ !is.na(age), label = "Age recorded",
-#'              type = "include", category = "Valid age")
+#'              type = "include", category = "Valid age", reason = "Age missing")
 #'
 #' # Group-level inclusion (clusters with >= 5 participants)
 #' cf_criterion(
@@ -84,7 +92,8 @@ cf_criterion <- function(predicate,
                                   "select_within", "randomise"),
                          by       = NULL,
                          category = NULL,
-                         arms     = NULL) {
+                         arms     = NULL,
+                         reason   = NULL) {
   type <- match.arg(type)
 
   if (is.null(predicate)) {
@@ -143,6 +152,22 @@ cf_criterion <- function(predicate,
     }
   }
 
+  if (!is.null(reason)) {
+    if (type == "randomise") {
+      rlang::abort(c(
+        "`reason` must be NULL for type \"randomise\".",
+        "i" = "A randomise() step removes no rows, so there is nothing to give a reason for."
+      ))
+    }
+    if (!is.character(reason) || length(reason) != 1L || is.na(reason) || !nzchar(reason)) {
+      rlang::abort(c(
+        "`reason` must be a single non-empty string or NULL.",
+        "x" = sprintf("Criterion \"%s\" was given <%s> of length %d.", label,
+                      paste(class(reason), collapse = "/"), length(reason))
+      ))
+    }
+  }
+
   structure(
     list(
       predicate = predicate,
@@ -150,10 +175,23 @@ cf_criterion <- function(predicate,
       type      = type,
       by        = by,
       category  = category,
-      arms      = arms
+      arms      = arms,
+      reason    = reason
     ),
     class = "cf_criterion"
   )
+}
+
+# Text describing the rows a step removes, for exclusion boxes: the explicit
+# `reason`, else the label for exclusion-type steps (whose label already
+# describes the removed rows), else `NA` (an include-type label describes
+# the rows kept, so it cannot stand in). Works on criteria and on the step
+# records of a flow (which copy `reason`; flows built before `reason`
+# existed have none, so they fall back the same way).
+.step_reason <- function(s) {
+  if (!is.null(s$reason)) return(s$reason)
+  if (s$type %in% c("exclude", "group_exclude")) return(s$label)
+  NA_character_
 }
 
 # ---------------------------------------------------------------------------
@@ -197,10 +235,11 @@ print.cf_criterion <- function(x, ...) {
   pred_type <- if (is.null(x$predicate)) "-" else if (is_formula(x$predicate)) "~" else "f"
   by_str    <- if (!is.null(x$by)) sprintf(" [by: %s]", paste(x$by, collapse = ", ")) else ""
   arms_str  <- if (!is.null(x$arms)) sprintf(" [arms: %s]", x$arms) else ""
+  reason_str <- if (!is.null(x$reason)) sprintf("\n    removes: %s", x$reason) else ""
 
   cat(sprintf(
-    "[%s][%s] %s%s%s\n    %s\n",
-    type_sym, pred_type, x$label, by_str, arms_str, pred_str
+    "[%s][%s] %s%s%s\n    %s%s\n",
+    type_sym, pred_type, x$label, by_str, arms_str, pred_str, reason_str
   ))
   invisible(x)
 }
@@ -214,7 +253,9 @@ format.cf_criterion <- function(x, ...) {
   pred_type <- if (is.null(x$predicate)) "-" else if (is_formula(x$predicate)) "~" else "f"
   by_str    <- if (!is.null(x$by)) sprintf(" [by: %s]", paste(x$by, collapse = ", ")) else ""
   arms_str  <- if (!is.null(x$arms)) sprintf(" [arms: %s]", x$arms) else ""
-  sprintf("[%s][%s] %s%s%s  (%s)", type_sym, pred_type, x$label, by_str, arms_str, pred_str)
+  reason_str <- if (!is.null(x$reason)) sprintf(" [removes: %s]", x$reason) else ""
+  sprintf("[%s][%s] %s%s%s%s  (%s)", type_sym, pred_type, x$label, by_str, arms_str, reason_str,
+          pred_str)
 }
 
 # ---------------------------------------------------------------------------

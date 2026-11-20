@@ -11,7 +11,8 @@ cf_criterion(
     "randomise"),
   by = NULL,
   category = NULL,
-  arms = NULL
+  arms = NULL,
+  reason = NULL
 )
 }
 \arguments{
@@ -56,6 +57,15 @@ naming the column in the data that holds each unit's allocated arm
 (e.g. \code{"arm"}). Used by \code{\link[=as_consort_diagram]{as_consort_diagram()}}/\code{\link[=as_attrition_tibble]{as_attrition_tibble()}}
 to default \code{branch_by} when not explicitly supplied. Must be \code{NULL} for
 all other types.}
+
+\item{reason}{An optional short description of the rows this step
+\emph{removes}, used wherever removals are listed: the exclusion boxes of
+\code{\link[=as_consort_diagram]{as_consort_diagram()}}. \code{NULL} (default) falls back to \code{label} for the
+exclusion types (\code{exclude}, \code{group_exclude}), whose label already
+describes the removed rows. For \code{include}, \code{group_include} and
+\code{select_within} the label describes the rows \emph{kept}, so set \code{reason}
+(e.g. \verb{label = "Aged 18 or over", reason = "Under 18"}). Must be \code{NULL}
+for \code{randomise}. See the Labels section of \code{\link[=include]{include()}}.}
 }
 \value{
 A \code{cf_criterion} object (an S3 list).
@@ -71,9 +81,9 @@ the step type.
 # Row-wise inclusion
 cf_criterion(~ age >= 18, label = "Adults only", type = "include")
 
-# Grouped under a category
+# Grouped under a category, with the text shown for the rows it removes
 cf_criterion(~ !is.na(age), label = "Age recorded",
-             type = "include", category = "Valid age")
+             type = "include", category = "Valid age", reason = "Age missing")
 
 # Group-level inclusion (clusters with >= 5 participants)
 cf_criterion(
