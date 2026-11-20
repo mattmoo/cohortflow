@@ -29,7 +29,7 @@ values are handled, and the step types for grouped data.
 
 | Builder | Acts on | Keeps | Typical use |
 |---|---|---|---|
-| `include()` | each row | rows where the condition is `TRUE` | "Aged 18 or over" |
+| `include()` | each row | rows where the condition is `TRUE` | "Aged 18 or over" (`reason`: "Under 18") |
 | `exclude()` | each row | rows where the condition is not `TRUE` | "Withdrew consent" |
 | `group_include()` | each group (`by`) | every row of groups where the condition is `TRUE` | "Cluster recruited 20 or more" |
 | `group_exclude()` | each group (`by`) | every row of groups where the condition is not `TRUE` | "Site closed early" |
@@ -86,34 +86,52 @@ complex closures may not survive the round trip.
 ## Labels and categories
 
 Every step needs a `label`. It names the step in printed flows,
-attrition tables and diagrams. A `category` groups consecutive steps under
-one heading.
+attrition tables and diagrams. Write it the way the step reads:
+
+- For `include()`, `group_include()` and `select_within()` the label
+  describes the rows **kept** ("Aged 18 or over").
+- For `exclude()` and `group_exclude()` it describes the rows **removed**
+  ("Withdrew consent").
+
+Inclusion steps can also take a `reason`, describing the rows they remove
+("Under 18"). Diagrams use it in exclusion boxes. Exclusion steps don't need
+one, because their label already says who was removed.
+
+A `category` groups consecutive steps under one heading.
 
 ```{r}
 crit <- cf_criteria() |>
-  include(~ !is.na(age), label = "Age recorded", category = "Age") |>
-  include(~ age >= 18, label = "Aged 18 or over", category = "Age") |>
-  include(~ eligible_screen, label = "Passed screening") |>
+  include(~ !is.na(age), label = "Age recorded", reason = "Age missing",
+          category = "Age") |>
+  include(~ age >= 18, label = "Aged 18 or over", reason = "Under 18",
+          category = "Age") |>
+  include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
   exclude(~ withdrew, label = "Withdrew consent")
 
 flow <- apply_criteria(dat, crit, id = "participant_id")
 ```
 
-Here is where each label ends up in the diagram:
+Here is where each piece of text ends up in the diagram:
 
-```{r, fig.width = 5.9, fig.height = 3.8, fig.alt = "CONSORT diagram with an Age category box listing its two steps as exclusion reasons, followed by Passed screening and Withdrew consent boxes."}
+```{r, fig.width = 5.9, fig.height = 3.8, fig.alt = "CONSORT diagram: an Age category box whose exclusion box lists Age missing and Under 18; a Passed screening box beside a Failed screening exclusion box; a Withdrew consent exclusion box above a Remaining box."}
 as_consort_diagram(flow)
 ```
 
-- A **main box** shows the label of the step (or category) and the number
-  remaining *after* it.
-- A **side box** shows how many that step removed. For a categorised step it
-  also lists each step's label with its own count.
+Every number sits beside text that describes those people:
 
-Both places use the same label, so it needs to make sense in both. Short,
-neutral descriptions of the condition ("Age recorded", "Consent") usually
-work best. If you need different wording in a report, the attrition tibble
-is plain data you can relabel.
+- A **main box** shows the number remaining after the step. An inclusion
+  step shows its label there; a category shows the category name; an
+  exclusion step shows "Remaining" (`remaining_label`), since its label is
+  about the people who left.
+- A **side box** shows how many the step removed: beside the `reason` for an
+  inclusion step, or beside the label for an exclusion step. A category's
+  side box lists each step's reason with its own count.
+
+An inclusion step with no `reason` gets a side box that just says
+"Excluded". Inside a category it would be listed under its label, which
+reads backwards ("Aged 18 or over (n=6)" for six people under 18), so
+`as_consort_diagram()` warns and asks for a `reason`. Attrition tables list
+every step by its label beside a "Removed" column.
 
 Categories only group *consecutive* steps, because reordering steps would
 change the counts. If a category's steps are split up, cohortflow warns and

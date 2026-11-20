@@ -39,9 +39,9 @@ dat <- mock_parallel_rct(n_participants = 200, seed = 5)
 invited <- cf_expected(participant_id = sprintf("P%04d", 1:220))
 
 crit <- cf_criteria() |>
-  include(~ !is.na(arm), label = "Record received") |>
-  include(~ eligible_screen, label = "Passed screening") |>
-  include(~ !is.na(consent_date), label = "Consented")
+  include(~ !is.na(arm), label = "Record received", reason = "No record received") |>
+  include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
+  include(~ !is.na(consent_date), label = "Consented", reason = "Did not consent")
 
 flow <- apply_criteria(dat, crit, id = "participant_id",
                        expected = invited, by = "participant_id")
@@ -79,8 +79,8 @@ diagram show the whole study.
 
 ```{r}
 stage1 <- cf_criteria() |>
-  include(~ eligible_screen, label = "Passed screening") |>
-  include(~ !is.na(consent_date), label = "Consented")
+  include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
+  include(~ !is.na(consent_date), label = "Consented", reason = "Did not consent")
 
 flow1 <- apply_criteria(dat, stage1, id = "participant_id")
 
@@ -93,8 +93,8 @@ followup <- data.frame(
 )
 
 stage2 <- cf_criteria() |>
-  include(~ outcome_recorded, label = "Outcome recorded") |>
-  include(~ weeks_followed >= 8, label = "Followed up for 8 weeks or more")
+  include(~ outcome_recorded, label = "Outcome recorded", reason = "Outcome missing") |>
+  include(~ weeks_followed >= 8, label = "Followed up for 8 weeks or more", reason = "Followed up under 8 weeks")
 
 flow2 <- continue_criteria(flow1, stage2, join = followup, by = "participant_id")
 flow2

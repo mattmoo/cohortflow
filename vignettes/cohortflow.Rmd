@@ -55,13 +55,13 @@ allocated, so later reports can show what happened in each arm afterwards.
 
 ```{r}
 crit <- cf_criteria() |>
-  include(~ !is.na(age), label = "Age recorded", category = "Age") |>
-  include(~ age >= 18, label = "Aged 18 or over", category = "Age") |>
-  include(~ eligible_screen, label = "Passed screening") |>
-  include(~ !is.na(consent_date), label = "Consented") |>
+  include(~ !is.na(age), label = "Age recorded", reason = "Age missing", category = "Age") |>
+  include(~ age >= 18, label = "Aged 18 or over", reason = "Under 18", category = "Age") |>
+  include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
+  include(~ !is.na(consent_date), label = "Consented", reason = "Did not consent") |>
   randomise(by = "participant_id", arms = "arm") |>
   exclude(~ withdrew, label = "Withdrew consent") |>
-  include(~ baseline_complete, label = "Baseline complete")
+  include(~ baseline_complete, label = "Baseline complete", reason = "Baseline incomplete")
 
 crit
 ```
@@ -136,9 +136,13 @@ diagram <- as_consort_diagram(flow)
 diagram
 ```
 
-Each main box shows the step label and how many people remain after that
-step. Each side box shows how many that step removed, with the reasons
-listed when the step belongs to a category (here, *Age*).
+Each main box shows how many people remain after a step, and each side box
+how many that step removed, each beside text that describes those people.
+An inclusion step's label ("Passed screening") goes on the main box and its
+`reason` ("Failed screening") on the side box. An exclusion step's label
+("Withdrew consent") goes on the side box, and the main box below it reads
+"Remaining". A category's side box lists the reason for each of its steps
+(here, *Age*).
 
 The diagram is a ggplot. Save it for a manuscript with
 `save_consort_diagram()`, which picks the format from the file extension and

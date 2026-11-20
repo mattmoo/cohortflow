@@ -11,13 +11,13 @@ library(cohortflow)
 
 dat <- mock_parallel_rct(n_participants = 300, seed = 2024)
 crit <- cf_criteria() |>
-  include(~ !is.na(age), label = "Age recorded", category = "Age") |>
-  include(~ age >= 18, label = "Aged 18 or over", category = "Age") |>
-  include(~ eligible_screen, label = "Passed screening") |>
-  include(~ !is.na(consent_date), label = "Consented") |>
+  include(~ !is.na(age), label = "Age recorded", reason = "Age missing", category = "Age") |>
+  include(~ age >= 18, label = "Aged 18 or over", reason = "Under 18", category = "Age") |>
+  include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
+  include(~ !is.na(consent_date), label = "Consented", reason = "Did not consent") |>
   randomise(by = "participant_id", arms = "arm") |>
   exclude(~ withdrew, label = "Withdrew consent") |>
-  include(~ baseline_complete, label = "Baseline complete")
+  include(~ baseline_complete, label = "Baseline complete", reason = "Baseline incomplete")
 flow <- apply_criteria(dat, crit, id = "participant_id")
 ```
 
@@ -130,27 +130,30 @@ When the pipeline contains `randomise()`, the final row is broken down by
 arm automatically (see the Control and Intervention columns above). Without
 a `randomise()` step, name the column with `branch_by`.
 
-For designs with several rows per person, add `count_by` so the arm columns
-count people rather than rows. In this crossover trial each participant has
-one row per period:
+For designs with several rows per person, count people rather than rows with
+`count_by`. In this crossover trial each participant has one row per period.
+`count_by` names a level of the flow's hierarchy (or that level's column), so
+the flow is built with a one-level `cf_hierarchy()`:
 
 ```{r}
 co <- mock_crossover(n_participants = 120, seed = 11)
 flow_co <- apply_criteria(
   co,
   cf_criteria() |>
-    include(~ eligible_screen, label = "Passed screening") |>
-    include(~ !is.na(consent_date), label = "Consented") |>
+    include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
+    include(~ !is.na(consent_date), label = "Consented", reason = "Did not consent") |>
     exclude(~ withdrew, label = "Withdrew"),
-  id = "event_id"
+  id = "event_id",
+  hierarchy = cf_hierarchy(participant = "participant_id")
 )
 
 as_attrition_tibble(flow_co, branch_by = "sequence", count_by = "participant_id")
 ```
 
-`count_by` applies only to the arm columns: the `n` column still counts rows
-(here, participant-periods). To count people throughout, use
-[hierarchy levels](hierarchical-designs.html).
+Every count is now of people: `n`, `n_removed`, the percentages and the arm
+columns. A person counts as removed at the step where they lose their last
+row. To report several levels side by side (for example clusters and
+participants), use [hierarchy levels](hierarchical-designs.html) instead.
 
 ## Grids by site and period
 
@@ -165,7 +168,7 @@ sw <- mock_stepped_wedge(n_clusters = 8, n_participants = 400,
 flow_sw <- apply_criteria(
   sw,
   cf_criteria() |>
-    include(~ !is.na(consent_date), label = "Consented") |>
+    include(~ !is.na(consent_date), label = "Consented", reason = "Did not consent") |>
     exclude(~ withdrew, label = "Withdrew"),
   id = "event_id"
 )

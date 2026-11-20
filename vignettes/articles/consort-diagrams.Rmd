@@ -22,10 +22,10 @@ with `save_consort_diagram()`.
 
 ```{r, fig.width = 5.9, fig.height = 3.8, fig.alt = "Linear CONSORT diagram: 300 assessed; an Age box with 279 after listing two age exclusion reasons; then Passed screening 253 and Consented 226."}
 crit <- cf_criteria() |>
-  include(~ !is.na(age), label = "Age recorded", category = "Age") |>
-  include(~ age >= 18, label = "Aged 18 or over", category = "Age") |>
-  include(~ eligible_screen, label = "Passed screening") |>
-  include(~ !is.na(consent_date), label = "Consented")
+  include(~ !is.na(age), label = "Age recorded", reason = "Age missing", category = "Age") |>
+  include(~ age >= 18, label = "Aged 18 or over", reason = "Under 18", category = "Age") |>
+  include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
+  include(~ !is.na(consent_date), label = "Consented", reason = "Did not consent")
 
 flow <- apply_criteria(dat, crit, id = "participant_id")
 as_consort_diagram(flow)
@@ -40,6 +40,23 @@ as_consort_diagram(flow)
 - The last box is the final cohort (`final_label`).
 
 `show_categories = FALSE` draws every step as its own box.
+
+### Which text goes in which box
+
+Each number sits beside text that describes those people, so a box never
+says "Withdrew consent (n=226)" about the people who stayed:
+
+| Step | Main box (number remaining) | Side box (number removed) |
+|---|---|---|
+| `include(~ age >= 18, "Aged 18 or over", reason = "Under 18")` | Aged 18 or over | Under 18 |
+| `include()` with no `reason` | its label | Excluded |
+| `exclude(~ withdrew, "Withdrew consent")` | Remaining (`remaining_label`) | Withdrew consent |
+| Steps sharing a `category` | the category | each step's `reason`, listed |
+
+An inclusion step's label says who is **kept**, so give it a `reason` that
+says who is **removed**. Inside a category the reasons are listed, and a step
+without one would be listed under its label ("Aged 18 or over (n=6)" for six
+people under 18). `as_consort_diagram()` warns when that happens.
 
 ## Styling
 
@@ -89,7 +106,7 @@ is how CONSORT asks for post-allocation losses to be reported.
 crit_rct <- crit |>
   randomise(by = "participant_id", arms = "arm") |>
   exclude(~ withdrew, label = "Withdrew consent") |>
-  include(~ baseline_complete, label = "Baseline complete")
+  include(~ baseline_complete, label = "Baseline complete", reason = "Baseline incomplete")
 
 flow_rct <- apply_criteria(dat, crit_rct, id = "participant_id")
 as_consort_diagram(flow_rct)
@@ -116,8 +133,9 @@ Rows where the `branch_by` column is `NA` get their own box, labelled by
 In a crossover trial every participant receives each treatment in turn.
 `stage_by` adds one box per period beneath each sequence, and
 `stage_label_by` labels each period with the treatment given in it. Each
-participant has one row per period, so `count_by` makes the sequence and
-period boxes count participants:
+participant has one row per period, so `count_by` makes every box count
+participants. It names a level of the flow's hierarchy, so the flow is built
+with `hierarchy =`:
 
 ```{r, fig.width = 5.8, fig.height = 5.4, fig.alt = "Crossover CONSORT diagram: after randomisation the AB and BA sequences each show period boxes for treatments A then B, or B then A."}
 co <- mock_crossover(n_participants = 120, seed = 11)
@@ -125,10 +143,11 @@ co <- mock_crossover(n_participants = 120, seed = 11)
 flow_co <- apply_criteria(
   co,
   cf_criteria() |>
-    include(~ eligible_screen, label = "Passed screening") |>
-    include(~ !is.na(consent_date), label = "Consented") |>
+    include(~ eligible_screen, label = "Passed screening", reason = "Failed screening") |>
+    include(~ !is.na(consent_date), label = "Consented", reason = "Did not consent") |>
     exclude(~ withdrew, label = "Withdrew"),
-  id = "event_id"
+  id = "event_id",
+  hierarchy = cf_hierarchy(participant = "participant_id")
 )
 
 as_consort_diagram(
@@ -141,10 +160,10 @@ as_consort_diagram(
 )
 ```
 
-Note that `count_by` applies to the sequence and period boxes only. The
-shared trunk above them still counts rows, here participant-periods (two
-per person). Say so in the figure legend, or apply the criteria to one row
-per participant if the trunk must count people.
+The trunk, sequence and period boxes all count people, so they add up. A
+participant counts as removed at the step where they lose their last
+period. Without `count_by`, every box would count participant-periods (two
+per person).
 
 ## Saving for publication
 
