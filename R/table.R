@@ -947,6 +947,8 @@ as_attrition_table <- function(
         "`levels` cannot be combined with `group_x`/`group_y`/`branch_by`/`count_by`."
       )
     }
+    # `NULL` means every level, finest to coarsest, as in `as_attrition_tibble()`.
+    if (is.null(levels) && !is.null(flow$hierarchy)) levels <- names(flow$hierarchy)
 
     level_labels_resolved <- .resolve_level_labels(levels, level_labels)
 
@@ -1308,6 +1310,9 @@ as_attrition_table <- function(
   )
 
   gt_tbl <- gt::gt(df) |>
+    # Empty cells (e.g. the header row's removed count, arm columns off the
+    # final row) show blank, as in the flextable and huxtable backends.
+    gt::sub_missing(missing_text = "") |>
     # Hide the helper column
     gt::cols_hide(".row") |>
     # Column labels
@@ -1730,6 +1735,9 @@ as_attrition_table <- function(
   }))
 
   gt_tbl <- gt::gt(df) |>
+    # Empty cells (e.g. the header row's removed count, arm columns off the
+    # final row) show blank, as in the flextable and huxtable backends.
+    gt::sub_missing(missing_text = "") |>
     gt::cols_hide(".row") |>
     gt::cols_label(.list = label_values) |>
     gt::cols_align(align = "right", columns = value_cols) |>
@@ -2156,6 +2164,9 @@ as_attrition_table <- function(
   value_cols <- unlist(lapply(grid$levels, function(lvl) unname(grid$level_cols[[lvl]])))
 
   gt_tbl <- gt::gt(df) |>
+    # Empty cells (e.g. the header row's removed count, arm columns off the
+    # final row) show blank, as in the flextable and huxtable backends.
+    gt::sub_missing(missing_text = "") |>
     gt::cols_hide(".row") |>
     gt::cols_label(.list = label_values) |>
     gt::cols_align(align = "right", columns = value_cols) |>

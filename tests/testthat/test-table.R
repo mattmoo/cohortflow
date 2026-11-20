@@ -588,6 +588,32 @@ test_that("as_attrition_table() with gt accepts branch_by", {
   expect_s3_class(gt_tbl, "gt_tbl")
 })
 
+test_that("as_attrition_table(levels = NULL) shows every hierarchy level", {
+  skip_if_not_installed("gt")
+
+  flow <- make_flow_hierarchy()
+  expect_equal(
+    as_attrition_table(flow, backend = "gt", levels = NULL)[["_data"]],
+    as_attrition_table(flow, backend = "gt", levels = c("participant", "cluster"))[["_data"]]
+  )
+})
+
+test_that("gt tables show empty cells as blank, not NA", {
+  skip_if_not_installed("gt")
+
+  no_na_cells <- function(gt_tbl) {
+    html <- as.character(gt::as_raw_html(gt_tbl, inline_css = FALSE))
+    expect_false(grepl(">\\s*NA\\s*<", html))
+  }
+  no_na_cells(as_attrition_table(make_flow_parallel_rct(), backend = "gt", branch_by = "arm"))
+  no_na_cells(as_attrition_table(make_flow_stepped_wedge(), backend = "gt",
+                                 group_x = "site_id", group_y = "period"))
+  no_na_cells(as_attrition_table(make_flow_hierarchy(), backend = "gt",
+                                 levels = c("participant", "cluster")))
+  no_na_cells(as_characteristics_table(make_flow_parallel_rct(), vars = c("age", "sex"),
+                                       backend = "gt"))
+})
+
 test_that("as_attrition_table() with huxtable accepts branch_by", {
   skip_if_not_installed("huxtable")
 
