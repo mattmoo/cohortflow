@@ -895,8 +895,10 @@ as_consort_diagram <- function(
 
         anchor_y <- branch_anchor_df$y[b]
         anchor_h <- branch_anchor_df$h[b]
-        stage_y_start <- anchor_y - anchor_h / 2 - 0.06
-        stage_spacing <- 0.08
+        # Stage boxes stack edge to edge below the branch box, `gap_y` apart,
+        # so taller (wrapped) labels push later stages down rather than
+        # overlapping them.
+        stage_top <- anchor_y - anchor_h / 2 - gap_y
 
         for (s in seq_len(n_stages)) {
           stage_val   <- stages[s]
@@ -917,7 +919,8 @@ as_consort_diagram <- function(
           label <- sprintf("%s\n(n=%s)", stage_label, .format_n(stage_n, big_mark))
           dims <- .consort_box_dims(label, wrap_width = wrap_width)
 
-          stage_y <- stage_y_start - (s - 1) * stage_spacing
+          stage_y <- stage_top - dims$h / 2
+          stage_top <- stage_top - dims$h - gap_y
 
           stage_rows[[row_idx]] <- data.frame(
             id = paste0("stage_box_", b, "_", s),
