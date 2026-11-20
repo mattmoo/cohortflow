@@ -6,6 +6,13 @@
   each other. Stages (e.g. crossover periods) now stack below their branch
   box with the same gap as the rest of the diagram, and a wrapped label
   pushes later stages down instead of overlapping them.
+* The gt backend of `as_attrition_table()` and `as_characteristics_table()`
+  now leaves empty cells blank, as flextable and huxtable do. Previously it
+  printed `NA` in the header row's removed count and in every arm column
+  above the final row.
+* `as_attrition_table(levels = NULL)` now shows every hierarchy level, as
+  documented and as `as_attrition_tibble(levels = NULL)` does. Previously it
+  failed with an internal subsetting error.
 
 # cohortflow 0.0.0.9014
 
