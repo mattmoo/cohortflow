@@ -57,7 +57,7 @@ identified by `event_id`, and `count_by` makes the sequence and period boxes
 count participants.
 
 ```{r}
-co <- mock_crossover(n_participants = 150, arm_labels = c("Drug", "Placebo"), seed = 1)
+co <- mock_crossover(n_participants = 150, seed = 1)
 
 crit_co <- cf_criteria() |>
   include(~ eligible_screen, label = "Met inclusion criteria") |>
