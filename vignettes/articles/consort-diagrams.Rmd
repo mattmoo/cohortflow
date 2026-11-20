@@ -1,0 +1,186 @@
+---
+title: "CONSORT diagrams"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.align = "center")
+```
+
+```{r setup, message = FALSE}
+library(cohortflow)
+
+dat <- mock_parallel_rct(n_participants = 300, seed = 2024)
+```
+
+`as_consort_diagram()` draws a CONSORT-style flow diagram from a `cf_flow`.
+It is built from the same attrition tibble as `as_attrition_table()`, so the
+numbers in the diagram and the table always match. The result is a ggplot,
+so it prints anywhere a plot does and can be saved at publication quality
+with `save_consort_diagram()`.
+
+## Reading the diagram
+
+```{r, fig.width = 5.9, fig.height = 3.8, fig.alt = "Linear CONSORT diagram: 300 assessed; an Age box with 279 after listing two age exclusion reasons; then Passed screening 253 and Consented 226."}
+crit <- cf_criteria() |>
+  include(~ !is.na(age), label = "Age recorded", category = "Age") |>
+  include(~ age >= 18, label = "Aged 18 or over", category = "Age") |>
+  include(~ eligible_screen, label = "Passed screening") |>
+  include(~ !is.na(consent_date), label = "Consented")
+
+flow <- apply_criteria(dat, crit, id = "participant_id")
+as_consort_diagram(flow)
+```
+
+- The top box is everyone assessed (`assessed_label`).
+- Each main box below it is a step, or a category of consecutive steps,
+  showing **how many remain after it**.
+- The side box on the arrow into a main box shows **how many that step
+  removed**, as a count and a percentage of those entering it. For a
+  category, the box lists each step's own count.
+- The last box is the final cohort (`final_label`).
+
+`show_categories = FALSE` draws every step as its own box.
+
+## Styling
+
+The defaults suit journal submission: black outlines, no fill, 9-point text.
+Every element can be changed:
+
+```{r, fig.width = 5.8, fig.height = 4.9, fig.alt = "The same diagram with a title, teal outlines, pale fills and wrapped labels."}
+as_consort_diagram(
+  flow,
+  title = "Participant flow",
+  main_fill = "#E6F2F1",
+  excl_fill = "#FFF4E5",
+  border_colour = "#0B6E69",
+  border_linewidth = 0.4,
+  text_size = 10,
+  wrap_width = 26,
+  assessed_label = "Referred to the study",
+  final_label = "Eligible and consented"
+)
+```
+
+| Argument | Controls |
+|---|---|
+| `main_fill`, `excl_fill` | Fill of the main and side boxes (default none) |
+| `border_colour`, `border_linewidth` | Box outlines and arrows |
+| `text_size`, `text_colour`, `font_family` | Box text |
+| `title`, `title_colour` | Optional title above the diagram |
+| `wrap_width` | Wrap long labels at this many characters |
+| `digits`, `big_mark` | Percentage decimals and the thousands separator (`"1,234"`) |
+| `arrow_size` | Arrowhead length, in inches |
+
+Because the diagram is a ggplot, ggplot2 layers and themes can be added:
+
+```{r, fig.width = 5.9, fig.height = 4.1, fig.alt = "The default diagram with a caption added underneath."}
+as_consort_diagram(flow) +
+  ggplot2::labs(caption = "Synthetic data from mock_parallel_rct().")
+```
+
+## Randomised trials
+
+Add a `randomise()` step and the diagram splits there. Everything before it
+is one shared trunk. At the randomisation box it divides into one column
+per arm, and every later step is counted separately within each arm, which
+is how CONSORT asks for post-allocation losses to be reported.
+
+```{r, fig.width = 10.2, fig.height = 6.5, fig.alt = "CONSORT diagram that splits after the Randomised box into Control and Intervention columns, each with its own withdrawal and baseline exclusions."}
+crit_rct <- crit |>
+  randomise(by = "participant_id", arms = "arm") |>
+  exclude(~ withdrew, label = "Withdrew consent") |>
+  include(~ baseline_complete, label = "Baseline complete")
+
+flow_rct <- apply_criteria(dat, crit_rct, id = "participant_id")
+as_consort_diagram(flow_rct)
+```
+
+The arm column comes from the `arms` argument of `randomise()`. To split on
+a different column, pass `branch_by`.
+
+## Splitting without a randomisation step
+
+Without `randomise()`, `branch_by` splits the final cohort into one box per
+value of a column. That suits a cohort study reported by exposure group, or
+a trial whose allocation happened before the data begins:
+
+```{r, fig.width = 6.3, fig.height = 4.5, fig.alt = "Linear diagram ending in a final cohort box that splits into Control and Intervention boxes."}
+as_consort_diagram(flow, branch_by = "arm", final_label = "Allocated")
+```
+
+Rows where the `branch_by` column is `NA` get their own box, labelled by
+`branch_na_label`.
+
+## Crossover trials
+
+In a crossover trial every participant receives each treatment in turn.
+`stage_by` adds one box per period beneath each sequence, and
+`stage_label_by` labels each period with the treatment given in it. Each
+participant has one row per period, so `count_by` makes the sequence and
+period boxes count participants:
+
+```{r, fig.width = 5.8, fig.height = 5.4, fig.alt = "Crossover CONSORT diagram: after randomisation the AB and BA sequences each show period boxes for treatments A then B, or B then A."}
+co <- mock_crossover(n_participants = 120, seed = 11)
+
+flow_co <- apply_criteria(
+  co,
+  cf_criteria() |>
+    include(~ eligible_screen, label = "Passed screening") |>
+    include(~ !is.na(consent_date), label = "Consented") |>
+    exclude(~ withdrew, label = "Withdrew"),
+  id = "event_id"
+)
+
+as_consort_diagram(
+  flow_co,
+  branch_by = "sequence",
+  stage_by = "period",
+  stage_label_by = "arm",
+  count_by = "participant_id",
+  final_label = "Randomised"
+)
+```
+
+Note that `count_by` applies to the sequence and period boxes only. The
+shared trunk above them still counts rows, here participant-periods (two
+per person). Say so in the figure legend, or apply the criteria to one row
+per participant if the trunk must count people.
+
+## Saving for publication
+
+`save_consort_diagram()` writes PNG, TIFF, JPEG, PDF, SVG or EPS, choosing
+the format from the file extension. By default the page is sized from the
+diagram's layout so the text fits its boxes, at 300 dpi for raster formats:
+
+```{r, eval = FALSE}
+diagram <- as_consort_diagram(flow_rct)
+
+save_consort_diagram(diagram, "figure1.pdf")             # vector, fonts embedded
+save_consort_diagram(diagram, "figure1.tiff", dpi = 600) # many journals want TIFF
+save_consort_diagram(diagram, "figure1.svg")             # editable in Inkscape/Illustrator
+save_consort_diagram(flow_rct, "figure1.png")            # a flow works too, with default styling
+```
+
+Give only `width` (or only `height`) to fix one dimension and keep the
+aspect ratio. Text is always drawn at `text_size` points, so to fit a wide
+diagram, such as a two-arm trial, into a single journal column, build it
+with a smaller `text_size` rather than shrinking the page:
+
+```{r, eval = FALSE}
+small <- as_consort_diagram(flow_rct, text_size = 7)
+save_consort_diagram(small, "figure1-column.pdf")
+```
+
+In R Markdown or Quarto, print the diagram in a chunk and set `fig-width`
+and `fig-height` to roughly the size `save_consort_diagram()` would choose.
+
+## Under the hood
+
+The box and arrow positions are attached to the diagram, in case you want
+to draw it some other way or check the layout:
+
+```{r}
+layout <- attr(as_consort_diagram(flow_rct), "consort_layout")
+names(layout)
+head(layout$main_boxes[, c("label", "x", "y", "w", "h")])
+```

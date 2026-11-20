@@ -1,0 +1,166 @@
+---
+title: "Staged pipelines and missing units"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.align = "center")
+```
+
+```{r setup, message = FALSE}
+library(cohortflow)
+```
+
+Real eligibility rarely happens in one pass over one tidy table. This
+article covers three situations the basic workflow doesn't:
+
+1. **Units that never appear in the data.** Someone was invited but has no
+   record, so they are silently missing from the denominator.
+2. **Eligibility assessed in stages.** Some criteria can only be checked
+   after data is collected later, such as an outcome or a processed
+   measurement.
+3. **Looking at the cohort part-way through**, or keeping every row with a
+   flag instead of filtering.
+
+## Units with no record: `cf_expected()`
+
+`apply_criteria()` starts from the rows in your data. A unit with no row at
+all, such as an invited participant who never returned a form or a
+scheduled visit that was never logged, is not counted anywhere. Often that
+is the largest loss in the study, and it is invisible.
+
+`cf_expected()` lists the units that *should* exist. Passed as `expected`,
+it is joined to the data before any step runs, so missing units appear as
+empty rows that the first step can count.
+
+Here 220 people were invited, but the data has records for only 200:
+
+```{r}
+dat <- mock_parallel_rct(n_participants = 200, seed = 5)
+invited <- cf_expected(participant_id = sprintf("P%04d", 1:220))
+
+crit <- cf_criteria() |>
+  include(~ !is.na(arm), label = "Record received") |>
+  include(~ eligible_screen, label = "Passed screening") |>
+  include(~ !is.na(consent_date), label = "Consented")
+
+flow <- apply_criteria(dat, crit, id = "participant_id",
+                       expected = invited, by = "participant_id")
+flow
+```
+
+`apply_criteria()` reports how many expected units had no match. If that
+number is unexpectedly large, the join key is usually at fault (for example
+`"P0001"` against `"1"`), not the data collection.
+
+`cf_expected()` builds every combination of its arguments, which suits
+repeated measures. For example, every participant at every scheduled
+visit:
+
+```{r}
+cf_expected(participant_id = c("P0001", "P0002"),
+            visit = c("baseline", "6 weeks", "12 weeks"))
+```
+
+The first step should test a column that every real record has, so that
+"no record" is counted on its own line rather than mixed into a later step.
+
+## Eligibility in stages: `continue_criteria()`
+
+Suppose screening and consent are assessed first, then outcome data is
+collected for those who passed, and the final criteria depend on that new
+data. Running `apply_criteria()` a second time on the survivors would start
+the counts again from the reduced cohort: the second table's denominator
+would leave out every stage-one loss, and the diagram would show only half
+the study.
+
+`continue_criteria()` instead adds steps to the existing flow, optionally
+joining new columns first. The step numbers continue on, and the tables and
+diagram show the whole study.
+
+```{r}
+stage1 <- cf_criteria() |>
+  include(~ eligible_screen, label = "Passed screening") |>
+  include(~ !is.na(consent_date), label = "Consented")
+
+flow1 <- apply_criteria(dat, stage1, id = "participant_id")
+
+# Later: follow-up data for those still in the study
+set.seed(1)
+followup <- data.frame(
+  participant_id = cohort(flow1)$participant_id,
+  weeks_followed = round(rnorm(nrow(cohort(flow1)), mean = 12, sd = 3)),
+  outcome_recorded = runif(nrow(cohort(flow1))) > 0.1
+)
+
+stage2 <- cf_criteria() |>
+  include(~ outcome_recorded, label = "Outcome recorded") |>
+  include(~ weeks_followed >= 8, label = "Followed up for 8 weeks or more")
+
+flow2 <- continue_criteria(flow1, stage2, join = followup, by = "participant_id")
+flow2
+```
+
+```{r, fig.width = 6.6, fig.height = 4.6, fig.alt = "CONSORT diagram covering both stages: 200 assessed, then screening, consent, outcome recorded and follow-up steps in one cascade."}
+as_consort_diagram(flow2, wrap_width = 30)
+```
+
+The new columns are joined onto *every* original row, so rows excluded at
+stage one have `NA` there. That is correct: those values were never
+measured for them.
+
+Two mistakes are caught before any step runs:
+
+```{r, error = TRUE}
+# The stage-two columns were never joined
+continue_criteria(flow1, stage2)
+
+# The join has two rows for one participant, which would duplicate them
+dup <- rbind(followup[1, ], followup)
+continue_criteria(flow1, stage2, join = dup, by = "participant_id")
+```
+
+The combined pipeline is stored in the flow, so `export_criteria()` writes
+both stages:
+
+```{r}
+length(flow2$criteria)
+```
+
+## The cohort at any step
+
+`cohort()` and `excluded()` take a step selector, meaning "up to and
+including this step":
+
+```{r}
+nrow(cohort(flow2, at = 0))            # step 0 is the starting data
+nrow(cohort(flow2, at = "Consented"))  # after stage one
+nrow(cohort(flow2))                    # the final cohort
+```
+
+`at` accepts a step number, a step label or a category name (meaning that
+category's last step). If a string could mean either a label or a category,
+use `label =` or `category =` explicitly.
+
+`excluded()` returns everyone removed up to the chosen step, with the step
+that removed them. Add `only = TRUE` for just the rows removed *at* that
+step:
+
+```{r}
+excluded(flow2, at = "Outcome recorded", only = TRUE)[, c("participant_id", "cf_step", "cf_label")]
+```
+
+## Flags instead of filtering
+
+Sometimes downstream code needs every row, for example to plot a complete
+recording or to compare everyone assessed with the analysed cohort.
+`cohort(flag = TRUE)` returns all rows in their original order, with columns
+saying whether each was included and, if not, which step removed it:
+
+```{r}
+flagged <- cohort(flow2, flag = TRUE)
+flagged[, c("participant_id", "cf_included", "cf_excluded_step", "cf_excluded_label")]
+```
+
+Combined with a step selector, the flags only consider steps up to that
+point, so `cohort(flow2, flag = TRUE, at = "Consented")` marks who was still
+in after stage one.
