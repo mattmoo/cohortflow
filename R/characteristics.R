@@ -698,6 +698,9 @@ as_characteristics_table <- function(flow,
   label_values <- c(list(label = variable_col_label), as.list(display$headers))
 
   gt_tbl <- gt::gt(df) |>
+    # Empty cells (e.g. the header row's removed count, arm columns off the
+    # final row) show blank, as in the flextable and huxtable backends.
+    gt::sub_missing(missing_text = "") |>
     gt::cols_label(.list = label_values) |>
     gt::cols_align(align = "right", columns = step_ids) |>
     gt::cols_align(align = "left", columns = "label") |>
