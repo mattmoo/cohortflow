@@ -5,6 +5,8 @@
 - **Matthew Moore**. Author, maintainer.
   [](https://orcid.org/0000-0003-0730-8027)
 
+- **Health Research Council of New Zealand**. Funder.
+
 ## Citation
 
 Source:

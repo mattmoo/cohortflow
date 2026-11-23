@@ -149,6 +149,11 @@ report](reference/figures/workflow.svg)
 
 cohortflow workflow: define criteria, apply them, then report
 
+## Funding
+
+Development of cohortflow was supported by the Health Research Council
+of New Zealand.
+
 ## License
 
 MIT. See [LICENSE](https://mattmoo.github.io/cohortflow/LICENSE).
