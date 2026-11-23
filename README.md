@@ -119,6 +119,11 @@ The [package website](https://mattmoo.github.io/cohortflow/) has the full
 
 ![cohortflow workflow: define criteria, apply them, then report](man/figures/workflow.svg)
 
+## Funding
+
+Development of cohortflow was supported by the Health Research Council of
+New Zealand.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
