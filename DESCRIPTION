@@ -2,8 +2,9 @@ Package: cohortflow
 Title: Define and Apply Cohort Inclusion/Exclusion Criteria
 Version: 0.0.0.9016
 Authors@R:
-    person("Matthew", "Moore", , "matthew.moore@auckland.ac.nz", role = c("aut", "cre"),
-           comment = c(ORCID = "0000-0003-0730-8027"))
+    c(person("Matthew", "Moore", , "matthew.moore@auckland.ac.nz", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0003-0730-8027")),
+    person("Health Research Council of New Zealand", role = "fnd"))
 Description: Define inclusion and exclusion criteria for cohort studies using
     formulas or functions, apply them to data, and render the resulting
     attrition flow as CONSORT flow diagrams, tables, or narrative text.
