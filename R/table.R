@@ -540,6 +540,23 @@ as_attrition_tibble <- function(
   )
 }
 
+# Records each step's type and removal text (`.step_reason()`) on the
+# attrition tibble's step rows, as `step_type` and `reason` columns (`NA` on
+# other rows). Every step contributes exactly one "step" row, in step order,
+# with or without categories, so the two line up by position. Used by
+# as_consort_diagram() and as_narrative().
+.annotate_step_reasons <- function(tbl, steps) {
+  step_rows <- which(tbl$row_type == "step")
+  if (length(step_rows) != length(steps)) {
+    rlang::abort("Internal error: attrition rows do not match the flow's steps.")
+  }
+  tbl$step_type <- NA_character_
+  tbl$reason    <- NA_character_
+  tbl$step_type[step_rows] <- vapply(steps, function(s) s$type, character(1L))
+  tbl$reason[step_rows]    <- vapply(steps, .step_reason, character(1L))
+  tbl
+}
+
 # Finds the first step of type "randomise" in a step-records list (each
 # element as recorded by `.run_criteria_steps()`), returning `NULL` if none
 # exists. Used to default `branch_by` and to compute `post_randomisation` in

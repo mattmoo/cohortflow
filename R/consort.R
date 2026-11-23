@@ -99,26 +99,11 @@
   c(header, reason_lines)
 }
 
-# The removal text of an attrition row annotated by .consort_annotate_steps(),
-# or "" when there is none (header/category/final rows, inclusion steps
-# without a `reason`).
+# The removal text of an attrition row annotated by .annotate_step_reasons()
+# (R/table.R), or "" when there is none (header/category/final rows,
+# inclusion steps without a `reason`).
 .consort_row_reason <- function(row) {
   if (!"reason" %in% names(row) || is.na(row$reason)) "" else row$reason
-}
-
-# Records each step's type and removal text on the attrition tibble's step
-# rows. Every step contributes exactly one "step" row, in step order, with or
-# without categories, so the two line up by position.
-.consort_annotate_steps <- function(tbl, steps) {
-  step_rows <- which(tbl$row_type == "step")
-  if (length(step_rows) != length(steps)) {
-    rlang::abort("Internal error: attrition rows do not match the flow's steps.")
-  }
-  tbl$step_type <- NA_character_
-  tbl$reason    <- NA_character_
-  tbl$step_type[step_rows] <- vapply(steps, function(s) s$type, character(1L))
-  tbl$reason[step_rows]    <- vapply(steps, .step_reason, character(1L))
-  tbl
 }
 
 # Main-box text for a group: the row's label beside the number remaining
@@ -591,7 +576,7 @@ as_consort_diagram <- function(
     digits          = digits,
     count_by        = count_by
   )
-  tbl <- .consort_annotate_steps(tbl, flow$steps)
+  tbl <- .annotate_step_reasons(tbl, flow$steps)
   .warn_missing_reasons(tbl)
 
   groups <- .consort_group_rows(tbl)
@@ -737,7 +722,7 @@ as_consort_diagram <- function(
           arm_flow, show_categories, assessed_label, final_label, digits,
           branch_by = NULL, count_by = count_by
         )
-        arm_tbl    <- .consort_annotate_steps(arm_tbl, arm_flow$steps)
+        arm_tbl    <- .annotate_step_reasons(arm_tbl, arm_flow$steps)
         arm_tbl    <- arm_tbl[arm_tbl$row_type != "header", , drop = FALSE]
         arm_groups <- .consort_group_rows(arm_tbl)
 

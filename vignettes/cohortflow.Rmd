@@ -183,7 +183,26 @@ article covers this and overlapping exclusion reasons.
 > visible with a separate "Age recorded" step. See [Missing
 > values](writing-criteria.html#missing-values) for a worked example.
 
-## 7. Save the criteria
+## 7. Writing it up
+
+The methods section usually describes the same flow in words.
+`as_narrative()` writes that paragraph from the flow, so its numbers match
+the table and the diagram. Each step is described by its `reason`, and after
+randomisation each sentence gives the counts for each arm:
+
+```{r}
+as_narrative(flow)
+```
+
+Use `style = "bullets"` to get one sentence per line, which is easier to
+edit into a draft. Set `unit` to the noun your study counts (for example
+"patients"). Read the text through and adapt it to the journal's style.
+
+```{r}
+as_narrative(flow, style = "bullets", unit = "people")
+```
+
+## 8. Save the criteria
 
 A criteria pipeline can be written to YAML and read back, so the exact
 definitions can be kept under version control, shared with collaborators or
