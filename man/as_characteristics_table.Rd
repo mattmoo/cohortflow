@@ -149,6 +149,7 @@ Other reporting:
 \code{\link[=as_attrition_tibble]{as_attrition_tibble()}},
 \code{\link[=as_characteristics_tibble]{as_characteristics_tibble()}},
 \code{\link[=as_consort_diagram]{as_consort_diagram()}},
+\code{\link[=as_narrative]{as_narrative()}},
 \code{\link[=save_consort_diagram]{save_consort_diagram()}}
 }
 \concept{reporting}
