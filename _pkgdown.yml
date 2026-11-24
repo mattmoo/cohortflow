@@ -18,7 +18,19 @@ home:
     and report the attrition as CONSORT flow diagrams, attrition tables and
     step-wise Table 1s, including cluster and stepped-wedge designs.
   sidebar:
-    structure: [links, license, community, citation, authors, dev]
+    structure: [links, license, community, citation, authors, llm, dev]
+    components:
+      llm:
+        title: LLM use
+        text: >
+          Developed with help from AI coding assistants (GitHub Copilot and
+          Claude Code). [Read the LLM use statement](articles/llm-use.html).
+
+footer:
+  structure:
+    left: [developed_by, llm]
+  components:
+    llm: "Developed with AI assistance; see the [LLM use statement](https://mattmoo.github.io/cohortflow/articles/llm-use.html)."
 
 navbar:
   structure:
@@ -40,6 +52,10 @@ articles:
     contents:
       - hierarchical-designs
       - articles/design-gallery
+  - title: About
+    navbar: ~
+    contents:
+      - articles/llm-use
 
 reference:
   - title: Defining criteria
