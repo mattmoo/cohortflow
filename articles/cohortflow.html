@@ -21,7 +21,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">cohortflow</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9016</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9017</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -1372,12 +1372,54 @@ values</a> for a worked example.</p>
 </blockquote>
 </div>
 <div class="section level2">
-<h2 id="save-the-criteria">7. Save the criteria<a class="anchor" aria-label="anchor" href="#save-the-criteria"></a>
+<h2 id="writing-it-up">7. Writing it up<a class="anchor" aria-label="anchor" href="#writing-it-up"></a>
+</h2>
+<p>The methods section usually describes the same flow in words.
+<code><a href="../reference/as_narrative.html">as_narrative()</a></code> writes that paragraph from the flow, so its
+numbers match the table and the diagram. Each step is described by its
+<code>reason</code>, and after randomisation each sentence gives the
+counts for each arm:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/as_narrative.html">as_narrative</a></span><span class="op">(</span><span class="va">flow</span><span class="op">)</span></span></code></pre></div>
+<p>Of 300 participants assessed for eligibility, 21 (7.0%) were
+excluded: age missing (n = 15) and under 18 (n = 6). A further 26 (9.3%)
+were excluded (failed screening). A further 27 (10.7%) were excluded
+(did not consent), leaving 226. The remaining 226 were randomised to
+Control (n = 121) and Intervention (n = 105). After randomisation, 3
+(2.5%) in Control and 5 (4.8%) in Intervention were excluded (withdrew
+consent). A further 11 (9.3%) in Control and 12 (12.0%) in Intervention
+were excluded (baseline incomplete). The final cohort comprised 195
+participants (65.0% of those assessed): 107 in Control and 88 in
+Intervention.</p>
+<p>Use <code>style = "bullets"</code> to get one sentence per line,
+which is easier to edit into a draft. Set <code>unit</code> to the noun
+your study counts (for example “patients”). Read the text through and
+adapt it to the journal’s style.</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/as_narrative.html">as_narrative</a></span><span class="op">(</span><span class="va">flow</span>, style <span class="op">=</span> <span class="st">"bullets"</span>, unit <span class="op">=</span> <span class="st">"people"</span><span class="op">)</span></span></code></pre></div>
+<ul>
+<li>Of 300 people assessed for eligibility, 21 (7.0%) were excluded: age
+missing (n = 15) and under 18 (n = 6).</li>
+<li>A further 26 (9.3%) were excluded (failed screening).</li>
+<li>A further 27 (10.7%) were excluded (did not consent), leaving
+226.</li>
+<li>The remaining 226 were randomised to Control (n = 121) and
+Intervention (n = 105).</li>
+<li>After randomisation, 3 (2.5%) in Control and 5 (4.8%) in
+Intervention were excluded (withdrew consent).</li>
+<li>A further 11 (9.3%) in Control and 12 (12.0%) in Intervention were
+excluded (baseline incomplete).</li>
+<li>The final cohort comprised 195 people (65.0% of those assessed): 107
+in Control and 88 in Intervention.</li>
+</ul>
+</div>
+<div class="section level2">
+<h2 id="save-the-criteria">8. Save the criteria<a class="anchor" aria-label="anchor" href="#save-the-criteria"></a>
 </h2>
 <p>A criteria pipeline can be written to YAML and read back, so the
 exact definitions can be kept under version control, shared with
 collaborators or attached to a protocol:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">yml</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/export_criteria.html">export_criteria</a></span><span class="op">(</span><span class="va">crit</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">yml</span><span class="op">)</span></span>
 <span><span class="co">#&gt; cohortflow_criteria:</span></span>

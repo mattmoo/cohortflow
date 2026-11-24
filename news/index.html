@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">cohortflow</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9016</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9017</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -53,6 +53,13 @@
       <small>Source: <a href="https://github.com/mattmoo/cohortflow/blob/master/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.0.0.9017" id="cohortflow-0009017">cohortflow 0.0.0.9017<a class="anchor" aria-label="anchor" href="#cohortflow-0009017"></a></h2>
+<div class="section level3">
+<h3 id="new-features-0-0-0-9017">New features<a class="anchor" aria-label="anchor" href="#new-features-0-0-0-9017"></a></h3>
+<ul><li>New <code><a href="../reference/as_narrative.html">as_narrative()</a></code> writes the attrition cascade as a paragraph for a methods section: “Of 200 participants assessed for eligibility, 16 (8.0%) were excluded: age missing (n = 10) and under 18 (n = 6). …” The numbers come from <code><a href="../reference/as_attrition_tibble.html">as_attrition_tibble()</a></code>, and after a <code><a href="../reference/randomise.html">randomise()</a></code> step from the same per-arm counts as <code><a href="../reference/as_consort_diagram.html">as_consort_diagram()</a></code>, so the text agrees with the table and diagram. There is one sentence per category (or per step), each step described by its <code>reason</code> (an inclusion step without one reads <code>not meeting "&lt;label&gt;"</code>), per-arm sentences after randomisation, and a final-cohort sentence broken down by arm. <code>count_by</code> counts units as in the table; <code>unit</code> sets the noun; <code>style = "bullets"</code> gives one sentence per line. The result prints wrapped to the console and drops into R Markdown and Quarto documents as text.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.0.0.9016" id="cohortflow-0009016">cohortflow 0.0.0.9016<a class="anchor" aria-label="anchor" href="#cohortflow-0009016"></a></h2>
 <div class="section level3">

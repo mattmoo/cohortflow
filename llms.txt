@@ -240,6 +240,14 @@ Get the cohort, the excluded rows, and each row’s status at every step.
 
   Print method for `consort_diagram` objects
 
+## Methods text
+
+The same flow written as a paragraph for a methods section.
+
+- [`as_narrative()`](https://mattmoo.github.io/cohortflow/reference/as_narrative.md)
+  [`print(`*`<cf_narrative>`*`)`](https://mattmoo.github.io/cohortflow/reference/as_narrative.md)
+  : Describe a cohort flow in words, for a methods section
+
 ## Baseline characteristics
 
 Step-wise “Table 1” of the cohort, or of the rows removed, at each step.

@@ -258,9 +258,17 @@ These are not in the current backlog but would add significant value:
 
 ### Reporting & Output
 
-**Narrative text generation** — Auto-generate methods-section paragraph
-from attrition log (e.g., *“Of 500 patients assessed, 17 were excluded
-due to age…”*)
+**Narrative text generation** — *Done:*
+`as_narrative(flow, assessed_label, unit, count_by, big_mark, digits, show_categories, drop_randomise, lowercase_reasons, style)`
+returns a `cf_narrative` string (print and `knit_print` methods): one
+sentence per category or step using each step’s `reason`
+(`not meeting "<label>"` for an inclusion step without one), a
+randomisation sentence, per-arm sentences with counts matching
+[`as_consort_diagram()`](https://mattmoo.github.io/cohortflow/reference/as_consort_diagram.md),
+and a final-cohort sentence; serial-comma lists; `style = "bullets"` for
+one sentence per line. Original brief: Auto-generate methods-section
+paragraph from attrition log (e.g., *“Of 500 patients assessed, 17 were
+excluded due to age…”*)
 
 **Quarto/R Markdown integration** — Helper to embed CONSORT diagram or
 attrition table directly into a report chunk

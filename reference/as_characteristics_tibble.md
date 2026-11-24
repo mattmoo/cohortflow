@@ -204,6 +204,7 @@ Other reporting:
 [`as_attrition_tibble()`](https://mattmoo.github.io/cohortflow/reference/as_attrition_tibble.md),
 [`as_characteristics_table()`](https://mattmoo.github.io/cohortflow/reference/as_characteristics_table.md),
 [`as_consort_diagram()`](https://mattmoo.github.io/cohortflow/reference/as_consort_diagram.md),
+[`as_narrative()`](https://mattmoo.github.io/cohortflow/reference/as_narrative.md),
 [`save_consort_diagram()`](https://mattmoo.github.io/cohortflow/reference/save_consort_diagram.md)
 
 ## Examples

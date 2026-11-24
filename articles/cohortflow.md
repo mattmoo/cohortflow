@@ -291,7 +291,53 @@ article covers this and overlapping exclusion reasons.
 > values](https://mattmoo.github.io/cohortflow/articles/writing-criteria.html#missing-values)
 > for a worked example.
 
-## 7. Save the criteria
+## 7. Writing it up
+
+The methods section usually describes the same flow in words.
+[`as_narrative()`](https://mattmoo.github.io/cohortflow/reference/as_narrative.md)
+writes that paragraph from the flow, so its numbers match the table and
+the diagram. Each step is described by its `reason`, and after
+randomisation each sentence gives the counts for each arm:
+
+``` r
+
+as_narrative(flow)
+```
+
+Of 300 participants assessed for eligibility, 21 (7.0%) were excluded:
+age missing (n = 15) and under 18 (n = 6). A further 26 (9.3%) were
+excluded (failed screening). A further 27 (10.7%) were excluded (did not
+consent), leaving 226. The remaining 226 were randomised to Control (n =
+121) and Intervention (n = 105). After randomisation, 3 (2.5%) in
+Control and 5 (4.8%) in Intervention were excluded (withdrew consent). A
+further 11 (9.3%) in Control and 12 (12.0%) in Intervention were
+excluded (baseline incomplete). The final cohort comprised 195
+participants (65.0% of those assessed): 107 in Control and 88 in
+Intervention.
+
+Use `style = "bullets"` to get one sentence per line, which is easier to
+edit into a draft. Set `unit` to the noun your study counts (for example
+“patients”). Read the text through and adapt it to the journal’s style.
+
+``` r
+
+as_narrative(flow, style = "bullets", unit = "people")
+```
+
+- Of 300 people assessed for eligibility, 21 (7.0%) were excluded: age
+  missing (n = 15) and under 18 (n = 6).
+- A further 26 (9.3%) were excluded (failed screening).
+- A further 27 (10.7%) were excluded (did not consent), leaving 226.
+- The remaining 226 were randomised to Control (n = 121) and
+  Intervention (n = 105).
+- After randomisation, 3 (2.5%) in Control and 5 (4.8%) in Intervention
+  were excluded (withdrew consent).
+- A further 11 (9.3%) in Control and 12 (12.0%) in Intervention were
+  excluded (baseline incomplete).
+- The final cohort comprised 195 people (65.0% of those assessed): 107
+  in Control and 88 in Intervention.
+
+## 8. Save the criteria
 
 A criteria pipeline can be written to YAML and read back, so the exact
 definitions can be kept under version control, shared with collaborators

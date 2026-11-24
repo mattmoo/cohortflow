@@ -1,5 +1,28 @@
 # Changelog
 
+## cohortflow 0.0.0.9017
+
+### New features
+
+- New
+  [`as_narrative()`](https://mattmoo.github.io/cohortflow/reference/as_narrative.md)
+  writes the attrition cascade as a paragraph for a methods section: “Of
+  200 participants assessed for eligibility, 16 (8.0%) were excluded:
+  age missing (n = 10) and under 18 (n = 6). …” The numbers come from
+  [`as_attrition_tibble()`](https://mattmoo.github.io/cohortflow/reference/as_attrition_tibble.md),
+  and after a
+  [`randomise()`](https://mattmoo.github.io/cohortflow/reference/randomise.md)
+  step from the same per-arm counts as
+  [`as_consort_diagram()`](https://mattmoo.github.io/cohortflow/reference/as_consort_diagram.md),
+  so the text agrees with the table and diagram. There is one sentence
+  per category (or per step), each step described by its `reason` (an
+  inclusion step without one reads `not meeting "<label>"`), per-arm
+  sentences after randomisation, and a final-cohort sentence broken down
+  by arm. `count_by` counts units as in the table; `unit` sets the noun;
+  `style = "bullets"` gives one sentence per line. The result prints
+  wrapped to the console and drops into R Markdown and Quarto documents
+  as text.
+
 ## cohortflow 0.0.0.9016
 
 ### Breaking changes
