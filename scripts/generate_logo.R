@@ -10,8 +10,11 @@
 # branch off to a dashed box on the right. Everything is laid out from the
 # parameters below, so changing `cohort` redraws the whole thing.
 #
-# PNG rendering uses rsvg if it is installed, otherwise headless Chrome (set
-# the CHROME environment variable if it is not in a standard location).
+# The wordmark is set in Inter, embedded in the SVG as a subset fetched from
+# Google Fonts, so the script needs an internet connection (as does
+# build_favicons()). PNG rendering uses headless Chrome (set the CHROME
+# environment variable if it is not in a standard location), falling back to
+# rsvg, which ignores embedded fonts.
 
 # ---- Parameters -------------------------------------------------------------
 
@@ -46,9 +49,11 @@ arrow_gap    <- 7    # gap between an arrow tip and the box it points at
 
 wordmark      <- "cohortflow"
 wordmark_y    <- 476
-wordmark_size <- 66
-wordmark_len  <- 330 # fixed width, so the text fits whatever font renders it
-font_family   <- "Segoe UI, Helvetica Neue, Arial, sans-serif"
+wordmark_size <- 62
+wordmark_track <- -1.5 # letter-spacing, px
+font_name     <- "Inter"
+font_weight   <- 700
+font_family   <- paste(font_name, "Segoe UI, Helvetica Neue, Arial, sans-serif", sep = ", ")
 
 svg_path <- "man/figures/logo.svg"
 png_path <- "man/figures/logo.png"
@@ -74,6 +79,27 @@ tag <- function(name, ..., .content = NULL) {
 dots <- function(n, cx, cy, fill) {
   xs <- cx + (seq_len(n) - (n + 1) / 2) * dot_gap
   vapply(xs, function(x) tag("circle", cx = x, cy = cy, r = dot_r, fill = fill), "")
+}
+
+# An SVG used as an <img> cannot load web fonts, and few viewers have Inter
+# installed, so embed it: Google Fonts serves a subset holding only the glyphs
+# in `text`, which keeps it to a couple of KB.
+embed_font <- function(family, weight, text) {
+  ua <- c(`User-Agent` = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36")
+  css_url <- sprintf("https://fonts.googleapis.com/css2?family=%s:wght@%d&text=%s",
+                     utils::URLencode(family), weight, utils::URLencode(text, reserved = TRUE))
+  con <- url(css_url, headers = ua)
+  css <- paste(readLines(con, warn = FALSE), collapse = "\n")
+  close(con)
+  font_url <- regmatches(css, regexpr("https://fonts\\.gstatic\\.com/[^)]+", css))
+  if (!length(font_url)) stop("No font URL in Google Fonts response:\n", css)
+  tmp <- tempfile(fileext = ".woff2")
+  utils::download.file(font_url, tmp, mode = "wb", quiet = TRUE, headers = ua)
+  b64 <- jsonlite::base64_enc(readBin(tmp, "raw", file.size(tmp)))
+  b64 <- gsub("\\s", "", b64)
+  sprintf(paste0("@font-face{font-family:'%s';font-weight:%d;",
+                 "src:url(data:font/woff2;base64,%s) format('woff2');}"),
+          family, weight, b64)
 }
 
 # Pointy-top hexagon whose outer stroke edge spans the full height.
@@ -129,9 +155,8 @@ body <- c(
   paste0("  ", unlist(Map(dots, excluded, excl_x + excl_w / 2, branch_y, pal$excluded))),
   "  <!-- name -->",
   paste0("  ", tag("text", x = hex$width / 2, y = wordmark_y, `text-anchor` = "middle",
-                   `font-family` = font_family, `font-size` = wordmark_size, `font-weight` = 700,
-                   fill = pal$text, textLength = wordmark_len, lengthAdjust = "spacingAndGlyphs",
-                   .content = wordmark))
+                   `font-family` = font_family, `font-size` = wordmark_size, `font-weight` = font_weight,
+                   `letter-spacing` = wordmark_track, fill = pal$text, .content = wordmark))
 )
 
 svg <- c(
@@ -140,6 +165,7 @@ svg <- c(
           fmt(hex$width), hex_height, fmt(hex$width), hex_height),
   '  <title id="t">cohortflow</title>',
   "  <defs>",
+  paste0("    <style>", embed_font(font_name, font_weight, wordmark), "</style>"),
   paste0('    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5"',
          ' orient="auto">'),
   paste0('      <path d="M0,0 L10,5 L0,10 z" fill="', pal$line, '"/>'),
@@ -169,10 +195,7 @@ find_chrome <- function() {
   if (length(candidates)) candidates[[1]] else NULL
 }
 
-if (requireNamespace("rsvg", quietly = TRUE)) {
-  rsvg::rsvg_png(svg_path, png_path, width = png_w, height = png_h)
-  message("Wrote ", png_path, " (rsvg)")
-} else if (!is.null(chrome <- find_chrome())) {
+if (!is.null(chrome <- find_chrome())) {
   html <- tempfile(fileext = ".html")
   svg_url <- paste0("file:///", normalizePath(svg_path, winslash = "/"))
   writeLines(sprintf(
@@ -188,6 +211,10 @@ if (requireNamespace("rsvg", quietly = TRUE)) {
   ), stdout = FALSE, stderr = FALSE)
   if (status != 0 || !file.exists(png_path)) stop("Chrome failed to render ", png_path)
   message("Wrote ", png_path, " (headless Chrome)")
+} else if (requireNamespace("rsvg", quietly = TRUE)) {
+  rsvg::rsvg_png(svg_path, png_path, width = png_w, height = png_h)
+  warning("Rendered ", png_path, " with rsvg, which ignores the embedded font; ",
+          "the wordmark will use a fallback font. Install Chrome for an exact render.")
 } else {
   warning("Neither rsvg nor Chrome found; ", png_path, " not updated.")
 }
