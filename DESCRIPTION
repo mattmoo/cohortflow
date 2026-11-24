@@ -11,8 +11,9 @@ Description: Define inclusion and exclusion criteria for cohort studies using
     Supports hierarchical designs (participants nested in clusters/sites) and
     flexible grouping for reporting. Criteria pipelines can be serialised to
     YAML for reproducibility and sharing.
-    Parts of this package were developed with the assistance of GitHub Copilot
-    (powered by Claude), an AI coding assistant.
+    Parts of this package were developed with the assistance of AI coding
+    assistants (GitHub Copilot and Claude Code, using Claude models from
+    Anthropic); see the LLM use statement on the package website.
 License: MIT + file LICENSE
 URL: https://mattmoo.github.io/cohortflow/,
     https://github.com/mattmoo/cohortflow

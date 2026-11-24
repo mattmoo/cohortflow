@@ -1,5 +1,12 @@
 # cohortflow 0.0.0.9017
 
+## Documentation
+
+* cohortflow has a hex logo.
+* The website has an LLM use statement (`vignettes/articles/llm-use.Rmd`)
+  saying which AI coding assistants were used, for what, and how their output
+  was checked. It is linked from the home-page sidebar and every page footer.
+
 ## New features
 
 * New `as_narrative()` writes the attrition cascade as a paragraph for a
