@@ -21,3 +21,8 @@
   designs](https://mattmoo.github.io/cohortflow/articles/hierarchical-designs.md):
 - [Study design
   gallery](https://mattmoo.github.io/cohortflow/articles/design-gallery.md):
+
+### About
+
+- [LLM use
+  statement](https://mattmoo.github.io/cohortflow/articles/llm-use.md):
