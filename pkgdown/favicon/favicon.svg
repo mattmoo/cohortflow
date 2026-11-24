@@ -1,26 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 600" width="520" height="600" role="img" aria-labelledby="t"><metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:creator>RealFaviconGenerator</dc:creator><dc:source>https://realfavicongenerator.net</dc:source></rdf:Description></rdf:RDF></metadata><title id="t">cohortflow</title><defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 519.6 600" width="519.6" height="600" role="img" aria-labelledby="t"><metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:creator>RealFaviconGenerator</dc:creator><dc:source>https://realfavicongenerator.net</dc:source></rdf:Description></rdf:RDF></metadata><title id="t">cohortflow</title><defs>
     <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
       <path d="M0,0 L10,5 L0,10 z" fill="#FFFFFF"></path>
     </marker>
-  </defs><polygon points="260,9.2 511.8,154.6 511.8,445.4 260,590.8 8.2,445.4 8.2,154.6" fill="#0B6E69" stroke="#073F3C" stroke-width="16" stroke-linejoin="round"></polygon><g stroke="#FFFFFF" stroke-width="5" fill="none" stroke-linecap="round">
-    <path d="M210,181 V229" marker-end="url(#arr)"></path>
-    <path d="M210,208 H340" marker-end="url(#arr)"></path>
-    <path d="M210,291 V339" marker-end="url(#arr)"></path>
-    <path d="M210,318 H340" marker-end="url(#arr)"></path>
-  </g><g fill="#FFFFFF">
-    <rect x="105" y="125" width="210" height="56" rx="12"></rect>
-    <rect x="135" y="235" width="150" height="56" rx="12"></rect>
-    <rect x="158" y="345" width="104" height="56" rx="12"></rect>
-  </g><g fill="#0B6E69">
-    <circle cx="135" cy="153" r="11"></circle><circle cx="165" cy="153" r="11"></circle><circle cx="195" cy="153" r="11"></circle>
-    <circle cx="225" cy="153" r="11"></circle><circle cx="255" cy="153" r="11"></circle><circle cx="285" cy="153" r="11"></circle>
-    <circle cx="165" cy="263" r="11"></circle><circle cx="195" cy="263" r="11"></circle>
-    <circle cx="225" cy="263" r="11"></circle><circle cx="255" cy="263" r="11"></circle>
-    <circle cx="180" cy="373" r="11"></circle><circle cx="210" cy="373" r="11"></circle><circle cx="240" cy="373" r="11"></circle>
-  </g><g fill="#FFFFFF" fill-opacity="0.1" stroke="#FFFFFF" stroke-width="3" stroke-dasharray="7 5">
-    <rect x="348" y="186" width="90" height="44" rx="10"></rect>
-    <rect x="348" y="296" width="90" height="44" rx="10"></rect>
-  </g><g fill="#F2A541">
-    <circle cx="378" cy="208" r="11"></circle><circle cx="408" cy="208" r="11"></circle>
-    <circle cx="393" cy="318" r="11"></circle>
-  </g><text x="260" y="476" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="66" font-weight="700" fill="#FFFFFF" textLength="330" lengthAdjust="spacingAndGlyphs">cohortflow</text></svg>
+  </defs><polygon points="259.8,9.2 8,154.6 8,445.4 259.8,590.8 511.6,445.4 511.6,154.6" fill="#0B6E69" stroke="#073F3C" stroke-width="16" stroke-linejoin="round"></polygon><g stroke="#FFFFFF" stroke-width="5" fill="none" stroke-linecap="round">
+    <path d="M210,181 V228" marker-end="url(#arr)"></path>
+    <path d="M210,291 V338" marker-end="url(#arr)"></path>
+    <path d="M210,208 H341" marker-end="url(#arr)"></path>
+    <path d="M210,318 H341" marker-end="url(#arr)"></path>
+  </g><rect x="105" y="125" width="210" height="56" rx="12" fill="#FFFFFF"></rect><rect x="135" y="235" width="150" height="56" rx="12" fill="#FFFFFF"></rect><rect x="150" y="345" width="120" height="56" rx="12" fill="#FFFFFF"></rect><circle cx="135" cy="153" r="11" fill="#0B6E69"></circle><circle cx="165" cy="153" r="11" fill="#0B6E69"></circle><circle cx="195" cy="153" r="11" fill="#0B6E69"></circle><circle cx="225" cy="153" r="11" fill="#0B6E69"></circle><circle cx="255" cy="153" r="11" fill="#0B6E69"></circle><circle cx="285" cy="153" r="11" fill="#0B6E69"></circle><circle cx="165" cy="263" r="11" fill="#0B6E69"></circle><circle cx="195" cy="263" r="11" fill="#0B6E69"></circle><circle cx="225" cy="263" r="11" fill="#0B6E69"></circle><circle cx="255" cy="263" r="11" fill="#0B6E69"></circle><circle cx="180" cy="373" r="11" fill="#0B6E69"></circle><circle cx="210" cy="373" r="11" fill="#0B6E69"></circle><circle cx="240" cy="373" r="11" fill="#0B6E69"></circle><rect x="348" y="186" width="90" height="44" rx="10" fill="#FFFFFF" fill-opacity="0.1" stroke="#FFFFFF" stroke-width="3" stroke-dasharray="7 5"></rect><rect x="348" y="296" width="90" height="44" rx="10" fill="#FFFFFF" fill-opacity="0.1" stroke="#FFFFFF" stroke-width="3" stroke-dasharray="7 5"></rect><circle cx="378" cy="208" r="11" fill="#F2A541"></circle><circle cx="408" cy="208" r="11" fill="#F2A541"></circle><circle cx="393" cy="318" r="11" fill="#F2A541"></circle><text x="259.8" y="476" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="66" font-weight="700" fill="#FFFFFF" textLength="330" lengthAdjust="spacingAndGlyphs">cohortflow</text></svg>
