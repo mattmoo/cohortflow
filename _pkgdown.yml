@@ -26,11 +26,15 @@ home:
           Developed with help from AI coding assistants (GitHub Copilot and
           Claude Code). [Read the LLM use statement](articles/llm-use.html).
 
+authors:
+  footer:
+    roles: [aut, cre]
+
 footer:
   structure:
     left: [developed_by, llm]
   components:
-    llm: "Developed with AI assistance; see the [LLM use statement](https://mattmoo.github.io/cohortflow/articles/llm-use.html)."
+    llm: "Written with AI assistance; see the [LLM use statement](https://mattmoo.github.io/cohortflow/articles/llm-use.html)."
 
 navbar:
   structure:
