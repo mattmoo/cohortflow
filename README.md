@@ -1,4 +1,4 @@
-# cohortflow
+# cohortflow <img src="man/figures/logo.png" align="right" height="139" alt="cohortflow hex logo" />
 
 [![R-CMD-check](https://github.com/mattmoo/cohortflow/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/mattmoo/cohortflow/actions/workflows/R-CMD-check.yaml)
 [![lint](https://github.com/mattmoo/cohortflow/actions/workflows/lint.yaml/badge.svg)](https://github.com/mattmoo/cohortflow/actions/workflows/lint.yaml)
